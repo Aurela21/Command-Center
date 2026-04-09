@@ -1,0 +1,33 @@
+import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/db";
+import { scenes } from "@/db/schema";
+import { eq, asc } from "drizzle-orm";
+import type { NewScene } from "@/db/schema";
+
+type Params = { params: Promise<{ id: string }> };
+
+export async function GET(_req: NextRequest, { params }: Params) {
+  const { id } = await params;
+  const rows = await db
+    .select()
+    .from(scenes)
+    .where(eq(scenes.projectId, id))
+    .orderBy(asc(scenes.sceneOrder));
+  return NextResponse.json(rows);
+}
+
+export async function POST(req: NextRequest, { params }: Params) {
+  const { id: projectId } = await params;
+  const body = await req.json();
+
+  // Accept a single scene object or an array (for bulk creation on manifest approval)
+  const inputs: Omit<NewScene, "id" | "createdAt" | "updatedAt">[] = (
+    Array.isArray(body) ? body : [body]
+  ).map((s) => ({ ...s, projectId }));
+
+  const created = await db.insert(scenes).values(inputs).returning();
+
+  return NextResponse.json(Array.isArray(body) ? created : created[0], {
+    status: 201,
+  });
+}

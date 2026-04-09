@@ -1,0 +1,494 @@
+"use client";
+
+import { useState, useRef, useEffect, useCallback } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import {
+  AlertCircle,
+  BookOpen,
+  Check,
+  FileText,
+  Loader2,
+  RefreshCw,
+  Search,
+  Trash2,
+  Upload,
+  X,
+} from "lucide-react";
+import { toast } from "sonner";
+import type { KnowledgeDocument } from "@/db/schema";
+import type { SearchResult } from "@/app/api/knowledge/search/route";
+
+// ─── Status badge ─────────────────────────────────────────────────────────────
+
+function StatusBadge({ status }: { status: string | null }) {
+  if (status === "ready") {
+    return (
+      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600">
+        <Check className="h-3 w-3" />
+        Ready
+      </span>
+    );
+  }
+  if (status === "processing") {
+    return (
+      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600">
+        <Loader2 className="h-3 w-3 animate-spin" />
+        Processing
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-red-500">
+      <AlertCircle className="h-3 w-3" />
+      Error
+    </span>
+  );
+}
+
+// ─── Upload zone ─────────────────────────────────────────────────────────────
+
+type UploadState =
+  | { kind: "idle" }
+  | { kind: "uploading"; filename: string; progress: number }
+  | { kind: "processing"; filename: string }
+  | { kind: "done" }
+  | { kind: "error"; message: string };
+
+function UploadZone({ onDone }: { onDone: () => void }) {
+  const [state, setState] = useState<UploadState>({ kind: "idle" });
+  const inputRef = useRef<HTMLInputElement>(null);
+  const xhrRef = useRef<XMLHttpRequest | null>(null);
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    startUpload(file);
+    // Reset input so the same file can be re-selected
+    e.target.value = "";
+  }
+
+  async function startUpload(file: File) {
+    setState({ kind: "uploading", filename: file.name, progress: 0 });
+
+    try {
+      // 1. Get presigned PUT URL
+      const urlRes = await fetch(
+        `/api/knowledge/upload-url?filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(file.type || "application/octet-stream")}`
+      );
+      if (!urlRes.ok) {
+        const err = await urlRes.json().catch(() => ({}));
+        throw new Error((err as { error?: string }).error ?? "Failed to get upload URL");
+      }
+      const { uploadUrl, key, fileType } = (await urlRes.json()) as {
+        uploadUrl: string;
+        key: string;
+        fileType: string;
+      };
+
+      // 2. XHR PUT to R2 with progress
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhrRef.current = xhr;
+        xhr.open("PUT", uploadUrl);
+        xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            setState({
+              kind: "uploading",
+              filename: file.name,
+              progress: Math.round((e.loaded / e.total) * 100),
+            });
+          }
+        };
+        xhr.onload = () =>
+          xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Upload failed: ${xhr.status}`));
+        xhr.onerror = () => reject(new Error("Network error during upload"));
+        xhr.send(file);
+      });
+
+      // 3. Create document record (background processing starts automatically)
+      setState({ kind: "processing", filename: file.name });
+      const docRes = await fetch("/api/knowledge/documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: file.name, fileUrl: key, fileType }),
+      });
+      if (!docRes.ok) throw new Error("Failed to create document record");
+
+      setState({ kind: "done" });
+      onDone();
+      setTimeout(() => setState({ kind: "idle" }), 2000);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Upload failed";
+      setState({ kind: "error", message: msg });
+      toast.error(msg);
+    }
+  }
+
+  if (state.kind === "idle") {
+    return (
+      <div>
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".pdf,.docx,.txt,.md"
+          className="hidden"
+          onChange={handleFileChange}
+        />
+        <Button
+          onClick={() => inputRef.current?.click()}
+          className="gap-2 bg-neutral-900 hover:bg-neutral-700 text-white h-9 text-sm"
+        >
+          <Upload className="h-3.5 w-3.5" />
+          Upload document
+        </Button>
+      </div>
+    );
+  }
+
+  if (state.kind === "uploading") {
+    return (
+      <div className="flex items-center gap-3 text-sm text-neutral-600">
+        <Loader2 className="h-4 w-4 animate-spin shrink-0 text-blue-500" />
+        <div className="flex-1 min-w-0">
+          <p className="truncate text-xs font-medium">{state.filename}</p>
+          <div className="mt-1 h-1 bg-neutral-100 rounded-full overflow-hidden w-48">
+            <div
+              className="h-full bg-blue-500 rounded-full transition-all"
+              style={{ width: `${state.progress}%` }}
+            />
+          </div>
+        </div>
+        <span className="text-xs tabular-nums text-neutral-400 shrink-0">
+          {state.progress}%
+        </span>
+      </div>
+    );
+  }
+
+  if (state.kind === "processing") {
+    return (
+      <div className="flex items-center gap-2 text-sm text-neutral-600">
+        <Loader2 className="h-4 w-4 animate-spin shrink-0 text-blue-500" />
+        <span className="text-xs">Extracting &amp; embedding…</span>
+      </div>
+    );
+  }
+
+  if (state.kind === "done") {
+    return (
+      <div className="flex items-center gap-2 text-sm text-emerald-600">
+        <Check className="h-4 w-4 shrink-0" />
+        <span className="text-xs font-medium">Uploaded — processing in background</span>
+      </div>
+    );
+  }
+
+  // error state
+  return (
+    <div className="flex items-center gap-2 text-sm text-red-500">
+      <X className="h-4 w-4 shrink-0" />
+      <span className="text-xs">{state.kind === "error" ? state.message : "Error"}</span>
+      <button
+        onClick={() => setState({ kind: "idle" })}
+        className="text-xs underline hover:no-underline"
+      >
+        Try again
+      </button>
+    </div>
+  );
+}
+
+// ─── Document list item ───────────────────────────────────────────────────────
+
+function DocumentItem({
+  doc,
+  onDelete,
+  onReprocess,
+}: {
+  doc: KnowledgeDocument;
+  onDelete: (id: string) => void;
+  onReprocess: (id: string) => void;
+}) {
+  return (
+    <div className="flex items-center gap-4 px-4 py-3 border-b border-neutral-100 last:border-0 hover:bg-neutral-50/50 group transition-colors">
+      <div className="shrink-0">
+        <div className="w-9 h-9 rounded-lg bg-neutral-100 flex items-center justify-center">
+          <FileText className="h-4.5 w-4.5 text-neutral-400" />
+        </div>
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-neutral-800 truncate">{doc.name}</p>
+        <div className="flex items-center gap-3 mt-0.5">
+          <StatusBadge status={doc.status} />
+          {doc.status === "ready" && doc.totalChunks != null && (
+            <span className="text-[11px] text-neutral-400">
+              {doc.totalChunks} chunk{doc.totalChunks !== 1 ? "s" : ""}
+            </span>
+          )}
+          <span className="text-[11px] text-neutral-300">
+            {doc.fileType?.toUpperCase()}
+          </span>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        {doc.status === "error" && (
+          <button
+            onClick={() => onReprocess(doc.id)}
+            title="Retry processing"
+            className="p-1.5 rounded text-neutral-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+          </button>
+        )}
+        <button
+          onClick={() => onDelete(doc.id)}
+          title="Delete document"
+          className="p-1.5 rounded text-neutral-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Search panel ─────────────────────────────────────────────────────────────
+
+function SearchPanel() {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<SearchResult[] | null>(null);
+  const [searching, setSearching] = useState(false);
+
+  async function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    if (!query.trim()) return;
+    setSearching(true);
+    try {
+      const res = await fetch("/api/knowledge/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: query.trim(), topK: 6 }),
+      });
+      if (!res.ok) throw new Error("Search failed");
+      setResults(await res.json());
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Search failed");
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Search input */}
+      <form onSubmit={handleSearch} className="flex gap-2 mb-5">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search knowledge base…"
+            className="w-full pl-9 pr-4 py-2 text-sm border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-neutral-200 focus:border-neutral-300 transition-all placeholder:text-neutral-400"
+          />
+        </div>
+        <Button
+          type="submit"
+          disabled={searching || !query.trim()}
+          variant="outline"
+          className="h-9 px-4 text-sm gap-1.5"
+        >
+          {searching ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Search className="h-3.5 w-3.5" />
+          )}
+          Search
+        </Button>
+      </form>
+
+      {/* Results */}
+      <div className="flex-1 overflow-y-auto space-y-3">
+        {results === null ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <Search className="h-8 w-8 text-neutral-200 mb-3" />
+            <p className="text-sm text-neutral-400">
+              Search the knowledge base to find relevant chunks
+            </p>
+            <p className="text-xs text-neutral-300 mt-1">
+              Used by the script generator for RAG context
+            </p>
+          </div>
+        ) : results.length === 0 ? (
+          <p className="text-sm text-neutral-400 text-center py-10">
+            No results found
+          </p>
+        ) : (
+          results.map((r) => (
+            <div
+              key={r.id}
+              className="rounded-xl border border-neutral-100 bg-white p-4 space-y-2"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-neutral-700 truncate">
+                    {r.documentName}
+                  </p>
+                  {r.sectionTitle && (
+                    <p className="text-[11px] text-neutral-400 truncate">
+                      {r.sectionTitle}
+                    </p>
+                  )}
+                </div>
+                <span
+                  className={cn(
+                    "text-xs font-semibold tabular-nums shrink-0 px-2 py-0.5 rounded-full",
+                    r.similarity >= 0.8
+                      ? "bg-emerald-50 text-emerald-600"
+                      : r.similarity >= 0.6
+                      ? "bg-blue-50 text-blue-600"
+                      : "bg-neutral-100 text-neutral-500"
+                  )}
+                >
+                  {Math.round(r.similarity * 100)}%
+                </span>
+              </div>
+              <p className="text-xs text-neutral-600 leading-relaxed line-clamp-4">
+                {r.content}
+              </p>
+              <p className="text-[10px] text-neutral-300 tabular-nums">
+                chunk {r.chunkIndex}
+              </p>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Knowledge page ───────────────────────────────────────────────────────────
+
+export default function KnowledgePage() {
+  const qc = useQueryClient();
+
+  const { data: documents = [], isLoading } = useQuery<KnowledgeDocument[]>({
+    queryKey: ["knowledge-documents"],
+    queryFn: async () => {
+      const res = await fetch("/api/knowledge/documents");
+      if (!res.ok) throw new Error("Failed to fetch documents");
+      return res.json();
+    },
+    // Poll every 5s while any document is still processing
+    refetchInterval: (query) => {
+      const docs = query.state.data as KnowledgeDocument[] | undefined;
+      return docs?.some((d) => d.status === "processing") ? 5000 : false;
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/knowledge/documents/${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete");
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["knowledge-documents"] }),
+    onError: () => toast.error("Failed to delete document"),
+  });
+
+  const reprocessMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/knowledge/documents/${id}/process`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("Failed to reprocess");
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["knowledge-documents"] });
+      toast.success("Reprocessing started");
+    },
+    onError: () => toast.error("Failed to start reprocessing"),
+  });
+
+  const processingCount = documents.filter((d) => d.status === "processing").length;
+  const readyCount = documents.filter((d) => d.status === "ready").length;
+  const totalChunks = documents.reduce((sum, d) => sum + (d.totalChunks ?? 0), 0);
+
+  return (
+    <div className="h-full flex flex-col overflow-hidden bg-white">
+      {/* Header */}
+      <div className="shrink-0 px-8 py-5 border-b border-neutral-200">
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-base font-semibold text-neutral-900">
+              Knowledge Base
+            </h1>
+            <p className="text-xs text-neutral-400 mt-0.5">
+              {isLoading ? (
+                "Loading…"
+              ) : (
+                <>
+                  {documents.length} document{documents.length !== 1 ? "s" : ""}{" "}
+                  &middot; {readyCount} ready &middot; {totalChunks.toLocaleString()} chunks
+                  {processingCount > 0 && (
+                    <span className="text-blue-500 ml-1">
+                      &middot; {processingCount} processing…
+                    </span>
+                  )}
+                </>
+              )}
+            </p>
+          </div>
+          <UploadZone
+            onDone={() =>
+              qc.invalidateQueries({ queryKey: ["knowledge-documents"] })
+            }
+          />
+        </div>
+      </div>
+
+      {/* Content: two columns */}
+      <div className="flex-1 overflow-hidden flex">
+        {/* Left: document list */}
+        <div className="w-80 shrink-0 border-r border-neutral-200 overflow-y-auto">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="h-5 w-5 animate-spin text-neutral-300" />
+            </div>
+          ) : documents.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+              <div className="w-12 h-12 rounded-xl bg-neutral-100 flex items-center justify-center mb-3">
+                <BookOpen className="h-6 w-6 text-neutral-300" />
+              </div>
+              <p className="text-sm font-medium text-neutral-600">
+                No documents yet
+              </p>
+              <p className="text-xs text-neutral-400 mt-1 leading-relaxed">
+                Upload PDFs, DOCX, or TXT files to build your RAG knowledge base
+              </p>
+            </div>
+          ) : (
+            documents.map((doc) => (
+              <DocumentItem
+                key={doc.id}
+                doc={doc}
+                onDelete={(id) => deleteMutation.mutate(id)}
+                onReprocess={(id) => reprocessMutation.mutate(id)}
+              />
+            ))
+          )}
+        </div>
+
+        {/* Right: search */}
+        <div className="flex-1 overflow-hidden px-8 py-6">
+          <SearchPanel />
+        </div>
+      </div>
+    </div>
+  );
+}

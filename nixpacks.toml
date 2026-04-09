@@ -1,0 +1,5 @@
+[phases.setup]
+aptPkgs = ["ffmpeg", "ffprobe"]
+
+[start]
+cmd = "npm start"
