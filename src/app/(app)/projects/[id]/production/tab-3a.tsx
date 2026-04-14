@@ -314,6 +314,24 @@ function SeedDetailPanel({
         }))) as { error: string };
         throw new Error(error);
       }
+      // Use the response directly — don't rely on SSE
+      const data = (await res.json()) as {
+        assetVersionId: string;
+        imageUrl: string;
+      };
+      updateScene(scene.sceneId, {
+        seedGenerating: false,
+        seedVersions: [
+          ...scene.seedVersions,
+          {
+            id: data.assetVersionId,
+            createdAt: new Date().toISOString(),
+            qualityScore: 0,
+            color: scene.color,
+            imageUrl: data.imageUrl,
+          },
+        ],
+      });
     } catch (err) {
       console.error("[generate-seed]", err);
       updateScene(scene.sceneId, { seedGenerating: false });
