@@ -335,33 +335,33 @@ function SeedDetailPanel({
     }).catch(console.error);
   }
 
-  const [rejecting, setRejecting] = useState<string | null>(null);
-
   async function handleReject(versionId: string) {
-    setRejecting(versionId);
-    try {
-      const res = await fetch(`/api/projects/${projectId}/reject-version`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assetVersionId: versionId }),
-      });
-      if (!res.ok) throw new Error("Reject failed");
-      const { rejectionReason } = (await res.json()) as { rejectionReason: string };
-      // Update local state to mark as rejected
-      updateScene(scene.sceneId, {
-        seedVersions: scene.seedVersions.map((v) =>
-          v.id === versionId ? { ...v, isRejected: true, rejectionReason } : v
-        ),
-        // If the rejected version was approved, unapprove
-        ...(scene.approvedSeedVersionId === versionId
-          ? { approvedSeedVersionId: null, seedImageApproved: false }
-          : {}),
-      });
-    } catch (err) {
-      console.error("[reject]", err);
-    } finally {
-      setRejecting(null);
-    }
+    // Optimistically hide immediately
+    updateScene(scene.sceneId, {
+      seedVersions: scene.seedVersions.map((v) =>
+        v.id === versionId ? { ...v, isRejected: true } : v
+      ),
+      ...(scene.approvedSeedVersionId === versionId
+        ? { approvedSeedVersionId: null, seedImageApproved: false }
+        : {}),
+    });
+
+    // Fire Claude analysis in the background — UI already updated
+    fetch(`/api/projects/${projectId}/reject-version`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ assetVersionId: versionId }),
+    })
+      .then((res) => res.json())
+      .then(({ rejectionReason }: { rejectionReason: string }) => {
+        // Update with the analysis once it comes back
+        updateScene(scene.sceneId, {
+          seedVersions: scene.seedVersions.map((v) =>
+            v.id === versionId ? { ...v, isRejected: true, rejectionReason } : v
+          ),
+        });
+      })
+      .catch(console.error);
   }
 
   async function handleUnapprove() {
@@ -530,7 +530,6 @@ function SeedDetailPanel({
                 <div className="grid grid-cols-2 gap-3">
                   {active.map((v: SeedVersion, i: number) => {
                     const isApproved = v.id === scene.approvedSeedVersionId;
-                    const isRejecting = rejecting === v.id;
                     return (
                       <div
                         key={v.id}
@@ -565,15 +564,10 @@ function SeedDetailPanel({
                           {!isApproved && (
                             <button
                               onClick={() => handleReject(v.id)}
-                              disabled={isRejecting}
-                              className="absolute top-1.5 right-1.5 p-1.5 rounded-lg bg-black/40 text-white opacity-0 group-hover/card:opacity-100 transition-opacity hover:bg-red-500/80 disabled:opacity-50"
-                              title="Reject — Claude will analyze why it's bad"
+                              className="absolute top-1.5 right-1.5 p-1.5 rounded-lg bg-black/40 text-white opacity-0 group-hover/card:opacity-100 transition-opacity hover:bg-red-500/80"
+                              title="Reject"
                             >
-                              {isRejecting ? (
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                              ) : (
-                                <Trash2 className="h-3 w-3" />
-                              )}
+                              <Trash2 className="h-3 w-3" />
                             </button>
                           )}
                         </div>
