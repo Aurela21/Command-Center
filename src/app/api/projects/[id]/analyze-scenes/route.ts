@@ -105,6 +105,7 @@ For each scene:
 - endTimeMs: end time in milliseconds
 - referenceFrame: the single most representative frame number within this scene
 - description: 1–2 sentence description of what happens visually and narratively
+- klingPrompt: a concise motion/action prompt (max 35 words) describing exactly what happens in this scene segment — camera movement, subject action, physical motions, gestures. This should read like a Kling video generation prompt that would recreate this exact clip. Focus on MOTION not appearance.
 - targetClipDurationS: how long this clip should be in the final output (3.0–10.0, must match scene duration)
 
 IMPORTANT: scenes must be contiguous and cover the full video (0 to ${totalFrames} frames / ${durationMs}ms).
@@ -119,7 +120,8 @@ Return ONLY valid JSON with this exact shape:
       "startTimeMs": 0,
       "endTimeMs": 3000,
       "referenceFrame": 45,
-      "description": "...",
+      "description": "Person models cream hoodie, showing front zipper and overall fit",
+      "klingPrompt": "Model turns slowly to camera revealing hoodie front, hands adjust zipper, slight sway, static medium shot with soft rack focus",
       "targetClipDurationS": 3.0
     }
   ]
@@ -148,6 +150,7 @@ Frame reference: each image corresponds to frame ${frameEntries.map((f, i) => `$
         endTimeMs: number;
         referenceFrame: number;
         description: string;
+        klingPrompt?: string;
         targetClipDurationS: number;
       }>;
     };
@@ -176,6 +179,7 @@ Frame reference: each image corresponds to frame ${frameEntries.map((f, i) => `$
         referenceFrame: s.referenceFrame,
         referenceFrameUrl: refEntry?.r2Url ?? null,
         description: s.description,
+        scenePrompt: s.klingPrompt ?? null,
         targetClipDurationS: Math.min(Math.max(s.targetClipDurationS, 3.0), 15.0),
         boundarySource: "ai" as const,
       };
