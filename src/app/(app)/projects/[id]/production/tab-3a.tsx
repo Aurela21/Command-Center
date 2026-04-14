@@ -104,16 +104,13 @@ function SeedDetailPanel({
 }) {
   const generating = scene.seedGenerating ?? false;
 
-  // Fetch available @tags from product_assets
-  const [productTags, setProductTags] = useState<string[]>([]);
+  // Fetch available @tags from product profiles
+  const [productTags, setProductTags] = useState<Array<{ slug: string; name: string; imageCount: number }>>([]);
   useEffect(() => {
-    fetch("/api/knowledge/documents")
+    fetch("/api/products")
       .then((r) => r.json())
-      .then((docs: Array<{ name: string; category?: string; status: string }>) => {
-        const tags = docs
-          .filter((d) => d.category === "product_assets" && d.status === "ready")
-          .map((d) => d.name.replace(/\.[^.]+$/, "").replace(/[^a-z0-9_-]/gi, "-"));
-        setProductTags(tags);
+      .then((products: Array<{ slug: string; name: string; imageCount: number }>) => {
+        setProductTags(products.filter((p) => (p.imageCount ?? 0) > 0));
       })
       .catch(() => {});
   }, []);
@@ -233,20 +230,21 @@ function SeedDetailPanel({
         {productTags.length > 0 && (
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
             <ShoppingBag className="h-3 w-3 text-neutral-300 shrink-0" />
-            {productTags.map((tag) => (
+            {productTags.map((p) => (
               <button
-                key={tag}
+                key={p.slug}
                 type="button"
+                title={`${p.name} (${p.imageCount} images)`}
                 onClick={() =>
                   updateScene(scene.sceneId, {
                     nanoBananaPrompt: scene.nanoBananaPrompt
-                      ? `${scene.nanoBananaPrompt} @${tag}`
-                      : `@${tag}`,
+                      ? `${scene.nanoBananaPrompt} @${p.slug}`
+                      : `@${p.slug}`,
                   })
                 }
                 className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 border border-orange-100 hover:bg-orange-100 transition-colors"
               >
-                @{tag}
+                @{p.slug}
               </button>
             ))}
           </div>

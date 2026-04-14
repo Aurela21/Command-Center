@@ -9,11 +9,11 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { scenes, assetVersions, jobs, knowledgeDocuments } from "@/db/schema";
-import { eq, and, inArray, sql, ilike } from "drizzle-orm";
+import { scenes, assetVersions, jobs, productProfiles, productImages } from "@/db/schema";
+import { eq, and, inArray, sql, asc } from "drizzle-orm";
 import { createJob, completeJob, failJob } from "@/lib/job-queue";
 import { generateSeedImage } from "@/lib/nano-banana";
-import { uploadBuffer, publicUrl } from "@/lib/r2";
+import { uploadBuffer } from "@/lib/r2";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -92,38 +92,53 @@ export async function POST(req: NextRequest, { params }: Params) {
     resultData: { prompt },
   });
 
-  // Parse @tags from prompt and look up product asset images
+  // Parse @tags from prompt and look up product profiles
   const tagMatches = prompt.match(/@[\w-]+/g) ?? [];
-  const productImageUrls: string[] = [];
+  const refImageUrls: string[] = [];
+  let productContext = "";
+
   for (const tag of tagMatches) {
-    const tagName = tag.slice(1); // remove @
-    // Match by filename (without extension) — e.g. @black-t-shirt matches "black-t-shirt.jpg"
-    const [doc] = await db
+    const slug = tag.slice(1); // remove @
+    const [profile] = await db
       .select()
-      .from(knowledgeDocuments)
-      .where(
-        and(
-          eq(knowledgeDocuments.category, "product_assets"),
-          eq(knowledgeDocuments.status, "ready"),
-          ilike(knowledgeDocuments.name, `${tagName}%`)
-        )
-      );
-    if (doc?.fileUrl) {
-      const url = doc.fileUrl.startsWith("http") ? doc.fileUrl : publicUrl(doc.fileUrl);
-      productImageUrls.push(url);
-      console.log(`[generate-seed] Resolved ${tag} → ${url}`);
+      .from(productProfiles)
+      .where(eq(productProfiles.slug, slug));
+
+    if (profile) {
+      // Get all images for this product
+      const images = await db
+        .select()
+        .from(productImages)
+        .where(eq(productImages.productId, profile.id))
+        .orderBy(asc(productImages.sortOrder));
+
+      for (const img of images) {
+        refImageUrls.push(img.fileUrl);
+      }
+
+      // Build text context: product description + image labels
+      const labels = images.map((img) => img.label).join(", ");
+      productContext += `\n\nProduct "${profile.name}" (${tag}): ${profile.description || "No description."}`;
+      if (labels) productContext += `\nImage angles: ${labels}`;
+
+      console.log(`[generate-seed] Resolved ${tag} → ${images.length} images`);
     } else {
-      console.warn(`[generate-seed] @tag "${tagName}" not found in product_assets`);
+      console.warn(`[generate-seed] @tag "${slug}" not found in product_profiles`);
     }
   }
 
+  // Append product context to the prompt for Gemini
+  const enrichedPrompt = productContext
+    ? `${prompt}\n\n--- Product Reference ---${productContext}\n\nUse the product reference images above to accurately represent the product. Match colors, details, and features exactly as shown.`
+    : prompt;
+
   // Generate image synchronously via Gemini
   try {
-    console.log(`[generate-seed] Calling Gemini for scene ${sceneId} with ${productImageUrls.length} product ref(s)…`);
+    console.log(`[generate-seed] Calling Gemini for scene ${sceneId} with ${refImageUrls.length} product ref(s)…`);
     const { imageBase64, mimeType } = await generateSeedImage({
       imageUrl,
-      prompt,
-      referenceImageUrls: productImageUrls.length > 0 ? productImageUrls : undefined,
+      prompt: enrichedPrompt,
+      referenceImageUrls: refImageUrls.length > 0 ? refImageUrls : undefined,
     });
 
     // Upload to R2

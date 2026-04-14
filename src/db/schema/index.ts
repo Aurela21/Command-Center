@@ -4,3 +4,4 @@ export * from "./asset-versions";
 export * from "./jobs";
 export * from "./quality-checks";
 export * from "./knowledge";
+export * from "./products";

@@ -126,48 +126,38 @@ function UploadZone({
     setState({ kind: "uploading", filename: file.name, progress: 0 });
 
     try {
-      // 1. Get presigned PUT URL
-      const urlRes = await fetch(
-        `/api/knowledge/upload-url?filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(file.type || "application/octet-stream")}`
+      // 1. Upload file through server (avoids R2 CORS issues)
+      const uploadRes = await new Promise<{ key: string; fileType: string }>(
+        (resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open(
+            "POST",
+            `/api/knowledge/upload?filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(file.type || "application/octet-stream")}`
+          );
+          xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+              setState({
+                kind: "uploading",
+                filename: file.name,
+                progress: Math.round((e.loaded / e.total) * 100),
+              });
+            }
+          };
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve(JSON.parse(xhr.responseText));
+            } else {
+              reject(new Error(`Upload failed: ${xhr.status}`));
+            }
+          };
+          xhr.onerror = () => reject(new Error("Network error during upload"));
+          xhr.send(file);
+        }
       );
-      if (!urlRes.ok) {
-        const err = await urlRes.json().catch(() => ({}));
-        throw new Error(
-          (err as { error?: string }).error ?? "Failed to get upload URL"
-        );
-      }
-      const { uploadUrl, key, fileType } = (await urlRes.json()) as {
-        uploadUrl: string;
-        key: string;
-        fileType: string;
-      };
 
-      // 2. XHR PUT to R2 with progress
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open("PUT", uploadUrl);
-        xhr.setRequestHeader(
-          "Content-Type",
-          file.type || "application/octet-stream"
-        );
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) {
-            setState({
-              kind: "uploading",
-              filename: file.name,
-              progress: Math.round((e.loaded / e.total) * 100),
-            });
-          }
-        };
-        xhr.onload = () =>
-          xhr.status >= 200 && xhr.status < 300
-            ? resolve()
-            : reject(new Error(`Upload failed: ${xhr.status}`));
-        xhr.onerror = () => reject(new Error("Network error during upload"));
-        xhr.send(file);
-      });
+      const { key, fileType } = uploadRes;
 
-      // 3. Create document record with category
+      // 2. Create document record with category
       setState({ kind: "processing", filename: file.name });
       const docRes = await fetch("/api/knowledge/documents", {
         method: "POST",
