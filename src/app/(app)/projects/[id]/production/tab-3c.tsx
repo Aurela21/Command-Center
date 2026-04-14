@@ -148,6 +148,7 @@ function SceneGenerationCard({
 }) {
   const [warningOpen, setWarningOpen] = useState(false);
   const [enhanceOpen, setEnhanceOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [refinedPrompt, setRefinedPrompt] = useState("");
   const [refining, setRefining] = useState(false);
   const colors = statusColor(scene.videoJobStatus);
@@ -202,10 +203,13 @@ function SceneGenerationCard({
     }
   }
 
+  const hasVersionHistory = scene.videoVersions && scene.videoVersions.length > 1;
+
   return (
     <div
       className={cn(
         "rounded-xl border bg-white overflow-hidden transition-all",
+        expanded && "col-span-full",
         scene.videoJobStatus === "completed"
           ? hasLowQuality
             ? "border-amber-300"
@@ -217,9 +221,10 @@ function SceneGenerationCard({
           : "border-neutral-100"
       )}
     >
-      {/* Seed image or video thumbnail */}
+      {/* Seed image or video thumbnail — click to expand */}
       <div
-        className="aspect-[9/16] relative overflow-hidden"
+        onClick={() => hasVersionHistory && setExpanded(!expanded)}
+        className={cn("aspect-[9/16] relative overflow-hidden", hasVersionHistory && "cursor-pointer")}
         style={{
           backgroundColor: scene.seedImageApproved ? scene.color : "#f5f5f5",
         }}
@@ -302,6 +307,15 @@ function SceneGenerationCard({
             {scene.targetClipDurationS.toFixed(1)}s
           </span>
         </div>
+
+        {/* Version count badge */}
+        {hasVersionHistory && (
+          <div className="absolute bottom-2 left-2">
+            <span className="text-[10px] font-medium bg-black/40 text-white px-1.5 py-0.5 rounded-full backdrop-blur-sm">
+              {scene.videoVersions.length} version{scene.videoVersions.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Card body */}
@@ -434,6 +448,62 @@ function SceneGenerationCard({
           )}
         </div>
       </div>
+
+      {/* Expanded version history */}
+      {expanded && scene.videoVersions && scene.videoVersions.length > 0 && (
+        <div className="border-t border-neutral-100 px-3 py-3">
+          <p className="text-[11px] font-medium text-neutral-400 uppercase tracking-widest mb-2">
+            All Generations ({scene.videoVersions.length})
+          </p>
+          <div className="space-y-2 max-h-60 overflow-y-auto">
+            {[...scene.videoVersions].reverse().map((v, i) => (
+              <div
+                key={v.id}
+                className={cn(
+                  "flex items-start gap-2.5 p-2 rounded-lg border transition-colors",
+                  i === 0 ? "border-emerald-200 bg-emerald-50/30" : "border-neutral-100 bg-neutral-50/50"
+                )}
+              >
+                <video
+                  src={v.fileUrl}
+                  className="w-16 aspect-[9/16] rounded object-cover shrink-0"
+                  muted
+                  loop
+                  playsInline
+                  onMouseEnter={(e) => (e.target as HTMLVideoElement).play()}
+                  onMouseLeave={(e) => { const el = e.target as HTMLVideoElement; el.pause(); el.currentTime = 0; }}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    {i === 0 && (
+                      <span className="text-[10px] font-medium text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded">
+                        Latest
+                      </span>
+                    )}
+                    <span className="text-[10px] text-neutral-400">
+                      v{scene.videoVersions.length - i}
+                    </span>
+                  </div>
+                  {v.prompt && (
+                    <p className="text-[11px] text-neutral-500 leading-snug line-clamp-2">
+                      {v.prompt}
+                    </p>
+                  )}
+                  <a
+                    href={v.fileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-[10px] text-blue-500 hover:text-blue-700 mt-1 transition-colors"
+                  >
+                    <Play className="h-2.5 w-2.5" />
+                    Open
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Quality warning dialog (low score) */}
       {scene.qualityScore != null && (

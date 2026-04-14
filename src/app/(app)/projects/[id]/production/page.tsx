@@ -7,6 +7,7 @@ import { SCENE_COLORS } from "../manifest/mock-data";
 import type {
   SceneProductionState,
   SeedVersion,
+  VideoVersion,
   SSEEvent,
   ProductionTab,
 } from "./types";
@@ -45,6 +46,7 @@ type DbAssetVersion = {
   isApproved: boolean | null;
   isRejected: boolean | null;
   rejectionReason: string | null;
+  generationPrompt: string | null;
   qualityScore: unknown;
   createdAt: string;
 };
@@ -78,6 +80,13 @@ function dbToState(
   const sceneAssets = assets.filter((a) => a.sceneId === scene.id);
   const seedAssets = sceneAssets.filter((a) => a.assetType === "seed_image");
   const klingAssets = sceneAssets.filter((a) => a.assetType === "kling_output");
+
+  const videoVersions: VideoVersion[] = klingAssets.map((a) => ({
+    id: a.id,
+    createdAt: a.createdAt,
+    fileUrl: a.fileUrl,
+    prompt: a.generationPrompt ?? undefined,
+  }));
 
   const seedVersions: SeedVersion[] = seedAssets.map((a) => {
     const qs = a.qualityScore;
@@ -170,6 +179,7 @@ function dbToState(
     videoJobError,
     videoJobId,
     videoUrl,
+    videoVersions,
   };
 }
 

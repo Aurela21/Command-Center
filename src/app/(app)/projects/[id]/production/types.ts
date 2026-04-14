@@ -15,6 +15,13 @@ export type VideoJobStatus =
   | "completed"
   | "failed";
 
+export type VideoVersion = {
+  id: string;
+  createdAt: string;
+  fileUrl: string;
+  prompt?: string;
+};
+
 export type SceneProductionState = {
   sceneId: string;
   sceneOrder: number;
@@ -37,7 +44,8 @@ export type SceneProductionState = {
   videoJobProgress: number; // 0–100
   videoJobError?: string;
   videoJobId?: string;
-  videoUrl?: string; // R2 public URL for completed video
+  videoUrl?: string; // R2 public URL for completed video (latest)
+  videoVersions: VideoVersion[]; // all completed video generations
   // Quality score populated via SSE job:completed event
   qualityScore?: {
     overall: number; // 0–100
