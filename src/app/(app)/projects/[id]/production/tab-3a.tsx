@@ -254,6 +254,7 @@ function SeedDetailPanel({
   const generating = scene.seedGenerating ?? false;
   const [refinedPrompt, setRefinedPrompt] = useState<string | null>(null);
   const [refining, setRefining] = useState(false);
+  const [aiInstruction, setAiInstruction] = useState("");
 
   // Fetch available @tags from product profiles
   const [productTags, setProductTags] = useState<Array<{ slug: string; name: string; imageCount: number }>>([]);
@@ -272,14 +273,19 @@ function SeedDetailPanel({
   }, [scene.nanoBananaPrompt]);
 
   async function handleEnhance() {
-    if (!scene.nanoBananaPrompt.trim()) return;
+    if (!scene.nanoBananaPrompt.trim() && !refinedPrompt) return;
     setRefining(true);
     try {
+      const basePrompt = refinedPrompt ?? scene.nanoBananaPrompt;
+      const promptToRefine = aiInstruction.trim()
+        ? `${basePrompt}\n\n[USER INSTRUCTION: ${aiInstruction.trim()}]`
+        : basePrompt;
+
       const res = await fetch(`/api/projects/${projectId}/refine-prompt`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt: scene.nanoBananaPrompt,
+          prompt: promptToRefine,
           target: "seed_image",
           sceneId: scene.sceneId,
         }),
@@ -287,6 +293,7 @@ function SeedDetailPanel({
       if (!res.ok) throw new Error("Refinement failed");
       const { refined } = (await res.json()) as { refined: string };
       setRefinedPrompt(refined);
+      setAiInstruction("");
     } catch (err) {
       console.error("[enhance]", err);
     } finally {
@@ -446,25 +453,39 @@ function SeedDetailPanel({
           products={productTags}
           placeholder="Describe the seed image… Type @ to reference a product"
         />
-        <div className="mt-2.5 flex items-center gap-2">
-          <Button
-            onClick={handleEnhance}
-            disabled={refining || !scene.nanoBananaPrompt.trim() || generating}
-            variant="outline"
-            className="gap-2 h-9 text-sm disabled:opacity-40"
-          >
-            {refining ? (
-              <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Enhancing…
-              </>
-            ) : (
-              <>
-                <Sparkles className="h-3.5 w-3.5" />
-                Enhance Prompt
-              </>
-            )}
-          </Button>
+        <div className="mt-2.5 space-y-2">
+          <div className="flex gap-2">
+            <input
+              value={aiInstruction}
+              onChange={(e) => setAiInstruction(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey && !refining) {
+                  e.preventDefault();
+                  handleEnhance();
+                }
+              }}
+              placeholder="e.g. add more realism, change lighting to golden hour..."
+              className="flex-1 text-sm border border-neutral-200 rounded-md px-3 py-1.5 h-9 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-300 transition-all placeholder:text-neutral-300"
+            />
+            <Button
+              onClick={handleEnhance}
+              disabled={refining || (!scene.nanoBananaPrompt.trim() && !refinedPrompt) || generating}
+              variant="outline"
+              className="gap-2 h-9 text-sm disabled:opacity-40 shrink-0"
+            >
+              {refining ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Enhancing…
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Enhance
+                </>
+              )}
+            </Button>
+          </div>
           {refinedPrompt === null && (
             <Button
               onClick={handleGenerate}

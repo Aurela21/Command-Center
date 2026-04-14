@@ -154,6 +154,7 @@ function SceneGenerationCard({
   const [expanded, setExpanded] = useState(false);
   const [refinedPrompt, setRefinedPrompt] = useState("");
   const [refining, setRefining] = useState(false);
+  const [aiInstruction, setAiInstruction] = useState("");
   const colors = statusColor(scene.videoJobStatus);
   const canGenerate =
     scene.seedImageApproved &&
@@ -178,11 +179,16 @@ function SceneGenerationCard({
   async function handleEnhance() {
     setRefining(true);
     try {
+      // Include AI instruction as part of the prompt if provided
+      const promptToRefine = aiInstruction.trim()
+        ? `${refinedPrompt || scene.klingPrompt}\n\n[USER INSTRUCTION: ${aiInstruction.trim()}]`
+        : refinedPrompt || scene.klingPrompt;
+
       const res = await fetch(`/api/projects/${projectId}/refine-prompt`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt: scene.klingPrompt,
+          prompt: promptToRefine,
           target: "kling_video",
           sceneId: scene.sceneId,
         }),
@@ -190,6 +196,7 @@ function SceneGenerationCard({
       if (!res.ok) throw new Error("Refinement failed");
       const { refined } = (await res.json()) as { refined: string };
       setRefinedPrompt(refined);
+      setAiInstruction("");
     } catch (err) {
       console.error("[enhance-kling]", err);
     } finally {
@@ -612,24 +619,46 @@ function SceneGenerationCard({
                 {scene.klingPrompt}
               </p>
             </div>
-            <Button
-              onClick={handleEnhance}
-              disabled={refining}
-              variant="outline"
-              className="gap-2 h-8 text-xs"
-            >
-              {refining ? (
-                <>
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  Enhancing…
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-3 w-3" />
-                  Enhance with Claude
-                </>
-              )}
-            </Button>
+            <div>
+              <p className="text-xs font-medium text-neutral-500 mb-1.5">
+                AI direction (optional)
+              </p>
+              <div className="flex gap-2">
+                <input
+                  value={aiInstruction}
+                  onChange={(e) => setAiInstruction(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey && !refining) {
+                      e.preventDefault();
+                      handleEnhance();
+                    }
+                  }}
+                  placeholder="e.g. add more realism, slow down the camera, make it more cinematic..."
+                  className="flex-1 text-sm border border-neutral-200 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-300 transition-all placeholder:text-neutral-300"
+                />
+                <Button
+                  onClick={handleEnhance}
+                  disabled={refining}
+                  variant="outline"
+                  className="gap-2 h-auto text-xs shrink-0"
+                >
+                  {refining ? (
+                    <>
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Enhancing…
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-3 w-3" />
+                      Enhance
+                    </>
+                  )}
+                </Button>
+              </div>
+              <p className="text-[10px] text-neutral-300 mt-1">
+                Tell Claude how to adjust the prompt, or leave blank for auto-enhance
+              </p>
+            </div>
             <div>
               <p className="text-xs font-medium text-neutral-500 mb-1.5">
                 {refinedPrompt !== scene.klingPrompt ? "Enhanced prompt (editable)" : "Prompt to send (editable)"}
