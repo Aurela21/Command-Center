@@ -105,7 +105,11 @@ For each scene:
 - endTimeMs: end time in milliseconds
 - referenceFrame: the single most representative frame number within this scene
 - description: 1–2 sentence description of what happens visually and narratively
-- klingPrompt: a concise motion/action prompt (max 35 words) describing exactly what happens in this scene segment — camera movement, subject action, physical motions, gestures. This should read like a Kling video generation prompt that would recreate this exact clip. Focus on MOTION not appearance.
+- klingPrompt: A precise Kling video generation prompt (max 35 words) that would recreate THIS EXACT clip segment. You MUST study the actual frames within this scene's boundaries and describe the SPECIFIC physical actions happening frame-by-frame:
+  * What is the subject's body DOING? (hands zipping, arms extending, head turning, body rotating, walking forward, jumping, crouching, pulling fabric, etc.)
+  * What CAMERA MOVEMENT is happening? (static, slow pan left, tilt up, dolly in, handheld shake, etc.)
+  * What is the PACE/RHYTHM? (slow deliberate motion, quick snappy cuts, smooth continuous, etc.)
+  DO NOT write generic prompts like "model showcases hoodie" — write exactly what you SEE happening: "Model's right hand pulls zipper down to mid-chest, left hand holds fabric open, camera slowly dollies in from waist to chest level"
 - targetClipDurationS: how long this clip should be in the final output (3.0–10.0, must match scene duration)
 
 IMPORTANT: scenes must be contiguous and cover the full video (0 to ${totalFrames} frames / ${durationMs}ms).
@@ -121,7 +125,7 @@ Return ONLY valid JSON with this exact shape:
       "endTimeMs": 3000,
       "referenceFrame": 45,
       "description": "Person models cream hoodie, showing front zipper and overall fit",
-      "klingPrompt": "Model turns slowly to camera revealing hoodie front, hands adjust zipper, slight sway, static medium shot with soft rack focus",
+      "klingPrompt": "Model's right hand grips zipper pull, draws it down to mid-chest in one smooth motion, left hand holds hem, static medium shot, subtle body sway side to side",
       "targetClipDurationS": 3.0
     }
   ]
