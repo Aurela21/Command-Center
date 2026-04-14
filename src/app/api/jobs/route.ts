@@ -22,11 +22,12 @@ export async function GET(req: NextRequest) {
  * Requires the scene to have seedImageApproved = true and klingPromptApproved = true.
  */
 export async function POST(req: NextRequest) {
-  const { jobType, projectId, sceneId, promptOverride } = await req.json() as {
+  const { jobType, projectId, sceneId, promptOverride, durationOverride } = await req.json() as {
     jobType: string;
     projectId: string;
     sceneId: string;
     promptOverride?: string;
+    durationOverride?: number;
   };
 
   if (jobType !== "kling_generation") {
@@ -120,9 +121,10 @@ export async function POST(req: NextRequest) {
       .where(eq(jobsTable.id, j.id));
   }
 
-  // Kling only accepts 5 or 10 — snap to whichever is closest
-  const targetDuration = scene.targetClipDurationS ?? 5;
-  const durationSeconds = targetDuration <= 7.5 ? 5 : 10;
+  // Kling only accepts 5 or 10
+  const durationSeconds = durationOverride === 10 ? 10
+    : durationOverride === 5 ? 5
+    : (scene.targetClipDurationS ?? 5) <= 7.5 ? 5 : 10;
 
   const elementTags = (project.klingElementTags as string[]) ?? [];
 

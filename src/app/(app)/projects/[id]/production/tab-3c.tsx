@@ -147,7 +147,7 @@ function SceneGenerationCard({
   projectId: string;
   updateScene: (sceneId: string, patch: Partial<SceneProductionState>) => void;
   onGenerate: (sceneId: string) => Promise<void>;
-  onGenerateWithPrompt: (sceneId: string, refinedPrompt: string) => Promise<void>;
+  onGenerateWithPrompt: (sceneId: string, refinedPrompt: string, duration?: number) => Promise<void>;
 }) {
   const [warningOpen, setWarningOpen] = useState(false);
   const [enhanceOpen, setEnhanceOpen] = useState(false);
@@ -155,6 +155,9 @@ function SceneGenerationCard({
   const [refinedPrompt, setRefinedPrompt] = useState("");
   const [refining, setRefining] = useState(false);
   const [aiInstruction, setAiInstruction] = useState("");
+  const [clipDuration, setClipDuration] = useState<5 | 10>(
+    scene.targetClipDurationS <= 7.5 ? 5 : 10
+  );
   const colors = statusColor(scene.videoJobStatus);
   const canGenerate =
     scene.seedImageApproved &&
@@ -206,11 +209,7 @@ function SceneGenerationCard({
 
   function handleSubmit() {
     setEnhanceOpen(false);
-    if (refinedPrompt !== scene.klingPrompt) {
-      void onGenerateWithPrompt(scene.sceneId, refinedPrompt);
-    } else {
-      void onGenerate(scene.sceneId);
-    }
+    void onGenerateWithPrompt(scene.sceneId, refinedPrompt, clipDuration);
   }
 
   function handleRejectVideo(versionId: string) {
@@ -682,18 +681,47 @@ function SceneGenerationCard({
               </p>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEnhanceOpen(false)} className="text-xs">
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSubmit}
-              disabled={!refinedPrompt.trim()}
-              className="bg-neutral-900 hover:bg-neutral-700 text-white text-xs gap-2"
-            >
-              <Clapperboard className="h-3.5 w-3.5" />
-              Generate Video
-            </Button>
+          <DialogFooter className="flex items-center !justify-between">
+            <div className="flex items-center gap-2">
+              <p className="text-xs text-neutral-500">Clip length:</p>
+              <div className="flex rounded-md border border-neutral-200 overflow-hidden">
+                <button
+                  onClick={() => setClipDuration(5)}
+                  className={cn(
+                    "px-3 py-1 text-xs font-medium transition-colors",
+                    clipDuration === 5
+                      ? "bg-neutral-900 text-white"
+                      : "bg-white text-neutral-500 hover:bg-neutral-50"
+                  )}
+                >
+                  5s
+                </button>
+                <button
+                  onClick={() => setClipDuration(10)}
+                  className={cn(
+                    "px-3 py-1 text-xs font-medium transition-colors border-l border-neutral-200",
+                    clipDuration === 10
+                      ? "bg-neutral-900 text-white"
+                      : "bg-white text-neutral-500 hover:bg-neutral-50"
+                  )}
+                >
+                  10s
+                </button>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => setEnhanceOpen(false)} className="text-xs">
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSubmit}
+                disabled={!refinedPrompt.trim()}
+                className="bg-neutral-900 hover:bg-neutral-700 text-white text-xs gap-2"
+              >
+                <Clapperboard className="h-3.5 w-3.5" />
+                Generate {clipDuration}s
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -721,7 +749,7 @@ export function Tab3C({ scenes, updateScene, projectId }: Props) {
   ).length;
   const failed = scenes.filter((s) => s.videoJobStatus === "failed").length;
 
-  async function submitKlingJob(sceneId: string, refinedPrompt?: string) {
+  async function submitKlingJob(sceneId: string, refinedPrompt?: string, duration?: number) {
     updateScene(sceneId, { videoJobStatus: "queued", videoJobProgress: 0 });
     try {
       const res = await fetch("/api/jobs", {
@@ -732,6 +760,7 @@ export function Tab3C({ scenes, updateScene, projectId }: Props) {
           projectId,
           sceneId,
           ...(refinedPrompt ? { promptOverride: refinedPrompt } : {}),
+          ...(duration ? { durationOverride: duration } : {}),
         }),
       });
       if (!res.ok) {
@@ -805,7 +834,7 @@ export function Tab3C({ scenes, updateScene, projectId }: Props) {
               projectId={projectId}
               updateScene={updateScene}
               onGenerate={submitKlingJob}
-              onGenerateWithPrompt={(sceneId, prompt) => submitKlingJob(sceneId, prompt)}
+              onGenerateWithPrompt={(sceneId, prompt, duration) => submitKlingJob(sceneId, prompt, duration)}
             />
           ))}
         </div>
