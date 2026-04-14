@@ -72,14 +72,9 @@ function dbSceneToMock(
   },
   projectId: string
 ): MockScene {
-  // Candidate seconds spanning this scene (up to 8 evenly distributed)
-  const startS = Math.floor(s.startTimeMs / 1000);
-  const endS = Math.ceil(s.endTimeMs / 1000);
+  // One candidate per extracted frame (1fps) within the scene boundaries
   const cFrameNums = candidateFrames(s.startFrame, s.endFrame);
-  const cUrls = cFrameNums.map((_, i) => {
-    const sec = Math.round(startS + ((endS - startS) / (cFrameNums.length + 1)) * (i + 1));
-    return frameUrl(projectId, sec);
-  });
+  const cUrls = cFrameNums.map((f) => frameUrl(projectId, Math.round(f / 30)));
 
   return {
     id: s.id,
@@ -198,7 +193,7 @@ function ReferenceFramePicker({
   onSelect: (frame: number) => void;
 }) {
   return (
-    <div className="grid grid-cols-4 gap-2">
+    <div className="grid grid-cols-4 sm:grid-cols-5 lg:grid-cols-6 gap-2 max-h-80 overflow-y-auto">
       {frames.map((frame, i) => {
         const isSelected = frame === selectedFrame;
         const imgUrl = candidateFrameUrls?.[i];
@@ -565,14 +560,7 @@ export default function ManifestPage() {
         // Recompute candidate frames when boundaries change
         if (patch.startFrame !== undefined || patch.endFrame !== undefined) {
           const cFrameNums = candidateFrames(updated.startFrame, updated.endFrame);
-          const startS = Math.floor(updated.startTimeMs / 1000);
-          const endS = Math.ceil(updated.endTimeMs / 1000);
-          const cUrls = cFrameNums.map((_, i) => {
-            const sec = Math.round(
-              startS + ((endS - startS) / (cFrameNums.length + 1)) * (i + 1)
-            );
-            return frameUrl(id, sec);
-          });
+          const cUrls = cFrameNums.map((f) => frameUrl(id, Math.round(f / 30)));
           updated.candidateFrames = cFrameNums;
           updated.candidateFrameUrls = cUrls;
         }

@@ -15,12 +15,26 @@ export type MockScene = {
   targetClipDurationS: number;
 };
 
-/** 8 evenly-distributed interior frames across [start, end] */
-export function candidateFrames(start: number, end: number): number[] {
-  const span = end - start;
-  if (span <= 0) return [start];
-  const step = span / 9;
-  return Array.from({ length: 8 }, (_, i) => Math.round(start + step * (i + 1)));
+/**
+ * All extracted frames within [start, end] boundaries.
+ * Frames are extracted at 1fps (one per second at 30fps).
+ * Returns one frame number per second of video within the range.
+ */
+export function candidateFrames(start: number, end: number, fps = 30): number[] {
+  const startSec = Math.floor(start / fps);
+  const endSec = Math.ceil(end / fps);
+  const frames: number[] = [];
+  for (let sec = startSec; sec <= endSec; sec++) {
+    const frameNum = sec * fps;
+    if (frameNum >= start && frameNum <= end) {
+      frames.push(frameNum);
+    }
+  }
+  // If no frames fell exactly in range, include boundary seconds
+  if (frames.length === 0) {
+    frames.push(Math.round(((start + end) / 2 / fps)) * fps);
+  }
+  return frames;
 }
 
 /**
