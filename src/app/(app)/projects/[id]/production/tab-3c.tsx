@@ -12,6 +12,7 @@ import {
   Loader2,
   Play,
   RefreshCw,
+  Sparkles,
   Zap,
 } from "lucide-react";
 import {
@@ -136,12 +137,19 @@ function QualityWarningDialog({
 
 function SceneGenerationCard({
   scene,
+  projectId,
   onGenerate,
+  onGenerateWithPrompt,
 }: {
   scene: SceneProductionState;
+  projectId: string;
   onGenerate: (sceneId: string) => Promise<void>;
+  onGenerateWithPrompt: (sceneId: string, refinedPrompt: string) => Promise<void>;
 }) {
   const [warningOpen, setWarningOpen] = useState(false);
+  const [enhanceOpen, setEnhanceOpen] = useState(false);
+  const [refinedPrompt, setRefinedPrompt] = useState("");
+  const [refining, setRefining] = useState(false);
   const colors = statusColor(scene.videoJobStatus);
   const canGenerate =
     scene.seedImageApproved &&
@@ -154,11 +162,44 @@ function SceneGenerationCard({
     scene.qualityScore.overall < 60;
 
   function handleGenerate() {
-    void onGenerate(scene.sceneId);
+    setEnhanceOpen(true);
+    setRefinedPrompt(scene.klingPrompt);
   }
 
   function handleRetry() {
-    void onGenerate(scene.sceneId);
+    setEnhanceOpen(true);
+    setRefinedPrompt(scene.klingPrompt);
+  }
+
+  async function handleEnhance() {
+    setRefining(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/refine-prompt`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: scene.klingPrompt,
+          target: "kling_video",
+          sceneId: scene.sceneId,
+        }),
+      });
+      if (!res.ok) throw new Error("Refinement failed");
+      const { refined } = (await res.json()) as { refined: string };
+      setRefinedPrompt(refined);
+    } catch (err) {
+      console.error("[enhance-kling]", err);
+    } finally {
+      setRefining(false);
+    }
+  }
+
+  function handleSubmit() {
+    setEnhanceOpen(false);
+    if (refinedPrompt !== scene.klingPrompt) {
+      void onGenerateWithPrompt(scene.sceneId, refinedPrompt);
+    } else {
+      void onGenerate(scene.sceneId);
+    }
   }
 
   return (
@@ -394,6 +435,83 @@ function SceneGenerationCard({
           onRetry={handleRetry}
         />
       )}
+
+      {/* Enhance prompt dialog before Kling generation */}
+      <Dialog open={enhanceOpen} onOpenChange={setEnhanceOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              Scene {String(scene.sceneOrder).padStart(2, "0")} — Kling Prompt
+            </DialogTitle>
+            <DialogDescription>
+              Review and enhance the motion prompt before sending to Kling.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <p className="text-xs font-medium text-neutral-500 mb-1.5">
+                Original prompt
+              </p>
+              <p className="text-xs text-neutral-400 bg-neutral-50 rounded px-3 py-2 leading-relaxed">
+                {scene.klingPrompt}
+              </p>
+            </div>
+            <Button
+              onClick={handleEnhance}
+              disabled={refining}
+              variant="outline"
+              className="gap-2 h-8 text-xs"
+            >
+              {refining ? (
+                <>
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Enhancing…
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-3 w-3" />
+                  Enhance with Claude
+                </>
+              )}
+            </Button>
+            <div>
+              <p className="text-xs font-medium text-neutral-500 mb-1.5">
+                {refinedPrompt !== scene.klingPrompt ? "Enhanced prompt (editable)" : "Prompt to send (editable)"}
+              </p>
+              <textarea
+                value={refinedPrompt}
+                onChange={(e) => setRefinedPrompt(e.target.value)}
+                rows={4}
+                className={cn(
+                  "w-full text-sm rounded-md border px-3 py-2.5 resize-none focus:outline-none focus:ring-2 transition-all leading-relaxed",
+                  refinedPrompt !== scene.klingPrompt
+                    ? "border-blue-200 bg-blue-50/30 focus:ring-blue-200 focus:border-blue-300"
+                    : "border-neutral-200 bg-white focus:ring-neutral-200 focus:border-neutral-300"
+                )}
+              />
+              <p className="text-[11px] text-neutral-400 mt-1">
+                {refinedPrompt.trim().split(/\s+/).length} words
+                {refinedPrompt.trim().split(/\s+/).length > 40 && (
+                  <span className="text-amber-500 ml-1">— Kling works best under 40 words</span>
+                )}
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEnhanceOpen(false)} className="text-xs">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={!refinedPrompt.trim()}
+              className="bg-neutral-900 hover:bg-neutral-700 text-white text-xs gap-2"
+            >
+              <Clapperboard className="h-3.5 w-3.5" />
+              Generate Video
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -418,7 +536,7 @@ export function Tab3C({ scenes, updateScene, projectId }: Props) {
   ).length;
   const failed = scenes.filter((s) => s.videoJobStatus === "failed").length;
 
-  async function submitKlingJob(sceneId: string) {
+  async function submitKlingJob(sceneId: string, refinedPrompt?: string) {
     updateScene(sceneId, { videoJobStatus: "queued", videoJobProgress: 0 });
     try {
       const res = await fetch("/api/jobs", {
@@ -428,6 +546,7 @@ export function Tab3C({ scenes, updateScene, projectId }: Props) {
           jobType: "kling_generation",
           projectId,
           sceneId,
+          ...(refinedPrompt ? { promptOverride: refinedPrompt } : {}),
         }),
       });
       if (!res.ok) {
@@ -498,7 +617,9 @@ export function Tab3C({ scenes, updateScene, projectId }: Props) {
             <SceneGenerationCard
               key={scene.sceneId}
               scene={scene}
+              projectId={projectId}
               onGenerate={submitKlingJob}
+              onGenerateWithPrompt={(sceneId, prompt) => submitKlingJob(sceneId, prompt)}
             />
           ))}
         </div>

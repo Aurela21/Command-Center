@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Check, Loader2, Package, ShoppingBag, Wand2 } from "lucide-react";
+import { Check, Loader2, Package, ShoppingBag, Sparkles, Wand2 } from "lucide-react";
 import type { SceneProductionState, SeedVersion } from "./types";
 
 // ─── Scene list item (left panel) ────────────────────────────────────────────
@@ -250,6 +250,8 @@ function SeedDetailPanel({
   updateScene: (sceneId: string, patch: Partial<SceneProductionState>) => void;
 }) {
   const generating = scene.seedGenerating ?? false;
+  const [refinedPrompt, setRefinedPrompt] = useState<string | null>(null);
+  const [refining, setRefining] = useState(false);
 
   // Fetch available @tags from product profiles
   const [productTags, setProductTags] = useState<Array<{ slug: string; name: string; imageCount: number }>>([]);
@@ -262,8 +264,37 @@ function SeedDetailPanel({
       .catch(() => {});
   }, []);
 
-  async function handleGenerate() {
+  // Clear refined prompt when user edits the brief prompt
+  useEffect(() => {
+    setRefinedPrompt(null);
+  }, [scene.nanoBananaPrompt]);
+
+  async function handleEnhance() {
     if (!scene.nanoBananaPrompt.trim()) return;
+    setRefining(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/refine-prompt`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: scene.nanoBananaPrompt,
+          target: "seed_image",
+          sceneId: scene.sceneId,
+        }),
+      });
+      if (!res.ok) throw new Error("Refinement failed");
+      const { refined } = (await res.json()) as { refined: string };
+      setRefinedPrompt(refined);
+    } catch (err) {
+      console.error("[enhance]", err);
+    } finally {
+      setRefining(false);
+    }
+  }
+
+  async function handleGenerate() {
+    const finalPrompt = refinedPrompt ?? scene.nanoBananaPrompt;
+    if (!finalPrompt.trim()) return;
     updateScene(scene.sceneId, { seedGenerating: true });
     try {
       const res = await fetch(
@@ -273,7 +304,7 @@ function SeedDetailPanel({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             sceneId: scene.sceneId,
-            prompt: scene.nanoBananaPrompt,
+            prompt: finalPrompt,
           }),
         }
       );
@@ -283,7 +314,6 @@ function SeedDetailPanel({
         }))) as { error: string };
         throw new Error(error);
       }
-      // Job queued — SSE will fire job:completed to add the new version
     } catch (err) {
       console.error("[generate-seed]", err);
       updateScene(scene.sceneId, { seedGenerating: false });
@@ -360,7 +390,7 @@ function SeedDetailPanel({
         )}
       </div>
 
-      {/* Nano Banana prompt with @mention autocomplete */}
+      {/* Brief prompt with @mention autocomplete */}
       <div>
         <p className="text-xs font-medium uppercase tracking-widest text-neutral-400 mb-3">
           Seed Image Prompt
@@ -371,24 +401,86 @@ function SeedDetailPanel({
           products={productTags}
           placeholder="Describe the seed image… Type @ to reference a product"
         />
-        <Button
-          onClick={handleGenerate}
-          disabled={generating || !scene.nanoBananaPrompt.trim()}
-          className="mt-2.5 gap-2 bg-neutral-900 hover:bg-neutral-700 text-white h-9 text-sm disabled:opacity-40"
-        >
-          {generating ? (
-            <>
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Generating…
-            </>
-          ) : (
-            <>
-              <Wand2 className="h-3.5 w-3.5" />
-              Generate Seed Image
-            </>
+        <div className="mt-2.5 flex items-center gap-2">
+          <Button
+            onClick={handleEnhance}
+            disabled={refining || !scene.nanoBananaPrompt.trim() || generating}
+            variant="outline"
+            className="gap-2 h-9 text-sm disabled:opacity-40"
+          >
+            {refining ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Enhancing…
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-3.5 w-3.5" />
+                Enhance Prompt
+              </>
+            )}
+          </Button>
+          {refinedPrompt === null && (
+            <Button
+              onClick={handleGenerate}
+              disabled={generating || !scene.nanoBananaPrompt.trim()}
+              className="gap-2 bg-neutral-900 hover:bg-neutral-700 text-white h-9 text-sm disabled:opacity-40"
+            >
+              {generating ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Generating…
+                </>
+              ) : (
+                <>
+                  <Wand2 className="h-3.5 w-3.5" />
+                  Generate (skip enhance)
+                </>
+              )}
+            </Button>
           )}
-        </Button>
+        </div>
       </div>
+
+      {/* Refined prompt (shown after enhancement) */}
+      {refinedPrompt !== null && (
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">
+              Enhanced Prompt
+            </p>
+            <button
+              onClick={() => setRefinedPrompt(null)}
+              className="text-[11px] text-neutral-400 hover:text-neutral-600 transition-colors"
+            >
+              Discard
+            </button>
+          </div>
+          <textarea
+            value={refinedPrompt}
+            onChange={(e) => setRefinedPrompt(e.target.value)}
+            rows={5}
+            className="w-full text-sm rounded-md border border-blue-200 bg-blue-50/30 px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300 transition-all text-neutral-700 leading-relaxed"
+          />
+          <Button
+            onClick={handleGenerate}
+            disabled={generating}
+            className="mt-2.5 gap-2 bg-neutral-900 hover:bg-neutral-700 text-white h-9 text-sm disabled:opacity-40"
+          >
+            {generating ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Generating…
+              </>
+            ) : (
+              <>
+                <Wand2 className="h-3.5 w-3.5" />
+                Generate with Enhanced Prompt
+              </>
+            )}
+          </Button>
+        </div>
+      )}
 
       {/* Generated versions */}
       {scene.seedVersions.length > 0 ? (

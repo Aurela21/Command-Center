@@ -287,3 +287,66 @@ Return JSON:
         sceneSegments: params.scenes.map(() => ""),
       };
 }
+
+// ─── Prompt refinement layer ────────────────────────────────────────────────
+
+export type RefineTarget = "seed_image" | "kling_video";
+
+export async function refinePrompt(params: {
+  userPrompt: string;
+  target: RefineTarget;
+  sceneDescription: string;
+  durationS?: number;
+  productContext?: string;       // product name + description + image labels
+  styleKnowledge?: string;       // from Style knowledge category
+  klingKnowledge?: string;       // from Kling Prompts knowledge category
+  referenceFrameUrl?: string;    // can be sent to Claude for visual context
+}): Promise<string> {
+  const content: Anthropic.MessageParam["content"] = [];
+
+  // Optionally include reference frame for visual context
+  if (params.referenceFrameUrl && params.target === "seed_image") {
+    content.push({
+      type: "image",
+      source: { type: "url", url: params.referenceFrameUrl },
+    });
+  }
+
+  const targetInstructions =
+    params.target === "seed_image"
+      ? `You are refining a prompt for Gemini image generation (seed frame for a video ad).
+Focus on: composition, camera angle, lighting, subject positioning, color palette, depth of field, and art direction.
+Output a single detailed paragraph — no line breaks, no bullet points. Max 120 words.
+The output image will be 9:16 vertical format.`
+      : `You are refining a prompt for Kling AI video generation (image-to-video).
+Focus on: motion description, camera movement (pan/tilt/zoom/dolly/static), subject action, atmosphere, pacing.
+Do NOT describe static composition — the seed image already handles that. Describe what MOVES and HOW.
+Keep it under 40 words — Kling quality degrades above 50 words.
+Output a single concise paragraph.`;
+
+  let context = `Scene context: ${params.sceneDescription}`;
+  if (params.durationS) context += `\nTarget duration: ${params.durationS}s`;
+  if (params.productContext) context += `\n\nProduct details:\n${params.productContext}`;
+  if (params.styleKnowledge) context += `\n\nStyle reference:\n${params.styleKnowledge}`;
+  if (params.klingKnowledge) context += `\n\nKling prompting best practices:\n${params.klingKnowledge}`;
+
+  content.push({
+    type: "text",
+    text: `${targetInstructions}
+
+${context}
+
+User's brief prompt: "${params.userPrompt}"
+
+Expand this into an optimized generation prompt. Keep the user's creative intent — add technical detail, not different ideas. Return ONLY the refined prompt text, nothing else.`,
+  });
+
+  const msg = await getClient().messages.create({
+    model: FAST,
+    max_tokens: 300,
+    messages: [{ role: "user", content }],
+  });
+
+  const text = msg.content[0].type === "text" ? msg.content[0].text : "";
+  return text.trim().replace(/^["']|["']$/g, "");
+}

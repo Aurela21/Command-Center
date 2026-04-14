@@ -22,10 +22,11 @@ export async function GET(req: NextRequest) {
  * Requires the scene to have seedImageApproved = true and klingPromptApproved = true.
  */
 export async function POST(req: NextRequest) {
-  const { jobType, projectId, sceneId } = await req.json() as {
+  const { jobType, projectId, sceneId, promptOverride } = await req.json() as {
     jobType: string;
     projectId: string;
     sceneId: string;
+    promptOverride?: string;
   };
 
   if (jobType !== "kling_generation") {
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }
 
-  const prompt = scene.scriptSegment ?? scene.scenePrompt;
+  const prompt = promptOverride?.trim() || scene.scriptSegment || scene.scenePrompt;
   if (!prompt) {
     return NextResponse.json(
       { error: "Scene has no Kling prompt" },
