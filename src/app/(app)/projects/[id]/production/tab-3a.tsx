@@ -244,10 +244,12 @@ function SeedDetailPanel({
   scene,
   projectId,
   updateScene,
+  addSeedVersion,
 }: {
   scene: SceneProductionState;
   projectId: string;
   updateScene: (sceneId: string, patch: Partial<SceneProductionState>) => void;
+  addSeedVersion: (sceneId: string, version: SeedVersion) => void;
 }) {
   const generating = scene.seedGenerating ?? false;
   const [refinedPrompt, setRefinedPrompt] = useState<string | null>(null);
@@ -319,19 +321,15 @@ function SeedDetailPanel({
         assetVersionId: string;
         imageUrl: string;
       };
-      updateScene(scene.sceneId, {
-        seedGenerating: false,
-        seedVersions: [
-          ...scene.seedVersions,
-          {
-            id: data.assetVersionId,
-            createdAt: new Date().toISOString(),
-            qualityScore: 0,
-            color: scene.color,
-            imageUrl: data.imageUrl,
-          },
-        ],
-      });
+      const newVersion: SeedVersion = {
+        id: data.assetVersionId,
+        createdAt: new Date().toISOString(),
+        qualityScore: 0,
+        color: scene.color,
+        imageUrl: data.imageUrl,
+      };
+      // Use addSeedVersion to avoid stale closure overwriting current state
+      addSeedVersion(scene.sceneId, newVersion);
     } catch (err) {
       console.error("[generate-seed]", err);
       updateScene(scene.sceneId, { seedGenerating: false });
@@ -682,10 +680,11 @@ function SeedDetailPanel({
 type Props = {
   scenes: SceneProductionState[];
   updateScene: (sceneId: string, patch: Partial<SceneProductionState>) => void;
+  addSeedVersion: (sceneId: string, version: SeedVersion) => void;
   projectId: string;
 };
 
-export function Tab3A({ scenes, updateScene, projectId }: Props) {
+export function Tab3A({ scenes, updateScene, addSeedVersion, projectId }: Props) {
   const [selectedId, setSelectedId] = useState<string>(
     scenes[0]?.sceneId ?? ""
   );
@@ -718,6 +717,7 @@ export function Tab3A({ scenes, updateScene, projectId }: Props) {
             key={selected.sceneId}
             scene={selected}
             projectId={projectId}
+            addSeedVersion={addSeedVersion}
             updateScene={updateScene}
           />
         )}

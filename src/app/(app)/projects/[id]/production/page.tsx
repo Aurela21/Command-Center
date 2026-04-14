@@ -200,6 +200,23 @@ export default function ProductionPage() {
     []
   );
 
+  // Append a seed version using functional update (avoids stale closures)
+  const addSeedVersion = useCallback(
+    (sceneId: string, version: SeedVersion) => {
+      setScenes((prev) =>
+        prev.map((s) => {
+          if (s.sceneId !== sceneId) return s;
+          return {
+            ...s,
+            seedGenerating: false,
+            seedVersions: [...s.seedVersions, version],
+          };
+        })
+      );
+    },
+    []
+  );
+
   // Load initial production state
   useEffect(() => {
     fetch(`/api/projects/${projectId}/production-state`)
@@ -373,6 +390,7 @@ export default function ProductionPage() {
           <Tab3A
             scenes={scenes}
             updateScene={updateScene}
+            addSeedVersion={addSeedVersion}
             projectId={projectId}
           />
         )}
