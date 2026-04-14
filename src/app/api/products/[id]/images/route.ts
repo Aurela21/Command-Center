@@ -38,7 +38,7 @@ async function autoLabel(imageBase64: string, mimeType: string): Promise<string>
             },
             {
               type: "text",
-              text: 'This is a product photo for an e-commerce clothing brand. Describe what this image shows in 2-6 words as a label. Focus on: angle (front/back/side), what part of the product is featured, and any notable detail. Examples: "front full body", "back detail hood", "arm zipper pocket closeup", "fabric texture macro". Return ONLY the label, nothing else.',
+              text: 'This is a product photo for an e-commerce clothing brand. Generate a kebab-case tag (lowercase, hyphens, no spaces) that describes: the camera angle and what part of the product is shown.\n\nExamples: "front-full-body", "back-detail-hood", "left-arm-zipper-pocket-closeup", "fabric-texture-macro", "hood-interior-eye-mask", "side-profile-waist-up", "front-zipper-detail"\n\nReturn ONLY the tag, nothing else. No quotes, no explanation.',
             },
           ],
         },
@@ -47,7 +47,8 @@ async function autoLabel(imageBase64: string, mimeType: string): Promise<string>
 
     const text = msg.content[0].type === "text" ? msg.content[0].text : "";
     // Clean up: lowercase, trim quotes, limit length
-    return text.trim().replace(/^["']|["']$/g, "").toLowerCase().slice(0, 60) || "unlabeled";
+    // Enforce kebab-case: lowercase, replace spaces/underscores with hyphens, strip non-alphanumeric
+    return text.trim().replace(/^["']|["']$/g, "").toLowerCase().replace(/[\s_]+/g, "-").replace(/[^a-z0-9-]/g, "").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "unlabeled";
   } catch (err) {
     console.error("[auto-label] Claude Vision failed:", err);
     return "unlabeled";

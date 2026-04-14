@@ -348,7 +348,11 @@ ${context}
 
 User's brief prompt: "${params.userPrompt}"
 
-Expand this into an optimized generation prompt. Keep the user's creative intent — add technical detail, not different ideas. Return ONLY the refined prompt text, nothing else.`,
+Expand this into an optimized generation prompt. Keep the user's creative intent — add technical detail, not different ideas.
+
+IMPORTANT: Any @tags in the user's prompt (e.g. @airplane-hoodie) MUST be preserved exactly as-is in the refined output. These are system references to product image profiles — do NOT rewrite them as plain text, do NOT remove the @ prefix, do NOT change the tag name. Place the @tag naturally within the sentence.
+
+Return ONLY the refined prompt text, nothing else.`,
   });
 
   const msg = await getClient().messages.create({
