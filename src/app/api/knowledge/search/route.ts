@@ -15,7 +15,12 @@ export type SearchResult = {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { query, topK = 8 } = body as { query: string; topK?: number };
+  const { query, topK = 8, category, categories } = body as {
+    query: string;
+    topK?: number;
+    category?: string;      // filter to a single category
+    categories?: string[];  // filter to multiple categories
+  };
 
   if (!query?.trim()) {
     return NextResponse.json({ error: "query is required" }, { status: 400 });
@@ -24,6 +29,12 @@ export async function POST(req: NextRequest) {
   // Embed the query
   const queryEmbedding = await embed(query);
   const embeddingStr = `[${queryEmbedding.join(",")}]`;
+
+  // Build category filter
+  const catList = categories ?? (category ? [category] : null);
+  const categoryFilter = catList
+    ? sql`AND kd.category = ANY(${catList}::text[])`
+    : sql``;
 
   // pgvector cosine distance search — lower distance = higher similarity
   // 1 - cosine_distance = cosine_similarity
@@ -47,6 +58,7 @@ export async function POST(req: NextRequest) {
     FROM knowledge_chunks kc
     JOIN knowledge_documents kd ON kc.document_id = kd.id
     WHERE kd.status = 'ready'
+    ${categoryFilter}
     ORDER BY kc.embedding <=> ${embeddingStr}::vector
     LIMIT ${topK}
   `);

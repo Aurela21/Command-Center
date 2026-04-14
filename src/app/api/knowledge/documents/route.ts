@@ -17,10 +17,11 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { name, fileUrl, fileType } = body as {
+  const { name, fileUrl, fileType, category } = body as {
     name: string;
     fileUrl: string;
     fileType: string;
+    category?: string;
   };
 
   if (!name || !fileUrl || !fileType) {
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
 
   const [doc] = await db
     .insert(knowledgeDocuments)
-    .values({ name, fileUrl, fileType, status: "processing" })
+    .values({ name, fileUrl, fileType, category: category ?? "brand", status: "processing" })
     .returning();
 
   // Kick off extraction + embedding in the background.

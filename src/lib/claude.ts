@@ -228,22 +228,27 @@ export async function generateScript(params: {
   tonality: string;
   format: string;
   klingElementTags: string[];
-  knowledgeChunks: Array<{ content: string; sectionTitle?: string | null }>;
+  knowledgeChunks: Array<{ content: string; sectionTitle?: string | null; source?: "script" | "kling" }>;
 }): Promise<ScriptResult> {
-  const knowledgeSection =
-    params.knowledgeChunks.length > 0
-      ? `\n\n## Relevant Marketing Knowledge\n${params.knowledgeChunks
-          .map(
-            (c, i) =>
-              `[${i + 1}]${c.sectionTitle ? ` **${c.sectionTitle}**` : ""}\n${c.content}`
-          )
-          .join("\n\n")}`
-      : "";
+  const scriptChunks = params.knowledgeChunks.filter((c) => c.source !== "kling");
+  const klingChunks = params.knowledgeChunks.filter((c) => c.source === "kling");
+
+  let knowledgeSection = "";
+  if (scriptChunks.length > 0) {
+    knowledgeSection += `\n\n## Brand & Copy Reference (use for voiceover script)\n${scriptChunks
+      .map((c, i) => `[${i + 1}]${c.sectionTitle ? ` **${c.sectionTitle}**` : ""}\n${c.content}`)
+      .join("\n\n")}`;
+  }
+  if (klingChunks.length > 0) {
+    knowledgeSection += `\n\n## Kling Prompting Reference (use for visual prompts)\n${klingChunks
+      .map((c, i) => `[${i + 1}]${c.sectionTitle ? ` **${c.sectionTitle}**` : ""}\n${c.content}`)
+      .join("\n\n")}`;
+  }
 
   const msg = await getClient().messages.create({
     model: DEEP,
     max_tokens: 4096,
-    system: `You are an expert DTC video ad copywriter. You produce two things simultaneously: (1) a punchy voiceover/talking script — the actual words spoken aloud or shown as text on screen during the ad, and (2) per-scene Kling visual prompts — technical motion/camera descriptions used to generate video clips, NOT dialogue.${knowledgeSection}`,
+    system: `You are an expert DTC video ad copywriter. You produce two things simultaneously: (1) a punchy voiceover/talking script — the actual words spoken aloud or shown as text on screen during the ad, and (2) per-scene Kling visual prompts — technical motion/camera descriptions used to generate video clips, NOT dialogue.\n\nWhen "Brand & Copy Reference" material is provided, match the brand voice, tone, and copywriting style closely. When "Kling Prompting Reference" material is provided, follow those prompting patterns and best practices for the visual prompts.${knowledgeSection}`,
     messages: [
       {
         role: "user",

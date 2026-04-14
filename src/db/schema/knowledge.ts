@@ -25,12 +25,24 @@ const vector = customType<{ data: number[]; driverData: string }>({
   },
 });
 
+export const KNOWLEDGE_CATEGORIES = [
+  "brand",
+  "voice",
+  "style",
+  "script_copy",
+  "kling_prompts",
+  "product_assets",
+] as const;
+
+export type KnowledgeCategory = (typeof KNOWLEDGE_CATEGORIES)[number];
+
 export const knowledgeDocuments = pgTable("knowledge_documents", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
+  category: text("category").notNull().default("brand"),
   fileUrl: text("file_url"),
   fileType: text("file_type"),
-  // pdf | epub | txt | docx
+  // pdf | epub | txt | docx | jpg | png | webp
   totalChunks: integer("total_chunks").default(0),
   status: text("status").default("processing"),
   // processing | ready | error

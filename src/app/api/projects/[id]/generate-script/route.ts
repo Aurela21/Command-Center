@@ -47,34 +47,55 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
 
   // 2. Search knowledge base for relevant context
-  let knowledgeChunks: Array<{ content: string; sectionTitle?: string | null }> = [];
+  //    Voiceover script pulls from: brand, voice, script_copy
+  //    Kling prompts pull from: kling_prompts, style
+  let scriptKnowledge: Array<{ content: string; sectionTitle?: string | null }> = [];
+  let klingKnowledge: Array<{ content: string; sectionTitle?: string | null }> = [];
+
   try {
-    const query = `${project.name} ${angle} ${tonality} ${format} video ad script`;
-    const queryEmbedding = await embed(query);
-    const embeddingStr = `[${queryEmbedding.join(",")}]`;
+    const scriptQuery = `${project.name} ${angle} ${tonality} ${format} video ad script voiceover copy`;
+    const klingQuery = `kling video generation prompt ${format} visual motion camera`;
 
-    const rows = await db.execute<{
-      content: string;
-      section_title: string | null;
-      similarity: number;
-    }>(sql`
-      SELECT kc.content, kc.section_title,
-        (1 - (kc.embedding <=> ${embeddingStr}::vector))::float AS similarity
-      FROM knowledge_chunks kc
-      JOIN knowledge_documents kd ON kc.document_id = kd.id
-      WHERE kd.status = 'ready'
-      ORDER BY kc.embedding <=> ${embeddingStr}::vector
-      LIMIT 5
-    `);
+    const scriptEmbedding = await embed(scriptQuery);
+    const klingEmbedding = await embed(klingQuery);
+    const scriptEmbStr = `[${scriptEmbedding.join(",")}]`;
+    const klingEmbStr = `[${klingEmbedding.join(",")}]`;
 
-    knowledgeChunks = rows.map((r) => ({
-      content: r.content,
-      sectionTitle: r.section_title,
-    }));
+    const scriptCategories = ["brand", "voice", "script_copy"];
+    const klingCategories = ["kling_prompts", "style"];
+
+    const [scriptRows, klingRows] = await Promise.all([
+      db.execute<{ content: string; section_title: string | null; similarity: number }>(sql`
+        SELECT kc.content, kc.section_title,
+          (1 - (kc.embedding <=> ${scriptEmbStr}::vector))::float AS similarity
+        FROM knowledge_chunks kc
+        JOIN knowledge_documents kd ON kc.document_id = kd.id
+        WHERE kd.status = 'ready' AND kd.category = ANY(${scriptCategories}::text[])
+        ORDER BY kc.embedding <=> ${scriptEmbStr}::vector
+        LIMIT 5
+      `),
+      db.execute<{ content: string; section_title: string | null; similarity: number }>(sql`
+        SELECT kc.content, kc.section_title,
+          (1 - (kc.embedding <=> ${klingEmbStr}::vector))::float AS similarity
+        FROM knowledge_chunks kc
+        JOIN knowledge_documents kd ON kc.document_id = kd.id
+        WHERE kd.status = 'ready' AND kd.category = ANY(${klingCategories}::text[])
+        ORDER BY kc.embedding <=> ${klingEmbStr}::vector
+        LIMIT 5
+      `),
+    ]);
+
+    scriptKnowledge = scriptRows.map((r) => ({ content: r.content, sectionTitle: r.section_title }));
+    klingKnowledge = klingRows.map((r) => ({ content: r.content, sectionTitle: r.section_title }));
   } catch {
-    // Knowledge base is optional — proceed without it
     console.log("[generate-script] Knowledge base search skipped (no docs or error)");
   }
+
+  // Merge both sets for the Claude prompt — label them so Claude knows which is which
+  const knowledgeChunks = [
+    ...scriptKnowledge.map((c) => ({ ...c, source: "script" as const })),
+    ...klingKnowledge.map((c) => ({ ...c, source: "kling" as const })),
+  ];
 
   // 3. Generate script via Claude
   const result = await generateScript({
