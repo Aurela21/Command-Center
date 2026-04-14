@@ -10,7 +10,6 @@ import {
   LayoutList,
   Clapperboard,
   BookOpen,
-  ChevronRight,
   Lock,
   Circle,
   FolderOpen,

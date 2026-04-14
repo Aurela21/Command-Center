@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { scenes, projects } from "@/db/schema";
-import { eq, and, inArray, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { getJobsByProject, createJob, submitJob } from "@/lib/job-queue";
 import { submitKlingJob } from "@/lib/kling";
 

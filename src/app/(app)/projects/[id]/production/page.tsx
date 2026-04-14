@@ -268,11 +268,15 @@ export default function ProductionPage() {
         case "job:completed":
           if (event.sceneId) {
             if (event.jobType === "nano_banana") {
-              // Completed seed image — add to versions list
+              // Completed seed image — add to versions list (skip if already added by API response)
               if (event.assetVersionId) {
                 setScenes((prev) =>
                   prev.map((s) => {
                     if (s.sceneId !== event.sceneId) return s;
+                    // Deduplicate: skip if this version was already added by handleGenerate
+                    if (s.seedVersions.some((v) => v.id === event.assetVersionId)) {
+                      return { ...s, seedGenerating: false };
+                    }
                     const newVersion: SeedVersion = {
                       id: event.assetVersionId!,
                       createdAt: new Date().toISOString(),

@@ -38,7 +38,6 @@ export async function POST(req: NextRequest) {
 
   // Images (product assets) skip text extraction — just mark ready with the R2 URL
   if ((fileType as string) === "image") {
-    const { publicUrl } = await import("@/lib/r2");
     await db
       .update(knowledgeDocuments)
       .set({ status: "ready", totalChunks: 0 })

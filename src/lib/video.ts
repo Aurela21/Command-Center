@@ -1,6 +1,6 @@
 import ffmpeg from "fluent-ffmpeg";
 import { pipeline } from "stream/promises";
-import { createWriteStream, createReadStream, existsSync } from "fs";
+import { createWriteStream, existsSync } from "fs";
 import { unlink, mkdir } from "fs/promises";
 import { tmpdir } from "os";
 import path from "path";

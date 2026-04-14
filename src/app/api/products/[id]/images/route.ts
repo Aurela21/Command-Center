@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { productProfiles, productImages } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
-import { uploadBuffer, publicUrl } from "@/lib/r2";
+import { uploadBuffer } from "@/lib/r2";
 import Anthropic from "@anthropic-ai/sdk";
 
 type Params = { params: Promise<{ id: string }> };

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Check, Loader2, Package, ShoppingBag, Sparkles, Trash2, Wand2 } from "lucide-react";
+import { Check, Loader2, Package, Sparkles, Trash2, Wand2 } from "lucide-react";
 import type { SceneProductionState, SeedVersion } from "./types";
 
 // ─── Scene list item (left panel) ────────────────────────────────────────────

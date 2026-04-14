@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { X, Plus, ArrowRight, CheckCircle2 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { Project } from "@/db/schema";
 
