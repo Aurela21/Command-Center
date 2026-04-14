@@ -367,22 +367,31 @@ function SceneGenerationCard({
             </button>
           ) : scene.videoJobStatus === "completed" ? (
             <div className="flex items-center justify-between">
-              {scene.videoUrl ? (
-                <a
-                  href={scene.videoUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 hover:text-emerald-700 transition-colors"
+              <div className="flex items-center gap-3">
+                {scene.videoUrl ? (
+                  <a
+                    href={scene.videoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 hover:text-emerald-700 transition-colors"
+                  >
+                    <Play className="h-3 w-3" />
+                    View
+                  </a>
+                ) : (
+                  <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-600">
+                    <Play className="h-3 w-3" />
+                    Complete
+                  </span>
+                )}
+                <button
+                  onClick={handleGenerate}
+                  className="flex items-center gap-1.5 text-xs font-medium text-neutral-400 hover:text-neutral-700 transition-colors"
                 >
-                  <Play className="h-3 w-3" />
-                  View output
-                </a>
-              ) : (
-                <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-600">
-                  <Play className="h-3 w-3" />
-                  Complete
-                </span>
-              )}
+                  <RefreshCw className="h-3 w-3" />
+                  Rerun
+                </button>
+              </div>
               {scene.qualityScore != null && (
                 <button
                   onClick={() => setWarningOpen(true)}
