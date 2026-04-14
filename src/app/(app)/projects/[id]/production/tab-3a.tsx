@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Check, Loader2, ShoppingBag, Wand2 } from "lucide-react";
+import { Check, Loader2, Package, ShoppingBag, Wand2 } from "lucide-react";
 import type { SceneProductionState, SeedVersion } from "./types";
 
 // ─── Scene list item (left panel) ────────────────────────────────────────────
@@ -88,6 +88,153 @@ function SceneListItem({
         </p>
       </div>
     </button>
+  );
+}
+
+// ─── Prompt textarea with @mention autocomplete ─────────────────────────────
+
+type ProductTag = { slug: string; name: string; imageCount: number };
+
+function PromptWithMentions({
+  value,
+  onChange,
+  products,
+  placeholder,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  products: ProductTag[];
+  placeholder?: string;
+}) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [showMenu, setShowMenu] = useState(false);
+  const [menuFilter, setMenuFilter] = useState("");
+  const [menuIndex, setMenuIndex] = useState(0);
+  const [cursorPos, setCursorPos] = useState(0);
+
+  // Find the @word being typed at the cursor
+  const getAtWord = useCallback(
+    (text: string, cursor: number) => {
+      const before = text.slice(0, cursor);
+      const match = before.match(/@([\w-]*)$/);
+      return match ? { start: before.length - match[0].length, fragment: match[1] } : null;
+    },
+    []
+  );
+
+  const filtered = products.filter(
+    (p) =>
+      !menuFilter ||
+      p.slug.includes(menuFilter.toLowerCase()) ||
+      p.name.toLowerCase().includes(menuFilter.toLowerCase())
+  );
+
+  function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    const newVal = e.target.value;
+    const cursor = e.target.selectionStart ?? 0;
+    onChange(newVal);
+    setCursorPos(cursor);
+
+    const atWord = getAtWord(newVal, cursor);
+    if (atWord && products.length > 0) {
+      setMenuFilter(atWord.fragment);
+      setMenuIndex(0);
+      setShowMenu(true);
+    } else {
+      setShowMenu(false);
+    }
+  }
+
+  function insertMention(slug: string) {
+    const atWord = getAtWord(value, cursorPos);
+    if (!atWord) return;
+    const before = value.slice(0, atWord.start);
+    const after = value.slice(cursorPos);
+    const newVal = `${before}@${slug} ${after}`;
+    onChange(newVal);
+    setShowMenu(false);
+
+    // Restore focus and cursor position
+    requestAnimationFrame(() => {
+      const ta = textareaRef.current;
+      if (ta) {
+        const newCursor = atWord.start + slug.length + 2; // @slug + space
+        ta.focus();
+        ta.setSelectionRange(newCursor, newCursor);
+      }
+    });
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (!showMenu || filtered.length === 0) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setMenuIndex((i) => (i + 1) % filtered.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setMenuIndex((i) => (i - 1 + filtered.length) % filtered.length);
+    } else if (e.key === "Enter" || e.key === "Tab") {
+      e.preventDefault();
+      insertMention(filtered[menuIndex].slug);
+    } else if (e.key === "Escape") {
+      setShowMenu(false);
+    }
+  }
+
+  return (
+    <div className="relative">
+      <textarea
+        ref={textareaRef}
+        value={value}
+        onChange={handleChange}
+        onKeyDown={handleKeyDown}
+        onBlur={() => {
+          // Delay to allow menu click
+          setTimeout(() => setShowMenu(false), 200);
+        }}
+        rows={4}
+        placeholder={placeholder}
+        className="w-full text-sm rounded-md border border-neutral-200 px-3 py-2.5 bg-white resize-none focus:outline-none focus:ring-2 focus:ring-neutral-200 focus:border-neutral-300 transition-all placeholder:text-neutral-400"
+      />
+
+      {/* Autocomplete dropdown */}
+      {showMenu && filtered.length > 0 && (
+        <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-lg overflow-hidden max-h-48 overflow-y-auto">
+          {filtered.map((p, i) => (
+            <button
+              key={p.slug}
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                insertMention(p.slug);
+              }}
+              className={cn(
+                "w-full text-left flex items-center gap-3 px-3 py-2.5 transition-colors",
+                i === menuIndex
+                  ? "bg-orange-50"
+                  : "hover:bg-neutral-50"
+              )}
+            >
+              <div className="shrink-0 w-7 h-7 rounded bg-orange-100 flex items-center justify-center">
+                <Package className="h-3.5 w-3.5 text-orange-500" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-neutral-800 truncate">
+                  {p.name}
+                </p>
+                <p className="text-[11px] text-orange-500 font-mono">
+                  @{p.slug}
+                  <span className="text-neutral-300 ml-1.5">
+                    {p.imageCount} image{p.imageCount !== 1 ? "s" : ""}
+                  </span>
+                </p>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -213,42 +360,17 @@ function SeedDetailPanel({
         )}
       </div>
 
-      {/* Nano Banana prompt */}
+      {/* Nano Banana prompt with @mention autocomplete */}
       <div>
         <p className="text-xs font-medium uppercase tracking-widest text-neutral-400 mb-3">
-          Nano Banana Prompt
+          Seed Image Prompt
         </p>
-        <textarea
+        <PromptWithMentions
           value={scene.nanoBananaPrompt}
-          onChange={(e) =>
-            updateScene(scene.sceneId, { nanoBananaPrompt: e.target.value })
-          }
-          rows={4}
-          placeholder="Describe the seed image to generate from this reference frame…"
-          className="w-full text-sm rounded-md border border-neutral-200 px-3 py-2.5 bg-white resize-none focus:outline-none focus:ring-2 focus:ring-neutral-200 focus:border-neutral-300 transition-all placeholder:text-neutral-400"
+          onChange={(val) => updateScene(scene.sceneId, { nanoBananaPrompt: val })}
+          products={productTags}
+          placeholder="Describe the seed image… Type @ to reference a product"
         />
-        {productTags.length > 0 && (
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            <ShoppingBag className="h-3 w-3 text-neutral-300 shrink-0" />
-            {productTags.map((p) => (
-              <button
-                key={p.slug}
-                type="button"
-                title={`${p.name} (${p.imageCount} images)`}
-                onClick={() =>
-                  updateScene(scene.sceneId, {
-                    nanoBananaPrompt: scene.nanoBananaPrompt
-                      ? `${scene.nanoBananaPrompt} @${p.slug}`
-                      : `@${p.slug}`,
-                  })
-                }
-                className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 border border-orange-100 hover:bg-orange-100 transition-colors"
-              >
-                @{p.slug}
-              </button>
-            ))}
-          </div>
-        )}
         <Button
           onClick={handleGenerate}
           disabled={generating || !scene.nanoBananaPrompt.trim()}
