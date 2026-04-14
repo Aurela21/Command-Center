@@ -3,7 +3,7 @@
  * Used by the knowledge base processing pipeline.
  */
 
-export type SupportedFileType = "pdf" | "docx" | "txt";
+export type SupportedFileType = "pdf" | "docx" | "txt" | "image";
 
 /**
  * Extract plain text from a file buffer.
@@ -40,6 +40,11 @@ export async function extractText(
       return result.value;
     }
 
+    case "image": {
+      // Images are not text-extractable — return empty string
+      return "";
+    }
+
     default: {
       const exhaustive: never = fileType;
       throw new Error(`Unsupported file type: ${exhaustive}`);
@@ -64,5 +69,13 @@ export function inferFileType(
     return "docx";
   if (s.includes("text/plain") || s.endsWith(".txt") || s.endsWith(".md"))
     return "txt";
+  if (
+    s.includes("image/") ||
+    s.endsWith(".jpg") ||
+    s.endsWith(".jpeg") ||
+    s.endsWith(".png") ||
+    s.endsWith(".webp")
+  )
+    return "image";
   return null;
 }

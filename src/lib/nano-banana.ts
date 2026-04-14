@@ -9,8 +9,9 @@ const MODEL = "gemini-3-pro-image-preview";
 const BASE_URL = "https://generativelanguage.googleapis.com";
 
 export type NanoBananaRequest = {
-  imageUrl: string; // public R2 URL for the reference frame
-  prompt: string;   // change prompt describing what to generate
+  imageUrl: string;              // public R2 URL for the reference frame
+  prompt: string;                // change prompt describing what to generate
+  referenceImageUrls?: string[]; // additional product images resolved from @tags
 };
 
 export type NanoBananaResult = {
@@ -43,20 +44,37 @@ export async function generateSeedImage(
   const mimeType =
     imgRes.headers.get("content-type")?.split(";")[0] || "image/jpeg";
 
-  // 2. Call Gemini image generation
+  // 2. Fetch any product reference images (@tags)
+  const refParts: Array<{ inlineData: { mimeType: string; data: string } }> = [];
+  if (req.referenceImageUrls?.length) {
+    for (const refUrl of req.referenceImageUrls) {
+      const refRes = await fetch(refUrl);
+      if (!refRes.ok) {
+        console.warn(`[nano-banana] Failed to fetch product image: ${refUrl}`);
+        continue;
+      }
+      const refBuf = await refRes.arrayBuffer();
+      const refMime = refRes.headers.get("content-type")?.split(";")[0] || "image/jpeg";
+      refParts.push({
+        inlineData: { mimeType: refMime, data: Buffer.from(refBuf).toString("base64") },
+      });
+    }
+  }
+
+  // 3. Call Gemini image generation
+  // Parts order: [reference frame] + [product images] + [text prompt]
+  const parts: Array<Record<string, unknown>> = [
+    { inlineData: { mimeType, data: imgBase64 } },
+    ...refParts,
+    { text: req.prompt },
+  ];
+
   const url = `${BASE_URL}/v1beta/models/${MODEL}:generateContent?key=${apiKey()}`;
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      contents: [
-        {
-          parts: [
-            { inlineData: { mimeType, data: imgBase64 } },
-            { text: req.prompt },
-          ],
-        },
-      ],
+      contents: [{ parts }],
       generationConfig: { responseModalities: ["IMAGE"] },
     }),
   });

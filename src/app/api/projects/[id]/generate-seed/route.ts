@@ -9,11 +9,11 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { scenes, assetVersions, jobs } from "@/db/schema";
-import { eq, and, inArray, sql } from "drizzle-orm";
+import { scenes, assetVersions, jobs, knowledgeDocuments } from "@/db/schema";
+import { eq, and, inArray, sql, ilike } from "drizzle-orm";
 import { createJob, completeJob, failJob } from "@/lib/job-queue";
 import { generateSeedImage } from "@/lib/nano-banana";
-import { uploadBuffer } from "@/lib/r2";
+import { uploadBuffer, publicUrl } from "@/lib/r2";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -92,10 +92,39 @@ export async function POST(req: NextRequest, { params }: Params) {
     resultData: { prompt },
   });
 
+  // Parse @tags from prompt and look up product asset images
+  const tagMatches = prompt.match(/@[\w-]+/g) ?? [];
+  const productImageUrls: string[] = [];
+  for (const tag of tagMatches) {
+    const tagName = tag.slice(1); // remove @
+    // Match by filename (without extension) — e.g. @black-t-shirt matches "black-t-shirt.jpg"
+    const [doc] = await db
+      .select()
+      .from(knowledgeDocuments)
+      .where(
+        and(
+          eq(knowledgeDocuments.category, "product_assets"),
+          eq(knowledgeDocuments.status, "ready"),
+          ilike(knowledgeDocuments.name, `${tagName}%`)
+        )
+      );
+    if (doc?.fileUrl) {
+      const url = doc.fileUrl.startsWith("http") ? doc.fileUrl : publicUrl(doc.fileUrl);
+      productImageUrls.push(url);
+      console.log(`[generate-seed] Resolved ${tag} → ${url}`);
+    } else {
+      console.warn(`[generate-seed] @tag "${tagName}" not found in product_assets`);
+    }
+  }
+
   // Generate image synchronously via Gemini
   try {
-    console.log(`[generate-seed] Calling Gemini for scene ${sceneId}…`);
-    const { imageBase64, mimeType } = await generateSeedImage({ imageUrl, prompt });
+    console.log(`[generate-seed] Calling Gemini for scene ${sceneId} with ${productImageUrls.length} product ref(s)…`);
+    const { imageBase64, mimeType } = await generateSeedImage({
+      imageUrl,
+      prompt,
+      referenceImageUrls: productImageUrls.length > 0 ? productImageUrls : undefined,
+    });
 
     // Upload to R2
     const ext = mimeType.includes("png") ? "png" : "jpg";

@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Check, Loader2, Wand2 } from "lucide-react";
+import { Check, Loader2, ShoppingBag, Wand2 } from "lucide-react";
 import type { SceneProductionState, SeedVersion } from "./types";
 
 // ─── Scene list item (left panel) ────────────────────────────────────────────
@@ -103,6 +103,20 @@ function SeedDetailPanel({
   updateScene: (sceneId: string, patch: Partial<SceneProductionState>) => void;
 }) {
   const generating = scene.seedGenerating ?? false;
+
+  // Fetch available @tags from product_assets
+  const [productTags, setProductTags] = useState<string[]>([]);
+  useEffect(() => {
+    fetch("/api/knowledge/documents")
+      .then((r) => r.json())
+      .then((docs: Array<{ name: string; category?: string; status: string }>) => {
+        const tags = docs
+          .filter((d) => d.category === "product_assets" && d.status === "ready")
+          .map((d) => d.name.replace(/\.[^.]+$/, "").replace(/[^a-z0-9_-]/gi, "-"));
+        setProductTags(tags);
+      })
+      .catch(() => {});
+  }, []);
 
   async function handleGenerate() {
     if (!scene.nanoBananaPrompt.trim()) return;
@@ -216,6 +230,27 @@ function SeedDetailPanel({
           placeholder="Describe the seed image to generate from this reference frame…"
           className="w-full text-sm rounded-md border border-neutral-200 px-3 py-2.5 bg-white resize-none focus:outline-none focus:ring-2 focus:ring-neutral-200 focus:border-neutral-300 transition-all placeholder:text-neutral-400"
         />
+        {productTags.length > 0 && (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <ShoppingBag className="h-3 w-3 text-neutral-300 shrink-0" />
+            {productTags.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() =>
+                  updateScene(scene.sceneId, {
+                    nanoBananaPrompt: scene.nanoBananaPrompt
+                      ? `${scene.nanoBananaPrompt} @${tag}`
+                      : `@${tag}`,
+                  })
+                }
+                className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 border border-orange-100 hover:bg-orange-100 transition-colors"
+              >
+                @{tag}
+              </button>
+            ))}
+          </div>
+        )}
         <Button
           onClick={handleGenerate}
           disabled={generating || !scene.nanoBananaPrompt.trim()}

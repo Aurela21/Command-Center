@@ -36,6 +36,18 @@ export async function POST(req: NextRequest) {
     .values({ name, fileUrl, fileType, category: category ?? "brand", status: "processing" })
     .returning();
 
+  // Images (product assets) skip text extraction — just mark ready with the R2 URL
+  if ((fileType as string) === "image") {
+    const { publicUrl } = await import("@/lib/r2");
+    await db
+      .update(knowledgeDocuments)
+      .set({ status: "ready", totalChunks: 0 })
+      .where(eq(knowledgeDocuments.id, doc.id));
+    const updated = { ...doc, status: "ready" as const, totalChunks: 0 };
+    console.log(`[knowledge] Image asset ${doc.id} ready — ${doc.name}`);
+    return NextResponse.json(updated, { status: 201 });
+  }
+
   // Kick off extraction + embedding in the background.
   // setImmediate works on Railway's persistent Node.js process.
   setImmediate(() => {
