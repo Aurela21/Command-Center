@@ -557,8 +557,28 @@ export default function ManifestPage() {
 
   // ── Scene mutations (local state only — saved to DB on approve) ───────────
 
-  function updateScene(id: string, patch: Partial<MockScene>) {
-    setScenes((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+  function updateScene(sceneId: string, patch: Partial<MockScene>) {
+    setScenes((prev) =>
+      prev.map((s) => {
+        if (s.id !== sceneId) return s;
+        const updated = { ...s, ...patch };
+        // Recompute candidate frames when boundaries change
+        if (patch.startFrame !== undefined || patch.endFrame !== undefined) {
+          const cFrameNums = candidateFrames(updated.startFrame, updated.endFrame);
+          const startS = Math.floor(updated.startTimeMs / 1000);
+          const endS = Math.ceil(updated.endTimeMs / 1000);
+          const cUrls = cFrameNums.map((_, i) => {
+            const sec = Math.round(
+              startS + ((endS - startS) / (cFrameNums.length + 1)) * (i + 1)
+            );
+            return frameUrl(id, sec);
+          });
+          updated.candidateFrames = cFrameNums;
+          updated.candidateFrameUrls = cUrls;
+        }
+        return updated;
+      })
+    );
   }
 
   function splitScene(id: string) {
