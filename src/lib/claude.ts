@@ -318,12 +318,20 @@ export async function refinePrompt(params: {
       ? `You are refining a prompt for Gemini image generation (seed frame for a video ad).
 Focus on: composition, camera angle, lighting, subject positioning, color palette, depth of field, and art direction.
 Output a single detailed paragraph — no line breaks, no bullet points. Max 120 words.
-The output image will be 9:16 vertical format.`
+The output image will be 9:16 vertical format.
+
+CRITICAL: Product fidelity rules:
+- NEVER invent or assume how product features work. Describe features EXACTLY as stated in the product description.
+- If the product description says a feature is "built into" or "integrated with" another part, they are ONE piece — do NOT describe them as separate items.
+- If you are unsure how a feature physically works, omit the detail rather than guessing wrong.
+- Use the product image labels to understand what each feature actually looks like — these are real photos of the real product.`
       : `You are refining a prompt for Kling AI video generation (image-to-video).
 Focus on: motion description, camera movement (pan/tilt/zoom/dolly/static), subject action, atmosphere, pacing.
 Do NOT describe static composition — the seed image already handles that. Describe what MOVES and HOW.
 Keep it under 40 words — Kling quality degrades above 50 words.
-Output a single concise paragraph.`;
+Output a single concise paragraph.
+
+CRITICAL: Do NOT invent product feature descriptions. If referencing a product, describe only actions/movements — not how the product is constructed.`;
 
   let context = `Scene context: ${params.sceneDescription}`;
   if (params.durationS) context += `\nTarget duration: ${params.durationS}s`;
