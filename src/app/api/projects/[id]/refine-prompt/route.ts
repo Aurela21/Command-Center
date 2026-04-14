@@ -9,8 +9,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { scenes, productProfiles, productImages } from "@/db/schema";
-import { eq, asc, sql } from "drizzle-orm";
+import { scenes, productProfiles, productImages, assetVersions } from "@/db/schema";
+import { eq, and, asc, sql } from "drizzle-orm";
 import { refinePrompt, type RefineTarget } from "@/lib/claude";
 import { embed } from "@/lib/embeddings";
 
@@ -111,6 +111,31 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
   }
 
+  // Look up past rejection reasons for this scene to avoid repeating mistakes
+  let rejectionHistory = "";
+  try {
+    const rejectedVersions = await db
+      .select({
+        rejectionReason: assetVersions.rejectionReason,
+        generationPrompt: assetVersions.generationPrompt,
+      })
+      .from(assetVersions)
+      .where(
+        and(
+          eq(assetVersions.sceneId, sceneId),
+          eq(assetVersions.isRejected, true)
+        )
+      );
+    if (rejectedVersions.length > 0) {
+      rejectionHistory = rejectedVersions
+        .filter((r) => r.rejectionReason)
+        .map((r) => `- Prompt: "${r.generationPrompt?.slice(0, 80) ?? "unknown"}"\n  Issues: ${r.rejectionReason}`)
+        .join("\n");
+    }
+  } catch {
+    // Rejection history optional
+  }
+
   try {
     const refined = await refinePrompt({
       userPrompt: prompt,
@@ -121,6 +146,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       styleKnowledge: styleKnowledge || undefined,
       klingKnowledge: klingKnowledge || undefined,
       referenceFrameUrl,
+      rejectionHistory: rejectionHistory || undefined,
     });
 
     return NextResponse.json({ refined });

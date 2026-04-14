@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Check, Loader2, Package, ShoppingBag, Sparkles, Wand2 } from "lucide-react";
+import { Check, Loader2, Package, ShoppingBag, Sparkles, Trash2, Wand2 } from "lucide-react";
 import type { SceneProductionState, SeedVersion } from "./types";
 
 // ─── Scene list item (left panel) ────────────────────────────────────────────
@@ -335,6 +335,35 @@ function SeedDetailPanel({
     }).catch(console.error);
   }
 
+  const [rejecting, setRejecting] = useState<string | null>(null);
+
+  async function handleReject(versionId: string) {
+    setRejecting(versionId);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/reject-version`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assetVersionId: versionId }),
+      });
+      if (!res.ok) throw new Error("Reject failed");
+      const { rejectionReason } = (await res.json()) as { rejectionReason: string };
+      // Update local state to mark as rejected
+      updateScene(scene.sceneId, {
+        seedVersions: scene.seedVersions.map((v) =>
+          v.id === versionId ? { ...v, isRejected: true, rejectionReason } : v
+        ),
+        // If the rejected version was approved, unapprove
+        ...(scene.approvedSeedVersionId === versionId
+          ? { approvedSeedVersionId: null, seedImageApproved: false }
+          : {}),
+      });
+    } catch (err) {
+      console.error("[reject]", err);
+    } finally {
+      setRejecting(null);
+    }
+  }
+
   async function handleUnapprove() {
     updateScene(scene.sceneId, {
       approvedSeedVersionId: null,
@@ -485,81 +514,135 @@ function SeedDetailPanel({
       {/* Generated versions */}
       {scene.seedVersions.length > 0 ? (
         <div>
-          <p className="text-xs font-medium uppercase tracking-widest text-neutral-400 mb-3">
-            Generated Versions
-          </p>
-          <div className="grid grid-cols-2 gap-3">
-            {scene.seedVersions.map((v: SeedVersion, i: number) => {
-              const isApproved = v.id === scene.approvedSeedVersionId;
-              return (
-                <div
-                  key={v.id}
-                  className={cn(
-                    "rounded-lg border-2 overflow-hidden transition-all",
-                    isApproved
-                      ? "border-neutral-900 ring-2 ring-neutral-900 ring-offset-1"
-                      : "border-neutral-100 hover:border-neutral-300"
+          {(() => {
+            const active = scene.seedVersions.filter((v) => !v.isRejected);
+            const rejected = scene.seedVersions.filter((v) => v.isRejected);
+            return (
+              <>
+                <p className="text-xs font-medium uppercase tracking-widest text-neutral-400 mb-3">
+                  Generated Versions
+                  {rejected.length > 0 && (
+                    <span className="text-neutral-300 font-normal ml-1">
+                      ({rejected.length} rejected)
+                    </span>
                   )}
-                >
-                  <div
-                    className="aspect-[9/16] relative overflow-hidden"
-                    style={{
-                      backgroundColor: v.imageUrl ? undefined : scene.color,
-                    }}
-                  >
-                    {v.imageUrl ? (
-                      <img
-                        src={v.imageUrl}
-                        alt={`Seed v${i + 1}`}
-                        className="absolute inset-0 w-full h-full object-cover"
-                      />
-                    ) : null}
-                    {isApproved && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                        <div className="bg-white rounded-full p-1">
-                          <Check className="h-3.5 w-3.5 text-neutral-900" />
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  {active.map((v: SeedVersion, i: number) => {
+                    const isApproved = v.id === scene.approvedSeedVersionId;
+                    const isRejecting = rejecting === v.id;
+                    return (
+                      <div
+                        key={v.id}
+                        className={cn(
+                          "rounded-lg border-2 overflow-hidden transition-all group/card",
+                          isApproved
+                            ? "border-neutral-900 ring-2 ring-neutral-900 ring-offset-1"
+                            : "border-neutral-100 hover:border-neutral-300"
+                        )}
+                      >
+                        <div
+                          className="aspect-[9/16] relative overflow-hidden"
+                          style={{
+                            backgroundColor: v.imageUrl ? undefined : scene.color,
+                          }}
+                        >
+                          {v.imageUrl ? (
+                            <img
+                              src={v.imageUrl}
+                              alt={`Seed v${i + 1}`}
+                              className="absolute inset-0 w-full h-full object-cover"
+                            />
+                          ) : null}
+                          {isApproved && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                              <div className="bg-white rounded-full p-1">
+                                <Check className="h-3.5 w-3.5 text-neutral-900" />
+                              </div>
+                            </div>
+                          )}
+                          {/* Trash button */}
+                          {!isApproved && (
+                            <button
+                              onClick={() => handleReject(v.id)}
+                              disabled={isRejecting}
+                              className="absolute top-1.5 right-1.5 p-1.5 rounded-lg bg-black/40 text-white opacity-0 group-hover/card:opacity-100 transition-opacity hover:bg-red-500/80 disabled:opacity-50"
+                              title="Reject — Claude will analyze why it's bad"
+                            >
+                              {isRejecting ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-3 w-3" />
+                              )}
+                            </button>
+                          )}
+                        </div>
+                        <div className="px-2.5 py-2 bg-white flex items-center justify-between">
+                          <span
+                            className={cn(
+                              "text-xs font-semibold tabular-nums",
+                              v.qualityScore >= 80
+                                ? "text-emerald-600"
+                                : v.qualityScore >= 65
+                                ? "text-amber-600"
+                                : "text-neutral-400"
+                            )}
+                          >
+                            {v.qualityScore > 0 ? v.qualityScore : `v${i + 1}`}
+                          </span>
+                          <button
+                            onClick={() =>
+                              isApproved
+                                ? handleUnapprove()
+                                : handleApproveSeed(v.id)
+                            }
+                            className={cn(
+                              "text-[11px] font-medium px-2 py-0.5 rounded transition-colors",
+                              isApproved
+                                ? "bg-neutral-900 text-white"
+                                : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
+                            )}
+                          >
+                            {isApproved ? "Approved" : "Approve"}
+                          </button>
                         </div>
                       </div>
-                    )}
-                    {!v.imageUrl && (
-                      <span className="absolute bottom-1 right-1 text-[9px] font-mono bg-white/80 px-1 py-0.5 rounded leading-none">
-                        v{i + 1}
-                      </span>
-                    )}
-                  </div>
-                  <div className="px-2.5 py-2 bg-white flex items-center justify-between">
-                    <span
-                      className={cn(
-                        "text-xs font-semibold tabular-nums",
-                        v.qualityScore >= 80
-                          ? "text-emerald-600"
-                          : v.qualityScore >= 65
-                          ? "text-amber-600"
-                          : "text-neutral-400"
-                      )}
-                    >
-                      {v.qualityScore > 0 ? v.qualityScore : `v${i + 1}`}
-                    </span>
-                    <button
-                      onClick={() =>
-                        isApproved
-                          ? handleUnapprove()
-                          : handleApproveSeed(v.id)
-                      }
-                      className={cn(
-                        "text-[11px] font-medium px-2 py-0.5 rounded transition-colors",
-                        isApproved
-                          ? "bg-neutral-900 text-white"
-                          : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
-                      )}
-                    >
-                      {isApproved ? "Approved" : "Approve"}
-                    </button>
-                  </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
-          </div>
+
+                {/* Rejected versions (collapsed) */}
+                {rejected.length > 0 && (
+                  <details className="mt-4">
+                    <summary className="text-xs text-neutral-400 cursor-pointer hover:text-neutral-600 transition-colors">
+                      {rejected.length} rejected version{rejected.length !== 1 ? "s" : ""} — click to view
+                    </summary>
+                    <div className="mt-2 space-y-2">
+                      {rejected.map((v, i) => (
+                        <div key={v.id} className="flex gap-3 p-2 rounded-lg bg-red-50/50 border border-red-100">
+                          {v.imageUrl && (
+                            <img
+                              src={v.imageUrl}
+                              alt={`Rejected v${i + 1}`}
+                              className="w-12 h-12 rounded object-cover shrink-0 opacity-60"
+                            />
+                          )}
+                          <div className="min-w-0">
+                            <p className="text-[11px] font-medium text-red-600">Rejected</p>
+                            {v.rejectionReason && (
+                              <p className="text-[11px] text-neutral-500 leading-relaxed mt-0.5 whitespace-pre-line">
+                                {v.rejectionReason}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+              </>
+            );
+          })()}
         </div>
       ) : generating ? (
         <div className="flex flex-col items-center justify-center py-12 text-center border border-dashed border-neutral-200 rounded-xl">

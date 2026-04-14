@@ -35,6 +35,9 @@ export const assetVersions = pgTable(
     // { overall: 0-100, breakdown: { prompt_adherence, visual_fidelity, ... } }
 
     isApproved: boolean("is_approved").default(false),
+    isRejected: boolean("is_rejected").default(false),
+    rejectionReason: text("rejection_reason"),
+    // Claude Vision analysis of why this version was rejected
     createdAt: timestamp("created_at", { withTimezone: true }).default(
       sql`NOW()`
     ),

@@ -301,6 +301,7 @@ export async function refinePrompt(params: {
   styleKnowledge?: string;       // from Style knowledge category
   klingKnowledge?: string;       // from Kling Prompts knowledge category
   referenceFrameUrl?: string;    // can be sent to Claude for visual context
+  rejectionHistory?: string;     // past rejection reasons to avoid repeating mistakes
 }): Promise<string> {
   const content: Anthropic.MessageParam["content"] = [];
 
@@ -329,6 +330,7 @@ Output a single concise paragraph.`;
   if (params.productContext) context += `\n\nProduct details:\n${params.productContext}`;
   if (params.styleKnowledge) context += `\n\nStyle reference:\n${params.styleKnowledge}`;
   if (params.klingKnowledge) context += `\n\nKling prompting best practices:\n${params.klingKnowledge}`;
+  if (params.rejectionHistory) context += `\n\nPREVIOUS REJECTED GENERATIONS (avoid these issues):\n${params.rejectionHistory}`;
 
   content.push({
     type: "text",

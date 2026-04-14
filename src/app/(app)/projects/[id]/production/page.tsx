@@ -43,6 +43,8 @@ type DbAssetVersion = {
   fileUrl: string;
   versionNumber: number;
   isApproved: boolean | null;
+  isRejected: boolean | null;
+  rejectionReason: string | null;
   qualityScore: unknown;
   createdAt: string;
 };
@@ -91,6 +93,8 @@ function dbToState(
       qualityScore: score,
       color,
       imageUrl: a.fileUrl,
+      isRejected: a.isRejected ?? false,
+      rejectionReason: a.rejectionReason ?? undefined,
     };
   });
 

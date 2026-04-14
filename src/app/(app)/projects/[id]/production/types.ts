@@ -4,6 +4,8 @@ export type SeedVersion = {
   qualityScore: number; // 0–100
   color: string;
   imageUrl?: string; // R2 public URL (undefined for mock/placeholder)
+  isRejected?: boolean;
+  rejectionReason?: string;
 };
 
 export type VideoJobStatus =
