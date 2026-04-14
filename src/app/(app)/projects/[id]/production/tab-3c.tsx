@@ -13,6 +13,7 @@ import {
   Play,
   RefreshCw,
   Sparkles,
+  Trash2,
   Zap,
 } from "lucide-react";
 import {
@@ -23,7 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { SceneProductionState, VideoJobStatus } from "./types";
+import type { SceneProductionState, VideoJobStatus, VideoVersion } from "./types";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -138,11 +139,13 @@ function QualityWarningDialog({
 function SceneGenerationCard({
   scene,
   projectId,
+  updateScene,
   onGenerate,
   onGenerateWithPrompt,
 }: {
   scene: SceneProductionState;
   projectId: string;
+  updateScene: (sceneId: string, patch: Partial<SceneProductionState>) => void;
   onGenerate: (sceneId: string) => Promise<void>;
   onGenerateWithPrompt: (sceneId: string, refinedPrompt: string) => Promise<void>;
 }) {
@@ -201,6 +204,30 @@ function SceneGenerationCard({
     } else {
       void onGenerate(scene.sceneId);
     }
+  }
+
+  function handleRejectVideo(versionId: string) {
+    // Optimistically hide
+    updateScene(scene.sceneId, {
+      videoVersions: scene.videoVersions.map((v) =>
+        v.id === versionId ? { ...v, isRejected: true } : v
+      ),
+    });
+    // Claude analyzes in background
+    fetch(`/api/projects/${projectId}/reject-version`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ assetVersionId: versionId }),
+    })
+      .then((res) => res.json())
+      .then(({ rejectionReason }: { rejectionReason: string }) => {
+        updateScene(scene.sceneId, {
+          videoVersions: scene.videoVersions.map((v) =>
+            v.id === versionId ? { ...v, isRejected: true, rejectionReason } : v
+          ),
+        });
+      })
+      .catch(console.error);
   }
 
   const hasVersionHistory = scene.videoVersions && scene.videoVersions.length > 1;
@@ -450,17 +477,25 @@ function SceneGenerationCard({
       </div>
 
       {/* Expanded version history */}
-      {expanded && scene.videoVersions && scene.videoVersions.length > 0 && (
+      {expanded && scene.videoVersions && scene.videoVersions.length > 0 && (() => {
+        const active = scene.videoVersions.filter((v) => !v.isRejected);
+        const rejected = scene.videoVersions.filter((v) => v.isRejected);
+        return (
         <div className="border-t border-neutral-100 px-3 py-3">
           <p className="text-[11px] font-medium text-neutral-400 uppercase tracking-widest mb-2">
-            All Generations ({scene.videoVersions.length})
+            Generations ({active.length})
+            {rejected.length > 0 && (
+              <span className="text-neutral-300 font-normal ml-1">
+                ({rejected.length} rejected)
+              </span>
+            )}
           </p>
-          <div className="space-y-2 max-h-60 overflow-y-auto">
-            {[...scene.videoVersions].reverse().map((v, i) => (
+          <div className="space-y-2 max-h-72 overflow-y-auto">
+            {[...active].reverse().map((v, i) => (
               <div
                 key={v.id}
                 className={cn(
-                  "flex items-start gap-2.5 p-2 rounded-lg border transition-colors",
+                  "flex items-start gap-2.5 p-2 rounded-lg border transition-colors group/version",
                   i === 0 ? "border-emerald-200 bg-emerald-50/30" : "border-neutral-100 bg-neutral-50/50"
                 )}
               >
@@ -474,15 +509,24 @@ function SceneGenerationCard({
                   onMouseLeave={(e) => { const el = e.target as HTMLVideoElement; el.pause(); el.currentTime = 0; }}
                 />
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5 mb-1">
-                    {i === 0 && (
-                      <span className="text-[10px] font-medium text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded">
-                        Latest
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-1.5">
+                      {i === 0 && (
+                        <span className="text-[10px] font-medium text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded">
+                          Latest
+                        </span>
+                      )}
+                      <span className="text-[10px] text-neutral-400">
+                        v{active.length - i}
                       </span>
-                    )}
-                    <span className="text-[10px] text-neutral-400">
-                      v{scene.videoVersions.length - i}
-                    </span>
+                    </div>
+                    <button
+                      onClick={() => handleRejectVideo(v.id)}
+                      className="p-1 rounded text-neutral-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover/version:opacity-100 transition-all"
+                      title="Reject — Claude will analyze why it's bad"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
                   </div>
                   {v.prompt && (
                     <p className="text-[11px] text-neutral-500 leading-snug line-clamp-2">
@@ -502,8 +546,41 @@ function SceneGenerationCard({
               </div>
             ))}
           </div>
+
+          {/* Rejected versions */}
+          {rejected.length > 0 && (
+            <details className="mt-3">
+              <summary className="text-[11px] text-neutral-400 cursor-pointer hover:text-neutral-600 transition-colors">
+                {rejected.length} rejected — click to view
+              </summary>
+              <div className="mt-2 space-y-2">
+                {rejected.map((v) => (
+                  <div key={v.id} className="flex gap-2.5 p-2 rounded-lg bg-red-50/50 border border-red-100">
+                    <video
+                      src={v.fileUrl}
+                      className="w-12 aspect-[9/16] rounded object-cover shrink-0 opacity-60"
+                      muted
+                      playsInline
+                    />
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-medium text-red-500">Rejected</p>
+                      {v.rejectionReason && (
+                        <p className="text-[10px] text-neutral-500 leading-relaxed mt-0.5 whitespace-pre-line">
+                          {v.rejectionReason}
+                        </p>
+                      )}
+                      {!v.rejectionReason && (
+                        <p className="text-[10px] text-neutral-300 italic mt-0.5">Analyzing...</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
         </div>
-      )}
+        );
+      })()}
 
       {/* Quality warning dialog (low score) */}
       {scene.qualityScore != null && (
@@ -697,6 +774,7 @@ export function Tab3C({ scenes, updateScene, projectId }: Props) {
               key={scene.sceneId}
               scene={scene}
               projectId={projectId}
+              updateScene={updateScene}
               onGenerate={submitKlingJob}
               onGenerateWithPrompt={(sceneId, prompt) => submitKlingJob(sceneId, prompt)}
             />

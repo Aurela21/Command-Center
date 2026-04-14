@@ -111,9 +111,11 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
   }
 
-  // Look up past rejection reasons for this scene to avoid repeating mistakes
+  // Look up past rejection reasons for this scene — filtered by asset type
+  // so seed image rejections inform seed prompts, video rejections inform Kling prompts
   let rejectionHistory = "";
   try {
+    const assetType = target === "seed_image" ? "seed_image" : "kling_output";
     const rejectedVersions = await db
       .select({
         rejectionReason: assetVersions.rejectionReason,
@@ -123,6 +125,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       .where(
         and(
           eq(assetVersions.sceneId, sceneId),
+          eq(assetVersions.assetType, assetType),
           eq(assetVersions.isRejected, true)
         )
       );

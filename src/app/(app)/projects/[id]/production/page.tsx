@@ -86,6 +86,8 @@ function dbToState(
     createdAt: a.createdAt,
     fileUrl: a.fileUrl,
     prompt: a.generationPrompt ?? undefined,
+    isRejected: a.isRejected ?? false,
+    rejectionReason: a.rejectionReason ?? undefined,
   }));
 
   const seedVersions: SeedVersion[] = seedAssets.map((a) => {

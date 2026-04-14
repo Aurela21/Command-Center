@@ -20,6 +20,8 @@ export type VideoVersion = {
   createdAt: string;
   fileUrl: string;
   prompt?: string;
+  isRejected?: boolean;
+  rejectionReason?: string;
 };
 
 export type SceneProductionState = {
