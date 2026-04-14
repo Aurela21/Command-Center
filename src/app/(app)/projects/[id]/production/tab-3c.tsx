@@ -46,13 +46,25 @@ function statusColor(
 ): { text: string; bg: string; dot: string } {
   switch (status) {
     case "idle":
-      return { text: "text-neutral-400", bg: "bg-neutral-50", dot: "bg-neutral-300" };
+      return {
+        text: "text-neutral-400",
+        bg: "bg-neutral-50",
+        dot: "bg-neutral-300",
+      };
     case "queued":
-      return { text: "text-amber-600", bg: "bg-amber-50", dot: "bg-amber-400" };
+      return {
+        text: "text-amber-600",
+        bg: "bg-amber-50",
+        dot: "bg-amber-400",
+      };
     case "processing":
       return { text: "text-blue-600", bg: "bg-blue-50", dot: "bg-blue-400" };
     case "completed":
-      return { text: "text-emerald-600", bg: "bg-emerald-50", dot: "bg-emerald-500" };
+      return {
+        text: "text-emerald-600",
+        bg: "bg-emerald-50",
+        dot: "bg-emerald-500",
+      };
     case "failed":
       return { text: "text-red-600", bg: "bg-red-50", dot: "bg-red-500" };
   }
@@ -78,12 +90,15 @@ function QualityWarningDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-amber-700">
             <AlertTriangle className="h-5 w-5" />
-            Low quality score — Scene {String(scene.sceneOrder).padStart(2, "0")}
+            Low quality score — Scene{" "}
+            {String(scene.sceneOrder).padStart(2, "0")}
           </DialogTitle>
           <DialogDescription>
             The generated video scored{" "}
-            <span className="font-semibold text-red-600">{qs?.overall ?? "—"}/100</span>,
-            which is below the 60-point threshold.
+            <span className="font-semibold text-red-600">
+              {qs?.overall ?? "—"}/100
+            </span>
+            , which is below the 60-point threshold.
             {qs?.notes && (
               <span className="block mt-1.5 text-neutral-600 italic">
                 &ldquo;{qs.notes}&rdquo;
@@ -102,7 +117,10 @@ function QualityWarningDialog({
             Keep it
           </Button>
           <Button
-            onClick={() => { onRetry(); onClose(); }}
+            onClick={() => {
+              onRetry();
+              onClose();
+            }}
             className="bg-neutral-900 hover:bg-neutral-700 text-white gap-1.5"
           >
             <RefreshCw className="h-3.5 w-3.5" />
@@ -118,12 +136,10 @@ function QualityWarningDialog({
 
 function SceneGenerationCard({
   scene,
-  updateScene,
-  projectId,
+  onGenerate,
 }: {
   scene: SceneProductionState;
-  updateScene: (sceneId: string, patch: Partial<SceneProductionState>) => void;
-  projectId: string;
+  onGenerate: (sceneId: string) => Promise<void>;
 }) {
   const [warningOpen, setWarningOpen] = useState(false);
   const colors = statusColor(scene.videoJobStatus);
@@ -138,18 +154,11 @@ function SceneGenerationCard({
     scene.qualityScore.overall < 60;
 
   function handleGenerate() {
-    // Queue the job. Production: POST /api/jobs → createJob → submitKlingJob
-    updateScene(scene.sceneId, { videoJobStatus: "queued", videoJobProgress: 0 });
+    void onGenerate(scene.sceneId);
   }
 
   function handleRetry() {
-    // POST /api/jobs/:id/retry → requeueJob
-    updateScene(scene.sceneId, {
-      videoJobStatus: "queued",
-      videoJobProgress: 0,
-      videoJobError: undefined,
-      qualityScore: undefined,
-    });
+    void onGenerate(scene.sceneId);
   }
 
   return (
@@ -167,13 +176,41 @@ function SceneGenerationCard({
           : "border-neutral-100"
       )}
     >
-      {/* Seed image placeholder */}
+      {/* Seed image or video thumbnail */}
       <div
-        className="aspect-video relative"
+        className="aspect-[9/16] relative overflow-hidden"
         style={{
           backgroundColor: scene.seedImageApproved ? scene.color : "#f5f5f5",
         }}
       >
+        {/* Show approved seed image */}
+        {scene.seedImageApproved &&
+          scene.seedVersions.find(
+            (v) => v.id === scene.approvedSeedVersionId
+          )?.imageUrl && (
+            <img
+              src={
+                scene.seedVersions.find(
+                  (v) => v.id === scene.approvedSeedVersionId
+                )!.imageUrl
+              }
+              alt={`Scene ${scene.sceneOrder} seed`}
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+          )}
+
+        {/* Show completed video */}
+        {scene.videoJobStatus === "completed" && scene.videoUrl && (
+          <video
+            src={scene.videoUrl}
+            className="absolute inset-0 w-full h-full object-cover"
+            muted
+            loop
+            autoPlay
+            playsInline
+          />
+        )}
+
         {/* Status overlay for active states */}
         {scene.videoJobStatus === "processing" && (
           <div className="absolute inset-0 bg-black/10 flex items-center justify-center">
@@ -184,7 +221,12 @@ function SceneGenerationCard({
         )}
         {scene.videoJobStatus === "completed" && (
           <div className="absolute inset-0 bg-black/10 flex items-center justify-center">
-            <div className={cn("rounded-full p-2", hasLowQuality ? "bg-amber-50/90" : "bg-white/90")}>
+            <div
+              className={cn(
+                "rounded-full p-2",
+                hasLowQuality ? "bg-amber-50/90" : "bg-white/90"
+              )}
+            >
               {hasLowQuality ? (
                 <AlertTriangle className="h-5 w-5 text-amber-600" />
               ) : (
@@ -267,7 +309,9 @@ function SceneGenerationCard({
           <p className="text-[11px] text-neutral-400">Seed image needed</p>
         )}
         {scene.seedImageApproved && !scene.klingPromptApproved && (
-          <p className="text-[11px] text-neutral-400">Prompt approval needed</p>
+          <p className="text-[11px] text-neutral-400">
+            Prompt approval needed
+          </p>
         )}
 
         {/* Action button */}
@@ -282,10 +326,22 @@ function SceneGenerationCard({
             </button>
           ) : scene.videoJobStatus === "completed" ? (
             <div className="flex items-center justify-between">
-              <button className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 hover:text-emerald-700 transition-colors">
-                <Play className="h-3 w-3" />
-                View output
-              </button>
+              {scene.videoUrl ? (
+                <a
+                  href={scene.videoUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 hover:text-emerald-700 transition-colors"
+                >
+                  <Play className="h-3 w-3" />
+                  View output
+                </a>
+              ) : (
+                <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-600">
+                  <Play className="h-3 w-3" />
+                  Complete
+                </span>
+              )}
               {scene.qualityScore != null && (
                 <button
                   onClick={() => setWarningOpen(true)}
@@ -357,19 +413,43 @@ export function Tab3C({ scenes, updateScene, projectId }: Props) {
   const queuedOrProcessing = scenes.filter((s) =>
     ["queued", "processing"].includes(s.videoJobStatus)
   ).length;
-  const completed = scenes.filter((s) => s.videoJobStatus === "completed").length;
+  const completed = scenes.filter(
+    (s) => s.videoJobStatus === "completed"
+  ).length;
   const failed = scenes.filter((s) => s.videoJobStatus === "failed").length;
 
+  async function submitKlingJob(sceneId: string) {
+    updateScene(sceneId, { videoJobStatus: "queued", videoJobProgress: 0 });
+    try {
+      const res = await fetch("/api/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jobType: "kling_generation",
+          projectId,
+          sceneId,
+        }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({
+          error: `Request failed (${res.status})`,
+        }))) as { error?: string };
+        throw new Error(body.error ?? `Request failed (${res.status})`);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      updateScene(sceneId, { videoJobStatus: "failed", videoJobError: msg });
+    }
+  }
+
   function handleGenerateAll() {
-    // Queue all scenes that have both seed + prompt approved and aren't already running
     scenes.forEach((scene) => {
       if (
         scene.seedImageApproved &&
         scene.klingPromptApproved &&
         scene.videoJobStatus === "idle"
       ) {
-        // Production: POST /api/jobs → createJob → submitKlingJob per scene
-        updateScene(scene.sceneId, { videoJobStatus: "queued", videoJobProgress: 0 });
+        void submitKlingJob(scene.sceneId);
       }
     });
   }
@@ -380,7 +460,9 @@ export function Tab3C({ scenes, updateScene, projectId }: Props) {
       <div className="shrink-0 px-8 py-4 border-b border-neutral-100 bg-neutral-50/50 flex items-center justify-between gap-4">
         <div className="flex items-center gap-4 text-xs text-neutral-500">
           <span>
-            <span className="font-medium text-neutral-700">{readyScenes.length}</span>
+            <span className="font-medium text-neutral-700">
+              {readyScenes.length}
+            </span>
             /{scenes.length} ready
           </span>
           {queuedOrProcessing > 0 && (
@@ -416,8 +498,7 @@ export function Tab3C({ scenes, updateScene, projectId }: Props) {
             <SceneGenerationCard
               key={scene.sceneId}
               scene={scene}
-              updateScene={updateScene}
-              projectId={projectId}
+              onGenerate={submitKlingJob}
             />
           ))}
         </div>

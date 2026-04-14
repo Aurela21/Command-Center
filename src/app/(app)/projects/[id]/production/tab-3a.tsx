@@ -57,6 +57,14 @@ function SceneListItem({
               )}
             />
           )}
+          {scene.seedGenerating && (
+            <Loader2
+              className={cn(
+                "h-3 w-3 animate-spin",
+                isSelected ? "text-white/60" : "text-neutral-400"
+              )}
+            />
+          )}
           {scene.seedVersions.length > 0 && !scene.seedImageApproved && (
             <span
               className={cn(
@@ -87,43 +95,71 @@ function SceneListItem({
 
 function SeedDetailPanel({
   scene,
+  projectId,
   updateScene,
 }: {
   scene: SceneProductionState;
+  projectId: string;
   updateScene: (sceneId: string, patch: Partial<SceneProductionState>) => void;
 }) {
-  const [generating, setGenerating] = useState(false);
+  const generating = scene.seedGenerating ?? false;
 
-  function handleGenerate() {
-    setGenerating(true);
-    // Mock: add a version after a short delay.
-    // Production: POST /api/jobs with { jobType: "nano_banana", sceneId, ... }
-    setTimeout(() => {
-      const newVersion: SeedVersion = {
-        id: `v-${Date.now()}`,
-        createdAt: new Date().toISOString(),
-        qualityScore: Math.floor(Math.random() * 30) + 65, // 65–95
-        color: scene.color,
-      };
-      updateScene(scene.sceneId, {
-        seedVersions: [...scene.seedVersions, newVersion],
-      });
-      setGenerating(false);
-    }, 1500);
+  async function handleGenerate() {
+    if (!scene.nanoBananaPrompt.trim()) return;
+    updateScene(scene.sceneId, { seedGenerating: true });
+    try {
+      const res = await fetch(
+        `/api/projects/${projectId}/generate-seed`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sceneId: scene.sceneId,
+            prompt: scene.nanoBananaPrompt,
+          }),
+        }
+      );
+      if (!res.ok) {
+        const { error } = (await res.json().catch(() => ({
+          error: "Request failed",
+        }))) as { error: string };
+        throw new Error(error);
+      }
+      // Job queued — SSE will fire job:completed to add the new version
+    } catch (err) {
+      console.error("[generate-seed]", err);
+      updateScene(scene.sceneId, { seedGenerating: false });
+    }
   }
 
-  function handleApproveSeed(versionId: string) {
+  async function handleApproveSeed(versionId: string) {
     updateScene(scene.sceneId, {
       approvedSeedVersionId: versionId,
       seedImageApproved: true,
     });
+    await fetch(`/api/projects/${projectId}/scenes/${scene.sceneId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        approvedSeedImageId: versionId,
+        seedImageApproved: true,
+      }),
+    }).catch(console.error);
   }
 
-  function handleUnapprove() {
+  async function handleUnapprove() {
     updateScene(scene.sceneId, {
       approvedSeedVersionId: null,
       seedImageApproved: false,
     });
+    await fetch(`/api/projects/${projectId}/scenes/${scene.sceneId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        approvedSeedImageId: null,
+        seedImageApproved: false,
+      }),
+    }).catch(console.error);
   }
 
   return (
@@ -148,14 +184,22 @@ function SeedDetailPanel({
         <p className="text-xs font-medium uppercase tracking-widest text-neutral-400 mb-3">
           Reference Frame
         </p>
-        <div
-          className="w-44 aspect-video rounded-lg border border-neutral-100 flex items-end justify-end p-2"
-          style={{ backgroundColor: scene.color }}
-        >
-          <span className="text-[10px] font-mono font-semibold text-neutral-600 bg-white/80 px-1.5 py-0.5 rounded leading-none">
-            f{scene.referenceFrame}
-          </span>
-        </div>
+        {scene.referenceFrameUrl ? (
+          <img
+            src={scene.referenceFrameUrl}
+            alt={`Scene ${scene.sceneOrder} reference frame`}
+            className="w-32 aspect-[9/16] rounded-lg border border-neutral-100 object-cover"
+          />
+        ) : (
+          <div
+            className="w-32 aspect-[9/16] rounded-lg border border-neutral-100 flex items-end justify-end p-2"
+            style={{ backgroundColor: scene.color }}
+          >
+            <span className="text-[10px] font-mono font-semibold text-neutral-600 bg-white/80 px-1.5 py-0.5 rounded leading-none">
+              f{scene.referenceFrame}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Nano Banana prompt */}
@@ -197,8 +241,8 @@ function SeedDetailPanel({
           <p className="text-xs font-medium uppercase tracking-widest text-neutral-400 mb-3">
             Generated Versions
           </p>
-          <div className="grid grid-cols-3 gap-3">
-            {scene.seedVersions.map((v, i) => {
+          <div className="grid grid-cols-2 gap-3">
+            {scene.seedVersions.map((v: SeedVersion, i: number) => {
               const isApproved = v.id === scene.approvedSeedVersionId;
               return (
                 <div
@@ -211,9 +255,18 @@ function SeedDetailPanel({
                   )}
                 >
                   <div
-                    className="aspect-video relative"
-                    style={{ backgroundColor: scene.color }}
+                    className="aspect-[9/16] relative overflow-hidden"
+                    style={{
+                      backgroundColor: v.imageUrl ? undefined : scene.color,
+                    }}
                   >
+                    {v.imageUrl ? (
+                      <img
+                        src={v.imageUrl}
+                        alt={`Seed v${i + 1}`}
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                    ) : null}
                     {isApproved && (
                       <div className="absolute inset-0 flex items-center justify-center bg-black/20">
                         <div className="bg-white rounded-full p-1">
@@ -221,9 +274,11 @@ function SeedDetailPanel({
                         </div>
                       </div>
                     )}
-                    <span className="absolute bottom-1 right-1 text-[9px] font-mono bg-white/80 px-1 py-0.5 rounded leading-none">
-                      v{i + 1}
-                    </span>
+                    {!v.imageUrl && (
+                      <span className="absolute bottom-1 right-1 text-[9px] font-mono bg-white/80 px-1 py-0.5 rounded leading-none">
+                        v{i + 1}
+                      </span>
+                    )}
                   </div>
                   <div className="px-2.5 py-2 bg-white flex items-center justify-between">
                     <span
@@ -233,14 +288,16 @@ function SeedDetailPanel({
                           ? "text-emerald-600"
                           : v.qualityScore >= 65
                           ? "text-amber-600"
-                          : "text-red-500"
+                          : "text-neutral-400"
                       )}
                     >
-                      {v.qualityScore}
+                      {v.qualityScore > 0 ? v.qualityScore : `v${i + 1}`}
                     </span>
                     <button
                       onClick={() =>
-                        isApproved ? handleUnapprove() : handleApproveSeed(v.id)
+                        isApproved
+                          ? handleUnapprove()
+                          : handleApproveSeed(v.id)
                       }
                       className={cn(
                         "text-[11px] font-medium px-2 py-0.5 rounded transition-colors",
@@ -256,6 +313,14 @@ function SeedDetailPanel({
               );
             })}
           </div>
+        </div>
+      ) : generating ? (
+        <div className="flex flex-col items-center justify-center py-12 text-center border border-dashed border-neutral-200 rounded-xl">
+          <Loader2 className="h-8 w-8 text-neutral-300 mb-3 animate-spin" />
+          <p className="text-sm text-neutral-400">Generating seed image…</p>
+          <p className="text-xs text-neutral-400 mt-1">
+            This takes about 30–60 seconds
+          </p>
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center py-12 text-center border border-dashed border-neutral-200 rounded-xl">
@@ -275,9 +340,10 @@ function SeedDetailPanel({
 type Props = {
   scenes: SceneProductionState[];
   updateScene: (sceneId: string, patch: Partial<SceneProductionState>) => void;
+  projectId: string;
 };
 
-export function Tab3A({ scenes, updateScene }: Props) {
+export function Tab3A({ scenes, updateScene, projectId }: Props) {
   const [selectedId, setSelectedId] = useState<string>(
     scenes[0]?.sceneId ?? ""
   );
@@ -309,6 +375,7 @@ export function Tab3A({ scenes, updateScene }: Props) {
           <SeedDetailPanel
             key={selected.sceneId}
             scene={selected}
+            projectId={projectId}
             updateScene={updateScene}
           />
         )}

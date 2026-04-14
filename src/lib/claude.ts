@@ -20,8 +20,8 @@ function getClient(): Anthropic {
   return client;
 }
 
-const FAST = "claude-sonnet-4-20250514";
-const DEEP = "claude-opus-4-0-20250115";
+const FAST = "claude-sonnet-4-6";
+const DEEP = "claude-opus-4-6";
 
 // ─── Step 2: Video context analysis ─────────────────────────────────────────
 
@@ -243,17 +243,17 @@ export async function generateScript(params: {
   const msg = await getClient().messages.create({
     model: DEEP,
     max_tokens: 4096,
-    system: `You are an expert DTC video ad copywriter. Write punchy, conversion-focused scripts that match the brand voice precisely. Each scene prompt must be Kling-optimized: a single unified block describing action, camera movement, and atmosphere — not dialogue and motion separately.${knowledgeSection}`,
+    system: `You are an expert DTC video ad copywriter. You produce two things simultaneously: (1) a punchy voiceover/talking script — the actual words spoken aloud or shown as text on screen during the ad, and (2) per-scene Kling visual prompts — technical motion/camera descriptions used to generate video clips, NOT dialogue.${knowledgeSection}`,
     messages: [
       {
         role: "user",
-        content: `Write a complete video ad script for "${params.projectName}".
+        content: `Write a complete video ad for "${params.projectName}".
 
 **Script Variables:**
 - Angle: ${params.angle}
 - Tonality: ${params.tonality}
 - Format: ${params.format}
-- Kling element tags (auto-inject into prompts): ${params.klingElementTags.join(", ") || "none"}
+- Kling element tags (auto-inject into visual prompts): ${params.klingElementTags.join(", ") || "none"}
 
 **Scene Structure (${params.scenes.length} scenes):**
 ${params.scenes.map((s) => `Scene ${s.order} (${(s.durationMs / 1000).toFixed(1)}s): ${s.description}`).join("\n")}
@@ -261,14 +261,13 @@ ${params.scenes.map((s) => `Scene ${s.order} (${(s.durationMs / 1000).toFixed(1)
 ${params.analysis ? `**Video Analysis:**\n${JSON.stringify(params.analysis, null, 2)}` : ""}
 
 **Requirements:**
-- Each scene segment = one unified Kling-optimized prompt (max 40 words)
-- Inject element tags naturally into relevant scene prompts
-- Match the specified angle, tonality, and format throughout
+- fullScript = the voiceover/talking script only — the actual words spoken or shown as on-screen text, scene by scene. No visual directions here.
+- sceneSegments = one Kling visual prompt per scene (max 40 words each) — describe camera movement, action, atmosphere, subject. Inject element tags naturally. No dialogue here.
 
 Return JSON:
 {
-  "fullScript": "complete readable script with scene headers",
-  "sceneSegments": ["prompt for scene 1", "prompt for scene 2", ...]
+  "fullScript": "Scene 1:\\n[voiceover line]\\n\\nScene 2:\\n[voiceover line]\\n\\n...",
+  "sceneSegments": ["kling visual prompt for scene 1", "kling visual prompt for scene 2", ...]
 }`,
       },
     ],

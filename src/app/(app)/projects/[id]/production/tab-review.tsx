@@ -60,32 +60,40 @@ function ScenePairRow({
 
       {/* Seed image */}
       <div className="shrink-0">
-        <div
-          className={cn(
-            "w-32 aspect-video rounded-lg border relative overflow-hidden flex items-center justify-center",
-            scene.seedImageApproved
-              ? "border-emerald-200"
-              : "border-neutral-100 border-dashed"
-          )}
-          style={{
-            backgroundColor: scene.seedImageApproved ? scene.color : undefined,
-          }}
-        >
-          {scene.seedImageApproved ? (
-            <>
-              <span className="absolute bottom-1 right-1 text-[9px] font-mono bg-white/80 px-1 py-0.5 rounded leading-none">
-                f{scene.referenceFrame}
-              </span>
-              <div className="absolute top-1 left-1">
-                <div className="bg-emerald-500 rounded-full p-0.5">
-                  <Check className="h-2.5 w-2.5 text-white" />
+        {(() => {
+          const approvedVersion = scene.seedVersions.find(
+            (v) => v.id === scene.approvedSeedVersionId
+          );
+          const imgUrl = approvedVersion?.imageUrl ?? scene.referenceFrameUrl;
+          return (
+            <div
+              className={cn(
+                "w-20 aspect-[9/16] rounded-lg border relative overflow-hidden flex items-center justify-center",
+                scene.seedImageApproved
+                  ? "border-emerald-200"
+                  : "border-neutral-100 border-dashed"
+              )}
+              style={{ backgroundColor: imgUrl ? undefined : scene.color }}
+            >
+              {imgUrl ? (
+                <img
+                  src={imgUrl}
+                  alt={`Scene ${scene.sceneOrder} seed`}
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
+              ) : (
+                <ImageOff className="h-4 w-4 text-neutral-200" />
+              )}
+              {scene.seedImageApproved && (
+                <div className="absolute top-1 left-1">
+                  <div className="bg-emerald-500 rounded-full p-0.5">
+                    <Check className="h-2.5 w-2.5 text-white" />
+                  </div>
                 </div>
-              </div>
-            </>
-          ) : (
-            <ImageOff className="h-5 w-5 text-neutral-200" />
-          )}
-        </div>
+              )}
+            </div>
+          );
+        })()}
         <button
           onClick={onEditSeed}
           className="mt-1.5 flex items-center gap-1 text-[11px] text-neutral-400 hover:text-neutral-700 transition-colors"

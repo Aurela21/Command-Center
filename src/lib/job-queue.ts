@@ -65,7 +65,8 @@ export async function updateJobProgress(
 export async function completeJob(
   jobId: string,
   resultData: unknown,
-  resultAssetVersionId?: string
+  resultAssetVersionId?: string,
+  qualityScore?: unknown
 ): Promise<Job> {
   const [job] = await db
     .update(jobs)
@@ -83,9 +84,11 @@ export async function completeJob(
   emit({
     type: "job:completed",
     jobId,
+    jobType: job.jobType,
     sceneId: job.sceneId,
     assetVersionId: resultAssetVersionId ?? null,
-    qualityScore: null,
+    qualityScore: qualityScore ?? null,
+    fileUrl: (resultData as Record<string, unknown>)?.file_url as string ?? null,
   });
 
   return job;

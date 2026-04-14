@@ -1,63 +1,60 @@
 /**
- * OpenAI embeddings — text-embedding-3-small (1536 dims)
+ * Voyage AI embeddings — voyage-3 (1024 dims)
  *
  * Used exclusively for the knowledge base RAG pipeline:
  * - Embed document chunks at upload time
- * - Embed query at script generation time → cosine similarity search
+ * - Embed query at search time → cosine similarity search via pgvector
  */
 
-import OpenAI from "openai";
+const VOYAGE_API_URL = "https://api.voyageai.com/v1/embeddings";
+const MODEL = "voyage-3";
+export const EMBEDDING_DIMS = 1024;
 
-// Singleton
-declare global {
-  var _openai: OpenAI | undefined;
-}
-
-function getClient(): OpenAI {
-  if (globalThis._openai) return globalThis._openai;
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  if (process.env.NODE_ENV !== "production") globalThis._openai = client;
-  return client;
-}
-
-const MODEL = "text-embedding-3-small";
-export const EMBEDDING_DIMS = 1536;
-
-// ─── Embed ───────────────────────────────────────────────────────────────────
-
-/** Embed a single string. Returns a 1536-dim vector. */
-export async function embed(text: string): Promise<number[]> {
-  const res = await getClient().embeddings.create({
-    model: MODEL,
-    input: text.replace(/\n+/g, " ").trim(),
-    dimensions: EMBEDDING_DIMS,
+async function voyageFetch(inputs: string[]): Promise<number[][]> {
+  const res = await fetch(VOYAGE_API_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.VOYAGE_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ input: inputs, model: MODEL }),
   });
-  return res.data[0].embedding;
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Voyage API ${res.status}: ${text}`);
+  }
+
+  const json = await res.json() as { data: Array<{ index: number; embedding: number[] }> };
+  return json.data
+    .sort((a, b) => a.index - b.index)
+    .map((d) => d.embedding);
+}
+
+// ─── Public API ──────────────────────────────────────────────────────────────
+
+/** Embed a single string. Returns a 1024-dim vector. */
+export async function embed(text: string): Promise<number[]> {
+  const results = await voyageFetch([text.replace(/\n+/g, " ").trim()]);
+  return results[0];
 }
 
 /**
- * Embed multiple strings in one API call.
- * More efficient than calling embed() in a loop for bulk chunk processing.
- * OpenAI supports up to ~2048 inputs per request (we batch at 512 to be safe).
+ * Embed multiple strings in batches.
+ * Voyage supports up to 128 inputs per request.
  */
 export async function embedBatch(texts: string[]): Promise<number[][]> {
   if (texts.length === 0) return [];
 
-  const BATCH = 512;
+  const BATCH = 128;
   const all: number[][] = [];
 
   for (let i = 0; i < texts.length; i += BATCH) {
     const slice = texts.slice(i, i + BATCH).map((t) =>
       t.replace(/\n+/g, " ").trim()
     );
-    const res = await getClient().embeddings.create({
-      model: MODEL,
-      input: slice,
-      dimensions: EMBEDDING_DIMS,
-    });
-    // API returns results in the same order, but sort by index to be safe
-    const sorted = res.data.sort((a, b) => a.index - b.index);
-    all.push(...sorted.map((d) => d.embedding));
+    const results = await voyageFetch(slice);
+    all.push(...results);
   }
 
   return all;
@@ -83,7 +80,6 @@ export function chunkText(
   while (start < cleaned.length) {
     let end = Math.min(start + maxChars, cleaned.length);
 
-    // Prefer breaking at a paragraph or sentence boundary
     if (end < cleaned.length) {
       const paragraphBreak = cleaned.lastIndexOf("\n\n", end);
       const sentenceBreak = cleaned.lastIndexOf(". ", end);
@@ -105,9 +101,7 @@ export function chunkText(
 
 /** Cosine similarity between two equal-length vectors. Returns -1 to 1. */
 export function cosineSimilarity(a: number[], b: number[]): number {
-  let dot = 0;
-  let normA = 0;
-  let normB = 0;
+  let dot = 0, normA = 0, normB = 0;
   for (let i = 0; i < a.length; i++) {
     dot += a[i] * b[i];
     normA += a[i] * a[i];
@@ -117,21 +111,13 @@ export function cosineSimilarity(a: number[], b: number[]): number {
   return denom === 0 ? 0 : dot / denom;
 }
 
-/**
- * In-process top-K similarity search over a pre-loaded chunk set.
- * For the knowledge base we use pgvector (DB-side), but this utility
- * is useful for small in-memory comparisons and testing.
- */
 export function topK<T extends { embedding: number[] }>(
   query: number[],
   items: T[],
   k: number
 ): Array<T & { similarity: number }> {
   return items
-    .map((item) => ({
-      ...item,
-      similarity: cosineSimilarity(query, item.embedding),
-    }))
+    .map((item) => ({ ...item, similarity: cosineSimilarity(query, item.embedding) }))
     .sort((a, b) => b.similarity - a.similarity)
     .slice(0, k);
 }

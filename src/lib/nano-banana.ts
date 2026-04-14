@@ -1,120 +1,110 @@
 /**
- * Nano Banana Pro — seed image generation client
+ * Seed image generation via Google AI Studio — Gemini 2.0 Flash image generation
  *
- * Flow: submitNanoBananaJob → returns job ID → cron calls pollNanoBananaJob
- * One output image per request. 30–90s generation time.
+ * Synchronous: takes a reference frame + prompt, returns a generated image.
+ * No polling required — result comes back in the same HTTP call (~10–30s).
  */
 
+const MODEL = "gemini-3-pro-image-preview";
+const BASE_URL = "https://generativelanguage.googleapis.com";
+
 export type NanoBananaRequest = {
-  imageUrl: string; // reference frame (presigned or public R2 URL)
-  prompt: string; // change prompt describing what to generate
+  imageUrl: string; // public R2 URL for the reference frame
+  prompt: string;   // change prompt describing what to generate
 };
 
 export type NanoBananaResult = {
-  outputUrl: string;
+  imageBase64: string;
+  mimeType: string;
 };
 
-// ─── Internal API types ──────────────────────────────────────────────────────
-
-type NBStatus = "pending" | "processing" | "completed" | "failed";
-
-interface NBJobResponse {
-  id: string;
-  status: NBStatus;
-  output?: { url: string };
-  error?: string;
+function apiKey() {
+  const key = process.env.GOOGLE_AI_API_KEY;
+  if (!key) throw new Error("GOOGLE_AI_API_KEY must be set");
+  return key;
 }
 
-// ─── Client ──────────────────────────────────────────────────────────────────
+/**
+ * Generate a seed image by passing the reference frame + prompt to Gemini.
+ * Returns base64-encoded image data.
+ */
+export async function generateSeedImage(
+  req: NanoBananaRequest
+): Promise<NanoBananaResult> {
+  // 1. Fetch reference image from R2
+  const imgRes = await fetch(req.imageUrl);
+  if (!imgRes.ok) {
+    throw new Error(
+      `Failed to fetch reference image (${imgRes.status}): ${req.imageUrl}`
+    );
+  }
+  const imgBuffer = await imgRes.arrayBuffer();
+  const imgBase64 = Buffer.from(imgBuffer).toString("base64");
+  const mimeType =
+    imgRes.headers.get("content-type")?.split(";")[0] || "image/jpeg";
 
-function baseUrl() {
-  return (
-    process.env.NANO_BANANA_API_BASE_URL?.replace(/\/$/, "") ??
-    "https://api.nanobanana.pro"
-  );
-}
-
-async function nbFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${baseUrl()}${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${process.env.NANO_BANANA_API_KEY}`,
-      "Content-Type": "application/json",
-      ...init?.headers,
-    },
+  // 2. Call Gemini image generation
+  const url = `${BASE_URL}/v1beta/models/${MODEL}:generateContent?key=${apiKey()}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [
+        {
+          parts: [
+            { inlineData: { mimeType, data: imgBase64 } },
+            { text: req.prompt },
+          ],
+        },
+      ],
+      generationConfig: { responseModalities: ["IMAGE"] },
+    }),
   });
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Nano Banana ${res.status}: ${text}`);
+    throw new Error(`Google AI ${res.status}: ${text}`);
   }
 
-  return res.json() as Promise<T>;
+  const data = (await res.json()) as {
+    candidates?: Array<{
+      content?: {
+        parts?: Array<{ inlineData?: { data: string; mimeType: string } }>;
+      };
+    }>;
+  };
+
+  const imagePart = data.candidates?.[0]?.content?.parts?.find(
+    (p) => p.inlineData
+  );
+
+  if (!imagePart?.inlineData) {
+    throw new Error("Gemini returned no image in response");
+  }
+
+  return {
+    imageBase64: imagePart.inlineData.data,
+    mimeType: imagePart.inlineData.mimeType || "image/png",
+  };
 }
 
-// ─── Public API ──────────────────────────────────────────────────────────────
+// ─── Legacy stubs — kept so cron.ts compiles without changes ─────────────────
 
-/** Submit a new seed image generation job. Returns the external job ID. */
+/** @deprecated Use generateSeedImage instead */
 export async function submitNanoBananaJob(
-  req: NanoBananaRequest
+  _req: NanoBananaRequest
 ): Promise<string> {
-  const data = await nbFetch<NBJobResponse>("/v1/generate", {
-    method: "POST",
-    body: JSON.stringify({
-      image_url: req.imageUrl,
-      prompt: req.prompt,
-    }),
-  });
-  return data.id;
+  throw new Error("submitNanoBananaJob is no longer used");
 }
 
 /**
- * Poll an in-flight Nano Banana job.
- * Called by the cron poller every 15 seconds for all active nano_banana jobs.
+ * Called by cron for any lingering queued jobs from before the rewrite.
+ * Marks them failed so they stop polluting the queue.
  */
 export async function pollNanoBananaJob(
   internalJobId: string,
-  externalJobId: string
+  _externalJobId: string
 ): Promise<void> {
-  const { updateJobProgress, completeJob, failJob, retryJob } = await import(
-    "./job-queue"
-  );
-  const { db } = await import("@/db");
-  const { jobs } = await import("@/db/schema");
-  const { eq } = await import("drizzle-orm");
-
-  let data: NBJobResponse;
-  try {
-    data = await nbFetch<NBJobResponse>(`/v1/jobs/${externalJobId}`);
-  } catch (err) {
-    console.error(
-      `[nano-banana] Poll fetch error for ${externalJobId}:`,
-      err
-    );
-    return; // transient — retry next tick
-  }
-
-  if (data.status === "completed" && data.output?.url) {
-    // TODO (Step 3A): download output from data.output.url, upload to R2,
-    // create asset_version record, run quality check
-    await completeJob(internalJobId, { output_url: data.output.url });
-  } else if (data.status === "failed") {
-    const [job] = await db
-      .select()
-      .from(jobs)
-      .where(eq(jobs.id, internalJobId));
-
-    const attempts = job?.attemptCount ?? 0;
-    const max = job?.maxAttempts ?? 3;
-
-    if (attempts < max) {
-      await retryJob(internalJobId);
-    } else {
-      await failJob(internalJobId, data.error ?? "Nano Banana generation failed");
-    }
-  } else {
-    // pending | processing
-    const progress = data.status === "processing" ? 50 : 10;
-    await updateJobProgress(internalJobId, progress, undefined, data.status);
-  }
+  const { failJob } = await import("./job-queue");
+  await failJob(internalJobId, "Superseded — resubmit from the UI");
 }

@@ -9,10 +9,10 @@ import {
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
-// pgvector custom type — vector(1536)
+// pgvector custom type — vector(1024) matches Voyage AI voyage-3 dims
 const vector = customType<{ data: number[]; driverData: string }>({
   dataType() {
-    return "vector(1536)";
+    return "vector(1024)";
   },
   toDriver(value: number[]): string {
     return `[${value.join(",")}]`;

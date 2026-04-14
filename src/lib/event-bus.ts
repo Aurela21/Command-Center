@@ -32,9 +32,11 @@ export type SSEEvent =
   | {
       type: "job:completed";
       jobId: string;
+      jobType: string;
       sceneId: string | null;
       assetVersionId: string | null;
       qualityScore: unknown;
+      fileUrl?: string | null;
     }
   | {
       type: "job:failed";

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,7 @@ import {
   Check,
   Scissors,
   Layers,
+  Loader2,
   Trash2,
   Sparkles,
   Pencil,
@@ -26,12 +27,11 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import {
-  MOCK_SCENES,
-  MOCK_TOTAL_DURATION_MS,
   SCENE_COLORS,
   candidateFrames,
   type MockScene,
 } from "./mock-data";
+import type { Project } from "@/db/schema";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -45,6 +45,58 @@ function msToTimecode(ms: number): string {
 
 function sceneColor(index: number): string {
   return SCENE_COLORS[index % SCENE_COLORS.length];
+}
+
+const R2_PUBLIC = process.env.NEXT_PUBLIC_R2_PUBLIC_URL ?? "";
+
+/** Build a public R2 URL for an extracted frame. Frames are uploaded at 1fps. */
+function frameUrl(projectId: string, secondIndex: number): string {
+  return `${R2_PUBLIC}/frames/${projectId}/f${String(secondIndex).padStart(4, "0")}.jpg`;
+}
+
+// Map a DB scene row to the MockScene shape used by the UI
+function dbSceneToMock(
+  s: {
+    id: string;
+    sceneOrder: number;
+    startFrame: number;
+    endFrame: number;
+    startTimeMs: number;
+    endTimeMs: number;
+    referenceFrame: number;
+    referenceFrameUrl: string | null;
+    referenceFrameSource: string | null;
+    boundarySource: string | null;
+    description: string | null;
+    targetClipDurationS: number | null;
+  },
+  projectId: string
+): MockScene {
+  // Candidate seconds spanning this scene (up to 8 evenly distributed)
+  const startS = Math.floor(s.startTimeMs / 1000);
+  const endS = Math.ceil(s.endTimeMs / 1000);
+  const cFrameNums = candidateFrames(s.startFrame, s.endFrame);
+  const cUrls = cFrameNums.map((_, i) => {
+    const sec = Math.round(startS + ((endS - startS) / (cFrameNums.length + 1)) * (i + 1));
+    return frameUrl(projectId, sec);
+  });
+
+  return {
+    id: s.id,
+    sceneOrder: s.sceneOrder,
+    startFrame: s.startFrame,
+    endFrame: s.endFrame,
+    startTimeMs: s.startTimeMs,
+    endTimeMs: s.endTimeMs,
+    referenceFrame: s.referenceFrame,
+    referenceFrameUrl: s.referenceFrameUrl ?? undefined,
+    candidateFrames: cFrameNums,
+    candidateFrameUrls: cUrls,
+    referenceFrameSource: (s.referenceFrameSource ?? "auto") as "auto" | "user_selected",
+    boundarySource: (s.boundarySource ?? "ai") as "ai" | "user_adjusted" | "user_created",
+    description: s.description ?? "",
+    targetClipDurationS: s.targetClipDurationS ?? 5,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -134,35 +186,47 @@ function ManifestTimeline({
 
 function ReferenceFramePicker({
   candidateFrames: frames,
+  candidateFrameUrls,
   selectedFrame,
   color,
   onSelect,
 }: {
   candidateFrames: number[];
+  candidateFrameUrls?: string[];
   selectedFrame: number;
   color: string;
   onSelect: (frame: number) => void;
 }) {
   return (
     <div className="grid grid-cols-4 gap-2">
-      {frames.map((frame) => {
+      {frames.map((frame, i) => {
         const isSelected = frame === selectedFrame;
+        const imgUrl = candidateFrameUrls?.[i];
         return (
           <button
             key={frame}
             onClick={() => onSelect(frame)}
             className={cn(
-              "aspect-video rounded overflow-hidden border-2 transition-all focus-visible:outline-none",
+              "aspect-[9/16] rounded overflow-hidden border-2 transition-all focus-visible:outline-none",
               isSelected
                 ? "border-neutral-900 ring-2 ring-neutral-900 ring-offset-1"
                 : "border-neutral-100 hover:border-neutral-300"
             )}
           >
-            {/* Mock thumbnail: colored placeholder with frame number */}
             <div
               className="w-full h-full relative flex items-end justify-end p-1"
-              style={{ backgroundColor: color }}
+              style={{ backgroundColor: imgUrl ? undefined : color }}
             >
+              {imgUrl && (
+                <img
+                  src={imgUrl}
+                  alt={`Frame ${frame}`}
+                  className="absolute inset-0 w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).style.display = "none";
+                  }}
+                />
+              )}
               {isSelected && (
                 <div className="absolute inset-0 bg-black/10" />
               )}
@@ -203,11 +267,9 @@ function SceneDetailPanel({
   const durationMs = scene.endTimeMs - scene.startTimeMs;
   const color = sceneColor(sceneIndex);
 
-  // Local controlled inputs for frame boundaries (commit on blur/enter)
   const [startInput, setStartInput] = useState(String(scene.startFrame));
   const [endInput, setEndInput] = useState(String(scene.endFrame));
 
-  // Re-sync inputs when the selected scene changes
   useEffect(() => {
     setStartInput(String(scene.startFrame));
     setEndInput(String(scene.endFrame));
@@ -220,9 +282,7 @@ function SceneDetailPanel({
         startFrame: val,
         startTimeMs: Math.round((val / 30) * 1000),
         boundarySource:
-          scene.boundarySource === "user_created"
-            ? "user_created"
-            : "user_adjusted",
+          scene.boundarySource === "user_created" ? "user_created" : "user_adjusted",
       });
     } else {
       setStartInput(String(scene.startFrame));
@@ -236,9 +296,7 @@ function SceneDetailPanel({
         endFrame: val,
         endTimeMs: Math.round((val / 30) * 1000),
         boundarySource:
-          scene.boundarySource === "user_created"
-            ? "user_created"
-            : "user_adjusted",
+          scene.boundarySource === "user_created" ? "user_created" : "user_adjusted",
       });
     } else {
       setEndInput(String(scene.endFrame));
@@ -247,15 +305,13 @@ function SceneDetailPanel({
 
   return (
     <div className="p-6 space-y-7">
-      {/* Scene number + badge row */}
       <div className="flex items-start justify-between">
         <div className="flex items-end gap-3">
           <span className="text-8xl font-light leading-none text-neutral-200 tabular-nums select-none">
             {String(scene.sceneOrder).padStart(2, "0")}
           </span>
           <span className="text-sm text-neutral-400 mb-2">
-            {(durationMs / 1000).toFixed(1)}s &middot; f{scene.startFrame}–f
-            {scene.endFrame}
+            {(durationMs / 1000).toFixed(1)}s &middot; f{scene.startFrame}–f{scene.endFrame}
           </span>
         </div>
         <div className="mt-1">
@@ -263,13 +319,22 @@ function SceneDetailPanel({
         </div>
       </div>
 
-      {/* Reference frame picker */}
       <div>
         <p className="text-xs font-medium uppercase tracking-widest text-neutral-400 mb-3">
           Reference Frame
         </p>
+        {scene.referenceFrameUrl && (
+          <div className="mb-3">
+            <img
+              src={scene.referenceFrameUrl}
+              alt="Reference frame"
+              className="w-full max-w-xs rounded-lg border border-neutral-100 object-cover aspect-[9/16]"
+            />
+          </div>
+        )}
         <ReferenceFramePicker
           candidateFrames={scene.candidateFrames}
+          candidateFrameUrls={scene.candidateFrameUrls}
           selectedFrame={scene.referenceFrame}
           color={color}
           onSelect={(frame) =>
@@ -287,7 +352,6 @@ function SceneDetailPanel({
         </p>
       </div>
 
-      {/* Boundary inputs */}
       <div>
         <p className="text-xs font-medium uppercase tracking-widest text-neutral-400 mb-3">
           Boundaries
@@ -327,7 +391,6 @@ function SceneDetailPanel({
         )}
       </div>
 
-      {/* Description textarea */}
       <div>
         <p className="text-xs font-medium uppercase tracking-widest text-neutral-400 mb-3">
           Description
@@ -341,24 +404,13 @@ function SceneDetailPanel({
         />
       </div>
 
-      {/* Action buttons */}
       <div className="flex items-center gap-2 pt-1 border-t border-neutral-100">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onSplit}
-          className="gap-1.5 text-xs h-8"
-        >
+        <Button variant="outline" size="sm" onClick={onSplit} className="gap-1.5 text-xs h-8">
           <Scissors className="h-3.5 w-3.5" />
           Split
         </Button>
         {!isLast && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onMerge}
-            className="gap-1.5 text-xs h-8"
-          >
+          <Button variant="outline" size="sm" onClick={onMerge} className="gap-1.5 text-xs h-8">
             <Layers className="h-3.5 w-3.5" />
             Merge with next
           </Button>
@@ -408,52 +460,27 @@ function SceneListItem({
         isSelected ? "bg-neutral-900" : "hover:bg-neutral-50"
       )}
     >
-      {/* Color swatch accent + scene number */}
       <div className="shrink-0 flex flex-col items-center gap-1.5 pt-0.5">
         <div
           className="w-2 h-2 rounded-full mt-1"
           style={{ backgroundColor: isSelected ? "rgba(255,255,255,0.3)" : color }}
         />
       </div>
-
       <div className="flex-1 min-w-0">
-        {/* Scene number + duration row */}
         <div className="flex items-baseline gap-2 mb-1">
-          <span
-            className={cn(
-              "text-xl font-light tabular-nums leading-none",
-              isSelected ? "text-white/30" : "text-neutral-200"
-            )}
-          >
+          <span className={cn("text-xl font-light tabular-nums leading-none", isSelected ? "text-white/30" : "text-neutral-200")}>
             {String(scene.sceneOrder).padStart(2, "0")}
           </span>
-          <span
-            className={cn(
-              "text-xs tabular-nums",
-              isSelected ? "text-white/40" : "text-neutral-400"
-            )}
-          >
+          <span className={cn("text-xs tabular-nums", isSelected ? "text-white/40" : "text-neutral-400")}>
             {(durationMs / 1000).toFixed(1)}s
           </span>
           {scene.boundarySource !== "ai" && (
-            <span
-              className={cn(
-                "text-[10px] font-medium",
-                isSelected ? "text-amber-300" : "text-amber-600"
-              )}
-            >
+            <span className={cn("text-[10px] font-medium", isSelected ? "text-amber-300" : "text-amber-600")}>
               {scene.boundarySource === "user_adjusted" ? "Adjusted" : "Created"}
             </span>
           )}
         </div>
-
-        {/* Description */}
-        <p
-          className={cn(
-            "text-xs leading-relaxed line-clamp-2",
-            isSelected ? "text-white/80" : "text-neutral-600"
-          )}
-        >
+        <p className={cn("text-xs leading-relaxed line-clamp-2", isSelected ? "text-white/80" : "text-neutral-600")}>
           {scene.description}
         </p>
       </div>
@@ -470,31 +497,65 @@ export default function ManifestPage() {
   const router = useRouter();
   const qc = useQueryClient();
 
-  const [scenes, setScenes] = useState<MockScene[]>(MOCK_SCENES);
-  const [selectedId, setSelectedId] = useState<string>(MOCK_SCENES[0].id);
+  const [scenes, setScenes] = useState<MockScene[]>([]);
+  const [selectedId, setSelectedId] = useState<string>("");
   const [approveOpen, setApproveOpen] = useState(false);
 
-  // Ref map for scrolling the scene list
   const itemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const listRef = useRef<HTMLDivElement>(null);
 
+  // ── Fetch project status ──────────────────────────────────────────────────
+  const { data: project } = useQuery<Project>({
+    queryKey: ["project", id],
+    queryFn: async () => {
+      const res = await fetch(`/api/projects/${id}`);
+      if (!res.ok) throw new Error("Failed to load project");
+      return res.json();
+    },
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status === "analyzing" ? 3000 : false;
+    },
+  });
+
+  // ── Fetch scenes ──────────────────────────────────────────────────────────
+  const { data: dbScenes, isLoading: scenesLoading } = useQuery({
+    queryKey: ["scenes", id],
+    queryFn: async () => {
+      const res = await fetch(`/api/projects/${id}/scenes`);
+      if (!res.ok) throw new Error("Failed to load scenes");
+      return res.json() as Promise<Parameters<typeof dbSceneToMock>[0][]>; // first param only
+    },
+    refetchInterval: (query) => {
+      // Keep polling while we have no scenes and project is still analyzing
+      return query.state.data?.length === 0 ? 3000 : false;
+    },
+  });
+
+  // Sync DB scenes into local state
+  useEffect(() => {
+    if (dbScenes && dbScenes.length > 0) {
+      const mapped = dbScenes.map((s) => dbSceneToMock(s, id));
+      setScenes(mapped);
+      if (!selectedId || !mapped.find((s) => s.id === selectedId)) {
+        setSelectedId(mapped[0].id);
+      }
+    }
+  }, [dbScenes]);
+
   const selectedIndex = scenes.findIndex((s) => s.id === selectedId);
   const selectedScene = scenes[selectedIndex] ?? scenes[0];
-  const totalDurationMs =
-    scenes[scenes.length - 1]?.endTimeMs ?? MOCK_TOTAL_DURATION_MS;
+  const totalDurationMs = scenes[scenes.length - 1]?.endTimeMs ?? 0;
+  const isAnalyzing = project?.status === "analyzing" || (project?.status === "manifest_review" && scenesLoading);
 
-  // Select a scene and scroll it into view in the list
   const selectScene = useCallback((id: string) => {
     setSelectedId(id);
     requestAnimationFrame(() => {
-      itemRefs.current[id]?.scrollIntoView({
-        block: "nearest",
-        behavior: "smooth",
-      });
+      itemRefs.current[id]?.scrollIntoView({ block: "nearest", behavior: "smooth" });
     });
   }, []);
 
-  // ---- Scene mutations (local state only) --------------------------------
+  // ── Scene mutations (local state only — saved to DB on approve) ───────────
 
   function updateScene(id: string, patch: Partial<MockScene>) {
     setScenes((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
@@ -513,9 +574,7 @@ export default function ManifestPage() {
       endTimeMs: midTimeMs,
       candidateFrames: candidateFrames(scene.startFrame, midFrame),
       referenceFrame: Math.floor((scene.startFrame + midFrame) / 2),
-      targetClipDurationS: parseFloat(
-        ((midTimeMs - scene.startTimeMs) / 1000).toFixed(1)
-      ),
+      targetClipDurationS: parseFloat(((midTimeMs - scene.startTimeMs) / 1000).toFixed(1)),
     };
     const newB: MockScene = {
       ...scene,
@@ -527,20 +586,13 @@ export default function ManifestPage() {
       boundarySource: "user_created",
       referenceFrameSource: "auto",
       description: scene.description,
-      targetClipDurationS: parseFloat(
-        ((scene.endTimeMs - midTimeMs) / 1000).toFixed(1)
-      ),
+      targetClipDurationS: parseFloat(((scene.endTimeMs - midTimeMs) / 1000).toFixed(1)),
     };
 
-    const updated = [
-      ...scenes.slice(0, idx),
-      newA,
-      newB,
-      ...scenes.slice(idx + 1),
-    ].map((s, i) => ({ ...s, sceneOrder: i + 1 }));
-
+    const updated = [...scenes.slice(0, idx), newA, newB, ...scenes.slice(idx + 1)].map(
+      (s, i) => ({ ...s, sceneOrder: i + 1 })
+    );
     setScenes(updated);
-    // Stay on the first half
     setSelectedId(newA.id);
   }
 
@@ -556,17 +608,12 @@ export default function ManifestPage() {
       endTimeMs: b.endTimeMs,
       candidateFrames: candidateFrames(a.startFrame, b.endFrame),
       description: a.description + " — " + b.description,
-      targetClipDurationS: parseFloat(
-        ((b.endTimeMs - a.startTimeMs) / 1000).toFixed(1)
-      ),
+      targetClipDurationS: parseFloat(((b.endTimeMs - a.startTimeMs) / 1000).toFixed(1)),
     };
 
-    const updated = [
-      ...scenes.slice(0, idx),
-      merged,
-      ...scenes.slice(idx + 2),
-    ].map((s, i) => ({ ...s, sceneOrder: i + 1 }));
-
+    const updated = [...scenes.slice(0, idx), merged, ...scenes.slice(idx + 2)].map(
+      (s, i) => ({ ...s, sceneOrder: i + 1 })
+    );
     setScenes(updated);
     setSelectedId(merged.id);
   }
@@ -574,25 +621,45 @@ export default function ManifestPage() {
   function removeScene(id: string) {
     if (scenes.length <= 1) return;
     const idx = scenes.findIndex((s) => s.id === id);
-    const updated = scenes
-      .filter((s) => s.id !== id)
-      .map((s, i) => ({ ...s, sceneOrder: i + 1 }));
+    const updated = scenes.filter((s) => s.id !== id).map((s, i) => ({ ...s, sceneOrder: i + 1 }));
     setScenes(updated);
     const nextSelected = updated[Math.min(idx, updated.length - 1)];
     setSelectedId(nextSelected.id);
   }
 
-  // ---- Approve manifest --------------------------------------------------
+  // ── Approve manifest ──────────────────────────────────────────────────────
 
   const approveMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/projects/${id}`, {
+      // 1. Save the final scene state to DB (replace existing)
+      const scenePayload = scenes.map((s) => ({
+        sceneOrder: s.sceneOrder,
+        startFrame: s.startFrame,
+        endFrame: s.endFrame,
+        startTimeMs: s.startTimeMs,
+        endTimeMs: s.endTimeMs,
+        referenceFrame: s.referenceFrame,
+        referenceFrameSource: s.referenceFrameSource,
+        boundarySource: s.boundarySource,
+        description: s.description,
+        targetClipDurationS: s.targetClipDurationS,
+      }));
+
+      const scenesRes = await fetch(`/api/projects/${id}/scenes?replace=true`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(scenePayload),
+      });
+      if (!scenesRes.ok) throw new Error("Failed to save scenes");
+
+      // 2. Advance project status
+      const projectRes = await fetch(`/api/projects/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "producing" }),
       });
-      if (!res.ok) throw new Error("Failed to approve manifest");
-      return res.json();
+      if (!projectRes.ok) throw new Error("Failed to approve manifest");
+      return projectRes.json();
     },
     onSuccess: (updated) => {
       qc.setQueryData(["project", id], updated);
@@ -602,19 +669,38 @@ export default function ManifestPage() {
     onError: () => toast.error("Failed to approve manifest"),
   });
 
-  // -----------------------------------------------------------------------
+  // ── Render ────────────────────────────────────────────────────────────────
+
+  if (isAnalyzing || (scenesLoading && scenes.length === 0)) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center bg-white gap-4">
+        <Loader2 className="h-8 w-8 text-neutral-300 animate-spin" />
+        <div className="text-center">
+          <p className="text-sm font-medium text-neutral-700">Analyzing video…</p>
+          <p className="text-xs text-neutral-400 mt-1">
+            Claude is detecting scenes. This takes 30–60 seconds.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (scenes.length === 0) {
+    return (
+      <div className="h-full flex items-center justify-center bg-white">
+        <p className="text-sm text-neutral-400">No scenes found. Try re-uploading the video.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col overflow-hidden bg-white">
       {/* ── Header ── */}
       <div className="shrink-0 flex items-center justify-between px-8 py-4 border-b border-neutral-200">
         <div>
-          <h1 className="text-base font-semibold text-neutral-900">
-            Scene Manifest
-          </h1>
+          <h1 className="text-base font-semibold text-neutral-900">Scene Manifest</h1>
           <p className="text-xs text-neutral-400 mt-0.5">
-            {scenes.length} scenes &middot;{" "}
-            {msToTimecode(totalDurationMs)} total
+            {scenes.length} scenes &middot; {msToTimecode(totalDurationMs)} total
           </p>
         </div>
         <Button
@@ -636,7 +722,6 @@ export default function ManifestPage() {
         />
         <div className="flex items-center justify-between mt-1.5 text-[11px] text-neutral-400 font-mono">
           <span>0:00</span>
-          {/* Timecodes at 25% intervals */}
           <span>{msToTimecode(totalDurationMs * 0.25)}</span>
           <span>{msToTimecode(totalDurationMs * 0.5)}</span>
           <span>{msToTimecode(totalDurationMs * 0.75)}</span>
@@ -646,11 +731,7 @@ export default function ManifestPage() {
 
       {/* ── Content row ── */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Scene list (left, ~38%) */}
-        <div
-          ref={listRef}
-          className="w-[38%] shrink-0 border-r border-neutral-200 overflow-y-auto"
-        >
+        <div ref={listRef} className="w-[38%] shrink-0 border-r border-neutral-200 overflow-y-auto">
           {scenes.map((scene, i) => (
             <SceneListItem
               key={scene.id}
@@ -658,14 +739,10 @@ export default function ManifestPage() {
               sceneIndex={i}
               isSelected={scene.id === selectedId}
               onSelect={() => selectScene(scene.id)}
-              ref={(el) => {
-                itemRefs.current[scene.id] = el;
-              }}
+              ref={(el) => { itemRefs.current[scene.id] = el; }}
             />
           ))}
         </div>
-
-        {/* Detail panel (right, ~62%) */}
         <div className="flex-1 overflow-y-auto bg-white">
           {selectedScene && (
             <SceneDetailPanel
@@ -707,9 +784,7 @@ export default function ManifestPage() {
               disabled={approveMutation.isPending}
               className="bg-neutral-900 hover:bg-neutral-700 text-white"
             >
-              {approveMutation.isPending
-                ? "Approving…"
-                : "Approve & continue"}
+              {approveMutation.isPending ? "Approving…" : "Approve & continue"}
             </Button>
           </DialogFooter>
         </DialogContent>

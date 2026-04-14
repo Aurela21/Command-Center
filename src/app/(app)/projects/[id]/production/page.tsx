@@ -3,32 +3,170 @@
 import { useState, useCallback, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { MOCK_SCENES, SCENE_COLORS } from "../manifest/mock-data";
-import type { SceneProductionState, SSEEvent, ProductionTab } from "./types";
+import { SCENE_COLORS } from "../manifest/mock-data";
+import type {
+  SceneProductionState,
+  SeedVersion,
+  SSEEvent,
+  ProductionTab,
+} from "./types";
 import { Tab3A } from "./tab-3a";
 import { Tab3B } from "./tab-3b";
 import { TabReview } from "./tab-review";
 import { Tab3C } from "./tab-3c";
+import { Loader2 } from "lucide-react";
 
-// ─── Initial state ───────────────────────────────────────────────────────────
+// ─── DB row types (mirrors what production-state returns) ────────────────────
 
-function initScenes(): SceneProductionState[] {
-  return MOCK_SCENES.map((s, i) => ({
-    sceneId: s.id,
-    sceneOrder: s.sceneOrder,
-    description: s.description,
-    referenceFrame: s.referenceFrame,
-    targetClipDurationS: s.targetClipDurationS,
-    color: SCENE_COLORS[i % SCENE_COLORS.length],
-    nanoBananaPrompt: "",
-    seedVersions: [],
-    approvedSeedVersionId: null,
-    seedImageApproved: false,
-    klingPrompt: "",
-    klingPromptApproved: false,
-    videoJobStatus: "idle",
-    videoJobProgress: 0,
-  }));
+type DbScene = {
+  id: string;
+  sceneOrder: number;
+  description: string | null;
+  referenceFrame: number;
+  referenceFrameUrl: string | null;
+  startFrameUrl: string | null;
+  targetClipDurationS: number | null;
+  nanoBananaPrompt: string | null;
+  scriptSegment: string | null;
+  scenePrompt: string | null;
+  approvedSeedImageId: string | null;
+  seedImageApproved: boolean | null;
+  klingPromptApproved: boolean | null;
+  startTimeMs: number;
+  endTimeMs: number;
+};
+
+type DbAssetVersion = {
+  id: string;
+  sceneId: string;
+  assetType: string;
+  fileUrl: string;
+  versionNumber: number;
+  isApproved: boolean | null;
+  qualityScore: unknown;
+  createdAt: string;
+};
+
+type DbJob = {
+  id: string;
+  sceneId: string | null;
+  jobType: string;
+  status: string;
+  externalJobId: string | null;
+  lastError: string | null;
+  createdAt: string;
+};
+
+// ─── DB → SceneProductionState mapper ────────────────────────────────────────
+
+const R2_PUBLIC = process.env.NEXT_PUBLIC_R2_PUBLIC_URL ?? "";
+
+function frameUrl(projectId: string, frameNumber: number): string {
+  const sec = Math.round(frameNumber / 30);
+  return `${R2_PUBLIC}/frames/${projectId}/f${String(sec).padStart(4, "0")}.jpg`;
+}
+
+function dbToState(
+  scene: DbScene,
+  assets: DbAssetVersion[],
+  jobs: DbJob[],
+  color: string,
+  projectId: string
+): SceneProductionState {
+  const sceneAssets = assets.filter((a) => a.sceneId === scene.id);
+  const seedAssets = sceneAssets.filter((a) => a.assetType === "seed_image");
+  const klingAssets = sceneAssets.filter((a) => a.assetType === "kling_output");
+
+  const seedVersions: SeedVersion[] = seedAssets.map((a) => {
+    const qs = a.qualityScore;
+    const score =
+      qs !== null && typeof qs === "object" && "overall" in (qs as object)
+        ? (qs as { overall: number }).overall
+        : typeof qs === "number"
+        ? qs
+        : 0;
+    return {
+      id: a.id,
+      createdAt: a.createdAt,
+      qualityScore: score,
+      color,
+      imageUrl: a.fileUrl,
+    };
+  });
+
+  const approvedSeed = seedAssets.find((a) => a.isApproved);
+
+  // Kling jobs — sorted desc by createdAt (production-state orders desc)
+  const klingJobs = jobs.filter(
+    (j) => j.sceneId === scene.id && j.jobType === "kling_generation"
+  );
+  const latestKling = klingJobs[0];
+
+  let videoJobStatus: SceneProductionState["videoJobStatus"] = "idle";
+  let videoJobProgress = 0;
+  let videoJobError: string | undefined;
+  let videoJobId: string | undefined;
+  let videoUrl: string | undefined;
+
+  // Only treat a kling job as active if it's recent (last 5 min) or already submitted to API
+  const klingIsActive =
+    latestKling &&
+    (latestKling.status === "completed" ||
+      latestKling.status === "failed" ||
+      latestKling.status === "processing" ||
+      (["queued", "submitted", "retrying"].includes(latestKling.status) &&
+        (latestKling.externalJobId != null ||
+          new Date(latestKling.createdAt).getTime() > Date.now() - 5 * 60 * 1000)));
+
+  if (klingIsActive && latestKling) {
+    videoJobId = latestKling.id;
+    const s = latestKling.status;
+    if (s === "completed") {
+      videoJobStatus = "completed";
+      videoJobProgress = 100;
+      videoUrl = klingAssets[0]?.fileUrl;
+    } else if (s === "failed") {
+      videoJobStatus = "failed";
+      videoJobError = latestKling.lastError ?? undefined;
+    } else if (s === "processing") {
+      videoJobStatus = "processing";
+    } else {
+      videoJobStatus = "queued";
+    }
+  }
+
+  // Detect in-progress nano_banana jobs — only jobs created in the last 5 minutes
+  // so stale stuck jobs from failed attempts don't permanently block the UI
+  const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+  const pendingSeed = jobs.find(
+    (j) =>
+      j.sceneId === scene.id &&
+      j.jobType === "nano_banana" &&
+      ["queued", "submitted", "processing"].includes(j.status) &&
+      new Date(j.createdAt).getTime() > fiveMinutesAgo
+  );
+
+  return {
+    sceneId: scene.id,
+    sceneOrder: scene.sceneOrder,
+    description: scene.description ?? "",
+    referenceFrame: scene.referenceFrame,
+    referenceFrameUrl: scene.referenceFrameUrl ?? frameUrl(projectId, scene.referenceFrame),
+    targetClipDurationS: scene.targetClipDurationS ?? 5,
+    color,
+    nanoBananaPrompt: scene.nanoBananaPrompt ?? "",
+    seedVersions,
+    approvedSeedVersionId: approvedSeed?.id ?? null,
+    seedImageApproved: scene.seedImageApproved ?? false,
+    seedGenerating: !!pendingSeed,
+    klingPrompt: scene.scriptSegment ?? scene.scenePrompt ?? "",
+    klingPromptApproved: scene.klingPromptApproved ?? false,
+    videoJobStatus,
+    videoJobProgress,
+    videoJobError,
+    videoJobId,
+    videoUrl,
+  };
 }
 
 // ─── Tab config ──────────────────────────────────────────────────────────────
@@ -45,8 +183,9 @@ const TABS: { id: ProductionTab; label: string }[] = [
 export default function ProductionPage() {
   const { id: projectId } = useParams<{ id: string }>();
   const [activeTab, setActiveTab] = useState<ProductionTab>("3a");
-  const [scenes, setScenes] = useState<SceneProductionState[]>(initScenes);
+  const [scenes, setScenes] = useState<SceneProductionState[]>([]);
   const [script, setScript] = useState<string>("");
+  const [loading, setLoading] = useState(true);
 
   const updateScene = useCallback(
     (sceneId: string, patch: Partial<SceneProductionState>) => {
@@ -57,7 +196,33 @@ export default function ProductionPage() {
     []
   );
 
-  // SSE listener — wires up live job progress for 3C once real jobs exist
+  // Load initial production state
+  useEffect(() => {
+    fetch(`/api/projects/${projectId}/production-state`)
+      .then((r) => r.json())
+      .then(
+        (data: {
+          scenes: DbScene[];
+          assetVersions: DbAssetVersion[];
+          jobs: DbJob[];
+        }) => {
+          const mapped = data.scenes.map((s, i) =>
+            dbToState(
+              s,
+              data.assetVersions,
+              data.jobs,
+              SCENE_COLORS[i % SCENE_COLORS.length],
+              projectId
+            )
+          );
+          setScenes(mapped);
+          setLoading(false);
+        }
+      )
+      .catch(() => setLoading(false));
+  }, [projectId]);
+
+  // SSE listener for live job updates
   useEffect(() => {
     const es = new EventSource("/api/events");
 
@@ -78,32 +243,62 @@ export default function ProductionPage() {
             });
           }
           break;
+
         case "job:completed":
           if (event.sceneId) {
-            const qs =
-              event.qualityScore != null &&
-              typeof event.qualityScore === "object"
-                ? (event.qualityScore as {
-                    overall: number;
-                    notes: string;
-                    lipSyncRisk?: boolean;
+            if (event.jobType === "nano_banana") {
+              // Completed seed image — add to versions list
+              if (event.assetVersionId) {
+                setScenes((prev) =>
+                  prev.map((s) => {
+                    if (s.sceneId !== event.sceneId) return s;
+                    const newVersion: SeedVersion = {
+                      id: event.assetVersionId!,
+                      createdAt: new Date().toISOString(),
+                      qualityScore: 0,
+                      color: s.color,
+                      imageUrl: event.fileUrl ?? undefined,
+                    };
+                    return {
+                      ...s,
+                      seedVersions: [...s.seedVersions, newVersion],
+                      seedGenerating: false,
+                    };
                   })
-                : undefined;
-            updateScene(event.sceneId, {
-              videoJobStatus: "completed",
-              videoJobProgress: 100,
-              qualityScore: qs,
-            });
+                );
+              } else {
+                updateScene(event.sceneId, { seedGenerating: false });
+              }
+            } else if (event.jobType === "kling_generation") {
+              const qs =
+                event.qualityScore != null &&
+                typeof event.qualityScore === "object"
+                  ? (event.qualityScore as {
+                      overall: number;
+                      notes: string;
+                      lipSyncRisk?: boolean;
+                    })
+                  : undefined;
+              updateScene(event.sceneId, {
+                videoJobStatus: "completed",
+                videoJobProgress: 100,
+                videoUrl: event.fileUrl ?? undefined,
+                qualityScore: qs,
+              });
+            }
           }
           break;
+
         case "job:failed":
           if (event.sceneId) {
             updateScene(event.sceneId, {
               videoJobStatus: "failed",
               videoJobError: event.error,
+              seedGenerating: false,
             });
           }
           break;
+
         case "job:retrying":
           if (event.sceneId) {
             updateScene(event.sceneId, {
@@ -117,6 +312,14 @@ export default function ProductionPage() {
 
     return () => es.close();
   }, [updateScene]);
+
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-neutral-400" />
+      </div>
+    );
+  }
 
   const seedsApproved = scenes.filter((s) => s.seedImageApproved).length;
   const promptsApproved = scenes.filter((s) => s.klingPromptApproved).length;
@@ -163,12 +366,17 @@ export default function ProductionPage() {
       {/* ── Tab content ── */}
       <div className="flex-1 overflow-hidden">
         {activeTab === "3a" && (
-          <Tab3A scenes={scenes} updateScene={updateScene} />
+          <Tab3A
+            scenes={scenes}
+            updateScene={updateScene}
+            projectId={projectId}
+          />
         )}
         {activeTab === "3b" && (
           <Tab3B
             scenes={scenes}
             updateScene={updateScene}
+            projectId={projectId}
             script={script}
             onScriptChange={setScript}
           />

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE_NAME, verifySessionToken } from "@/lib/auth";
 
-const PUBLIC_PATHS = ["/login", "/api/auth/login"];
+// API routes are excluded from session auth — they handle their own security
+// or are called internally server-to-server (e.g. process-video → analyze-scenes).
+const PUBLIC_PATHS = ["/login", "/api/"];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

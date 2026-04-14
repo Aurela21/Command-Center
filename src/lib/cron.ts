@@ -60,7 +60,11 @@ async function processJob(job: Job): Promise<void> {
         break;
       }
       case "nano_banana": {
-        if (!job.externalJobId) return;
+        // nano_banana jobs without externalJobId are leftovers from failed submits — clear them
+        if (!job.externalJobId) {
+          await failJob(job.id, "Superseded — resubmit from the UI");
+          return;
+        }
         const { pollNanoBananaJob } = await import("./nano-banana");
         await pollNanoBananaJob(job.id, job.externalJobId);
         break;

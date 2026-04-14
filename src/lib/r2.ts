@@ -4,6 +4,7 @@ import {
   GetObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { Readable } from "stream";
 
 // Singleton — survive Next.js hot reloads in dev
 declare global {
@@ -61,6 +62,35 @@ export function publicUrl(key: string): string {
   const base = process.env.R2_PUBLIC_URL;
   if (!base) throw new Error("R2_PUBLIC_URL is not set");
   return `${base.replace(/\/$/, "")}/${key}`;
+}
+
+/** Upload a buffer directly from the server to R2. Returns the public URL. */
+export async function uploadBuffer(
+  key: string,
+  buffer: Buffer,
+  contentType: string
+): Promise<string> {
+  await getClient().send(
+    new PutObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME!,
+      Key: key,
+      Body: buffer,
+      ContentType: contentType,
+    })
+  );
+  return publicUrl(key);
+}
+
+/** Download a URL and re-upload to R2. Returns the public URL. */
+export async function downloadAndUpload(
+  sourceUrl: string,
+  destKey: string,
+  contentType: string
+): Promise<string> {
+  const res = await fetch(sourceUrl);
+  if (!res.ok) throw new Error(`Download failed: ${res.status}`);
+  const buffer = Buffer.from(await res.arrayBuffer());
+  return uploadBuffer(destKey, buffer, contentType);
 }
 
 /** Derive file extension from MIME type. */

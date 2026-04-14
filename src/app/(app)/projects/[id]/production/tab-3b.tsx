@@ -20,69 +20,6 @@ function hasLipSyncRisk(description: string, durationS: number): boolean {
   );
 }
 
-// ─── Mock script generator ───────────────────────────────────────────────────
-// Produces a formatted script + per-scene Kling prompts.
-// In production this calls /api/projects/:id/generate-script → Claude.
-
-function generateMockScript(
-  angle: string,
-  tonality: string,
-  format: string
-): string {
-  return `[${format.toUpperCase()} · ${angle} · ${tonality}]
-
-SCENE 01 — KINETIC OPEN (0:00–0:04)
-VO (off-screen): "Every step. Every rep. Every limit—"
-
-SCENE 02 — THE PROBLEM (0:04–0:08)
-VO: "—is just a suit you haven't taken off yet."
-
-SCENE 03 — PROBLEM MONTAGE (0:08–0:12)
-[No dialogue — action-driven cut]
-
-SCENE 04 — BRAND REVEAL (0:12–0:15)
-SUPER: "Move Without Limits"
-
-SCENE 05 — PRODUCT SHOWCASE (0:15–0:20)
-VO: "Engineered for athletes who refuse to be held back."
-
-SCENE 06 — TECH DEMO (0:20–0:24)
-VO: "Four-way stretch. Ventilation mesh. Zero restrictions."
-
-SCENE 07 — PROOF OF PERFORMANCE (0:24–0:28)
-[No dialogue — rapid cut montage]
-
-SCENE 08 — SOCIAL PROOF (0:28–0:32)
-SUPER: "50,000+ athletes trust AirFlex"
-
-SCENE 09 — TESTIMONIAL (0:32–0:36)
-SARAH: "I've tried everything. Nothing moves like this. It's the last pair I'll ever need."
-
-SCENE 10 — COMPARISON (0:36–0:39)
-VO: "The difference is clear."
-
-SCENE 11 — CTA (0:39–0:42)
-SUPER: "FLEX30 · Shop Now · Limited Time"
-
-SCENE 12 — LOGO LOCK (0:42–0:45)
-SUPER: "AirFlex Pro · airflexpro.com"`;
-}
-
-const MOCK_KLING_PROMPTS: Record<number, string> = {
-  1: "Slow motion tracking shot at foot level following an athlete's stride, golden hour dust particles suspended in warm morning light, cinematic 4K",
-  2: "Close-up of person in stiff athletic clothing mid-squat, frustrated expression, crisp studio lighting, sharp texture detail on fabric stress points",
-  3: "Rapid intercutting: seam stress on lateral lunge, sweat-soaked fabric bunching, restricted overhead press, three athletes three identical pain points, kinetic editing rhythm",
-  4: "Brand logo dissolving in from clean white background, elegant sans-serif tagline fading beneath, minimal negative space, confident and still",
-  5: "360-degree product rotation of athletic leggings on floating studio pedestal, macro closeup of four-way stretch fabric and ventilation mesh weave, premium lifestyle lighting",
-  6: "Split screen thermal imaging comparison: left side competitor activewear with heat-trapped red zones, right side AirFlex staying cool blue throughout HIIT sprint sequence under dramatic studio lighting",
-  7: "Rapid cut montage: gymnast full split, CrossFit overhead press, yoga pigeon pose, all three athletes fluid and unrestricted in matching leggings, annotation overlay text, upbeat rhythm",
-  8: "Counter animation rolling to 50000 plus, five-star review cards scrolling in clean motion, three customer photo and quote pairings appearing sequentially, credibility-forward graphic design",
-  9: "Marathon runner woman speaking directly to camera in warmly lit minimalist home gym, natural handheld cinematography, genuine emotion and conviction, shallow depth of field with soft bokeh, warm practical lighting",
-  10: "Mirror-matched split screen with movements synchronized frame for frame: left athlete straining in old gear, right same athlete moving powerfully in AirFlex, seamless parallel editing",
-  11: "Full product lineup on clean white sweep, bold promo code typography animating in with kinetic energy, pulsing call to action button, urgency text rising from bottom",
-  12: "Brand logo lockup centered on white, website URL fading in beneath, bold tagline, clean breathing space, confident final hold before cut to black",
-};
-
 // ─── Scene prompt card ────────────────────────────────────────────────────────
 
 function ScenePromptCard({
@@ -94,15 +31,6 @@ function ScenePromptCard({
 }) {
   const wc = wordCount(scene.klingPrompt);
   const lipSync = hasLipSyncRisk(scene.description, scene.targetClipDurationS);
-
-  const wcColor =
-    wc === 0
-      ? "text-neutral-400"
-      : wc > 50
-      ? "text-red-600 font-semibold"
-      : wc > 40
-      ? "text-amber-600 font-semibold"
-      : "text-emerald-600";
 
   const cardBorder =
     wc > 50
@@ -259,36 +187,60 @@ const FORMATS = [
 type Props = {
   scenes: SceneProductionState[];
   updateScene: (sceneId: string, patch: Partial<SceneProductionState>) => void;
+  projectId: string;
   script: string;
   onScriptChange: (script: string) => void;
 };
 
-export function Tab3B({ scenes, updateScene, script, onScriptChange }: Props) {
+export function Tab3B({
+  scenes,
+  updateScene,
+  projectId,
+  script,
+  onScriptChange,
+}: Props) {
   const [angle, setAngle] = useState("Dynamic");
   const [tonality, setTonality] = useState("Energetic");
   const [format, setFormat] = useState("DTC Product");
   const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const approvedCount = scenes.filter((s) => s.klingPromptApproved).length;
 
-  function handleGenerateScript() {
+  async function handleGenerateScript() {
     setGenerating(true);
-    // Mock: generate after short delay. Production: POST to API → Claude.
-    setTimeout(() => {
-      const generatedScript = generateMockScript(angle, tonality, format);
-      onScriptChange(generatedScript);
-
-      // Populate per-scene Kling prompts from mock map
-      scenes.forEach((scene) => {
-        const prompt = MOCK_KLING_PROMPTS[scene.sceneOrder] ?? "";
-        updateScene(scene.sceneId, {
-          klingPrompt: prompt,
-          klingPromptApproved: false,
-        });
+    setError(null);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/generate-script`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ angle, tonality, format }),
       });
-
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || `Server error ${res.status}`);
+      }
+      const data = (await res.json()) as {
+        fullScript: string;
+        sceneSegments: string[];
+      };
+      onScriptChange(data.fullScript);
+      scenes.forEach((scene, i) => {
+        const prompt = data.sceneSegments[i] ?? "";
+        if (prompt) {
+          updateScene(scene.sceneId, {
+            klingPrompt: prompt,
+            klingPromptApproved: false,
+          });
+        }
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[generate-script]", msg);
+      setError(msg);
+    } finally {
       setGenerating(false);
-    }, 2000);
+    }
   }
 
   const selectClass =
@@ -353,6 +305,13 @@ export function Tab3B({ scenes, updateScene, script, onScriptChange }: Props) {
             )}
           </Button>
         </div>
+
+        {/* Error message */}
+        {error && (
+          <p className="mt-3 text-xs text-red-600">
+            Failed to generate script: {error}
+          </p>
+        )}
 
         {/* Script output */}
         {script && (

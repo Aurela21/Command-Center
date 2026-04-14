@@ -6,7 +6,9 @@ export type MockScene = {
   startTimeMs: number;
   endTimeMs: number;
   referenceFrame: number;
+  referenceFrameUrl?: string; // R2 public URL for the actual frame image
   candidateFrames: number[];
+  candidateFrameUrls?: string[]; // R2 public URLs matching candidateFrames order
   referenceFrameSource: "auto" | "user_selected";
   boundarySource: "ai" | "user_adjusted" | "user_created";
   description: string;

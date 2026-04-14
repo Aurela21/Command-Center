@@ -2,7 +2,8 @@ export type SeedVersion = {
   id: string;
   createdAt: string;
   qualityScore: number; // 0–100
-  color: string; // placeholder bg color for mock
+  color: string;
+  imageUrl?: string; // R2 public URL (undefined for mock/placeholder)
 };
 
 export type VideoJobStatus =
@@ -17,6 +18,7 @@ export type SceneProductionState = {
   sceneOrder: number;
   description: string;
   referenceFrame: number;
+  referenceFrameUrl?: string; // R2 public URL for the reference frame image
   targetClipDurationS: number;
   color: string;
   // Step 3A — Seed images (Nano Banana)
@@ -24,6 +26,7 @@ export type SceneProductionState = {
   seedVersions: SeedVersion[];
   approvedSeedVersionId: string | null;
   seedImageApproved: boolean;
+  seedGenerating?: boolean; // true while a nano_banana job is queued/processing
   // Step 3B — Kling prompts
   klingPrompt: string;
   klingPromptApproved: boolean;
@@ -32,6 +35,7 @@ export type SceneProductionState = {
   videoJobProgress: number; // 0–100
   videoJobError?: string;
   videoJobId?: string;
+  videoUrl?: string; // R2 public URL for completed video
   // Quality score populated via SSE job:completed event
   qualityScore?: {
     overall: number; // 0–100
@@ -53,9 +57,11 @@ export type SSEEvent =
   | {
       type: "job:completed";
       jobId: string;
+      jobType: string;
       sceneId: string | null;
       assetVersionId: string | null;
       qualityScore: unknown;
+      fileUrl?: string | null;
     }
   | {
       type: "job:failed";

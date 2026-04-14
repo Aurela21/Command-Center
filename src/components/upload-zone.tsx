@@ -47,23 +47,30 @@ function fmtDur(s: number) {
     : `${s.toFixed(0)}s`;
 }
 
-/** XHR PUT with upload-progress events. */
-function xhrPut(
+/** XHR POST to server-side upload endpoint with progress events. */
+function xhrUpload(
   url: string,
   file: File,
   onProgress: (pct: number) => void
-): Promise<void> {
+): Promise<{ key: string }> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.upload.addEventListener("progress", (e) => {
       if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
     });
     xhr.addEventListener("load", () => {
-      if (xhr.status >= 200 && xhr.status < 300) resolve();
-      else reject(new Error(`Upload failed (HTTP ${xhr.status})`));
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          resolve(JSON.parse(xhr.responseText) as { key: string });
+        } catch {
+          reject(new Error("Invalid server response"));
+        }
+      } else {
+        reject(new Error(`Upload failed (HTTP ${xhr.status})`));
+      }
     });
     xhr.addEventListener("error", () => reject(new Error("Network error during upload")));
-    xhr.open("PUT", url);
+    xhr.open("POST", url);
     xhr.setRequestHeader("Content-Type", file.type);
     xhr.send(file);
   });
@@ -165,20 +172,15 @@ export function UploadZone({ projectId }: { projectId: string }) {
     const { file } = phase;
 
     try {
-      // 1. Get presigned PUT URL
+      // 1. Upload file to server → R2 (server proxies to avoid CORS issues)
       setPhase({ kind: "uploading", file, progress: 0 });
-      const urlRes = await fetch(
-        `/api/projects/${projectId}/upload-url?contentType=${encodeURIComponent(file.type)}`
-      );
-      if (!urlRes.ok) throw new Error("Could not get upload URL");
-      const { uploadUrl, key } = await urlRes.json();
-
-      // 2. Upload directly to R2 with progress
-      await xhrPut(uploadUrl, file, (pct) =>
-        setPhase({ kind: "uploading", file, progress: pct })
+      const { key } = await xhrUpload(
+        `/api/projects/${projectId}/upload-video`,
+        file,
+        (pct) => setPhase({ kind: "uploading", file, progress: pct })
       );
 
-      // 3. Trigger server-side video processing
+      // 2. Trigger server-side video processing
       setPhase({ kind: "processing" });
       const procRes = await fetch(`/api/projects/${projectId}/process-video`, {
         method: "POST",
