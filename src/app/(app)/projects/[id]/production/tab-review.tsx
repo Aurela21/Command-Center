@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { Check, ChevronLeft, ChevronRight, ExternalLink, ImageOff, FileText, Loader2, Pencil, Plus, RefreshCw, Sparkles, Trash2, Wand2, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, ExternalLink, ImageOff, FileText, Loader2, Pencil, Play, Plus, RefreshCw, Sparkles, Trash2, Video, Wand2, X } from "lucide-react";
 import type { SceneProductionState } from "./types";
 import { PromptWithMentions, type ProductTag } from "./tab-3a";
 
@@ -337,6 +337,90 @@ function EndFrameSlot({
   );
 }
 
+function GenerateVideoButton({
+  scene,
+  projectId,
+  updateScene,
+}: {
+  scene: SceneProductionState;
+  projectId: string;
+  updateScene: (sceneId: string, patch: Partial<SceneProductionState>) => void;
+}) {
+  const [submitting, setSubmitting] = useState(false);
+  const isReady = scene.seedImageApproved && scene.klingPrompt.trim();
+  const isActive = scene.videoJobStatus === "queued" || scene.videoJobStatus === "processing";
+  const isCompleted = scene.videoJobStatus === "completed";
+
+  async function handleGenerate() {
+    if (!isReady || isActive) return;
+    setSubmitting(true);
+    updateScene(scene.sceneId, { videoJobStatus: "queued", videoJobProgress: 0 });
+    try {
+      const res = await fetch("/api/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jobType: "kling_generation",
+          projectId,
+          sceneId: scene.sceneId,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: "Failed" }));
+        throw new Error(data.error);
+      }
+    } catch (err) {
+      console.error("[generate-video]", err);
+      updateScene(scene.sceneId, { videoJobStatus: "failed", videoJobError: String(err) });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (isActive) {
+    return (
+      <div className="flex flex-col items-center gap-1">
+        <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+        <span className="text-[10px] text-blue-500">
+          {scene.videoJobStatus === "processing" ? `${scene.videoJobProgress}%` : "Queued"}
+        </span>
+      </div>
+    );
+  }
+
+  if (isCompleted) {
+    return (
+      <div className="flex flex-col items-center gap-1">
+        <button
+          onClick={handleGenerate}
+          disabled={!isReady || submitting}
+          className="p-2 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors disabled:opacity-40"
+          title="Regenerate video"
+        >
+          <Video className="h-4 w-4" />
+        </button>
+        <span className="text-[10px] text-emerald-500">Done</span>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={handleGenerate}
+      disabled={!isReady || submitting}
+      className={cn(
+        "p-2.5 rounded-lg transition-colors disabled:opacity-30",
+        isReady
+          ? "bg-blue-50 text-blue-600 hover:bg-blue-100"
+          : "bg-neutral-50 text-neutral-300"
+      )}
+      title={isReady ? "Generate video" : "Approve seed + prompt first"}
+    >
+      {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+    </button>
+  );
+}
+
 function ScenePairRow({
   scene,
   allScenes,
@@ -424,6 +508,11 @@ function ScenePairRow({
 
       {/* Kling prompt — editable inline */}
       <EditablePrompt scene={scene} updateScene={updateScene} productTags={productTags} />
+
+      {/* Generate video button */}
+      <div className="shrink-0 flex flex-col items-center justify-center w-20">
+        <GenerateVideoButton scene={scene} projectId={projectId} updateScene={updateScene} />
+      </div>
     </div>
   );
 }
@@ -556,12 +645,37 @@ export function TabReview({ scenes, updateScene, projectId, onGoTo3A, onGoTo3B, 
             <p className="text-sm font-medium text-neutral-700">
               Production readiness
             </p>
-            {ready && (
-              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full">
-                <Check className="h-3.5 w-3.5" />
-                Ready for 3C
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              {ready && (
+                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full">
+                  <Check className="h-3.5 w-3.5" />
+                  Ready
+                </span>
+              )}
+              {(() => {
+                const readyScenes = scenes.filter((s) => (s.seedImageApproved || s.seedSkipped) && s.klingPrompt.trim() && s.videoJobStatus !== "queued" && s.videoJobStatus !== "processing");
+                if (readyScenes.length === 0) return null;
+                return (
+                  <button
+                    onClick={async () => {
+                      for (const s of readyScenes) {
+                        updateScene(s.sceneId, { videoJobStatus: "queued", videoJobProgress: 0 });
+                        fetch("/api/jobs", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ jobType: "kling_generation", projectId, sceneId: s.sceneId }),
+                        }).catch(console.error);
+                      }
+                      setFeedback({ type: "success", msg: `Queued ${readyScenes.length} video generation(s)` });
+                    }}
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 px-2.5 py-1 rounded-full transition-colors"
+                  >
+                    <Play className="h-3 w-3" />
+                    Generate All ({readyScenes.length})
+                  </button>
+                );
+              })()}
+            </div>
           </div>
           <div className="space-y-2.5">
             <div>
