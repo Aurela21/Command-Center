@@ -139,20 +139,27 @@ export async function POST(req: NextRequest) {
 
   const elementTags = (project.klingElementTags as string[]) ?? [];
 
+  // If end frame is set, append motion direction to the prompt
+  // (Higgsfield doesn't support tail_image_url natively, so we guide via prompt)
+  let finalPrompt = prompt;
+  if (scene.endFrameUrl && scene.endFramePrompt) {
+    finalPrompt = `${prompt}. End position: ${scene.endFramePrompt}`;
+  }
+
   // Create job
   const job = await createJob({
     projectId,
     sceneId,
     jobType: "kling_generation",
     status: "queued",
-    resultData: { prompt, seed_image_url: seedImageUrl },
+    resultData: { prompt: finalPrompt, seed_image_url: seedImageUrl },
   });
 
   // Submit to Kling (with optional end frame)
   try {
     const externalJobId = await submitKlingJob({
       imageUrl: seedImageUrl,
-      prompt,
+      prompt: finalPrompt,
       elementTags: elementTags.length > 0 ? elementTags : undefined,
       durationSeconds,
       tailImageUrl: scene.endFrameUrl ?? undefined,

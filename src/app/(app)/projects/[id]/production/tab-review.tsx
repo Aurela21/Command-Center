@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { Check, ChevronLeft, ChevronRight, ExternalLink, ImageOff, FileText, Loader2, Pencil, Play, Plus, RefreshCw, Sparkles, Trash2, Video, Wand2, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Download, ExternalLink, ImageOff, FileText, Loader2, Pencil, Play, Plus, RefreshCw, Sparkles, Trash2, Video, Wand2, X } from "lucide-react";
 import type { SceneProductionState } from "./types";
 import { PromptWithMentions, type ProductTag } from "./tab-3a";
 
@@ -390,17 +390,14 @@ function GenerateVideoButton({
 
   if (isCompleted) {
     return (
-      <div className="flex flex-col items-center gap-1">
-        <button
-          onClick={handleGenerate}
-          disabled={!isReady || submitting}
-          className="p-2 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors disabled:opacity-40"
-          title="Regenerate video"
-        >
-          <Video className="h-4 w-4" />
-        </button>
-        <span className="text-[10px] text-emerald-500">Done</span>
-      </div>
+      <button
+        onClick={handleGenerate}
+        disabled={!isReady || submitting}
+        className="w-full flex items-center justify-center gap-1 text-[10px] font-medium px-2 py-1.5 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors disabled:opacity-40"
+        title="Rerun with current prompt"
+      >
+        {submitting ? <Loader2 className="h-3 w-3 animate-spin" /> : <><RefreshCw className="h-3 w-3" /> Rerun</>}
+      </button>
     );
   }
 
@@ -409,14 +406,14 @@ function GenerateVideoButton({
       onClick={handleGenerate}
       disabled={!isReady || submitting}
       className={cn(
-        "p-2.5 rounded-lg transition-colors disabled:opacity-30",
+        "w-full flex items-center justify-center gap-1 text-[10px] font-medium px-2 py-1.5 rounded transition-colors disabled:opacity-30",
         isReady
           ? "bg-blue-50 text-blue-600 hover:bg-blue-100"
           : "bg-neutral-50 text-neutral-300"
       )}
       title={isReady ? "Generate video" : "Approve seed + prompt first"}
     >
-      {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+      {submitting ? <Loader2 className="h-3 w-3 animate-spin" /> : <><Play className="h-3 w-3" /> Generate</>}
     </button>
   );
 }
@@ -509,9 +506,69 @@ function ScenePairRow({
       {/* Kling prompt — editable inline */}
       <EditablePrompt scene={scene} updateScene={updateScene} productTags={productTags} />
 
-      {/* Generate video button */}
-      <div className="shrink-0 flex flex-col items-center justify-center w-20">
+      {/* Actions column: approvals + generate + download */}
+      <div className="shrink-0 flex flex-col items-center gap-2 w-24 pt-1">
+        {/* Approval toggles */}
+        <div className="flex flex-col gap-1 w-full">
+          <button
+            onClick={() => updateScene(scene.sceneId, { seedImageApproved: !scene.seedImageApproved })}
+            className={cn(
+              "w-full text-[10px] font-medium px-2 py-1 rounded transition-colors",
+              scene.seedImageApproved
+                ? "bg-emerald-100 text-emerald-700"
+                : "bg-neutral-100 text-neutral-500 hover:bg-emerald-50"
+            )}
+          >
+            {scene.seedImageApproved ? "Seed ✓" : "Approve Seed"}
+          </button>
+          <button
+            onClick={() => {
+              const next = !scene.klingPromptApproved;
+              updateScene(scene.sceneId, { klingPromptApproved: next });
+              fetch(`/api/projects/${projectId}/scenes/${scene.sceneId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ klingPromptApproved: next }),
+              }).catch(console.error);
+            }}
+            className={cn(
+              "w-full text-[10px] font-medium px-2 py-1 rounded transition-colors",
+              scene.klingPromptApproved
+                ? "bg-emerald-100 text-emerald-700"
+                : "bg-neutral-100 text-neutral-500 hover:bg-emerald-50"
+            )}
+          >
+            {scene.klingPromptApproved ? "Prompt ✓" : "Approve Prompt"}
+          </button>
+        </div>
+
+        {/* Generate / Rerun */}
         <GenerateVideoButton scene={scene} projectId={projectId} updateScene={updateScene} />
+
+        {/* Download latest video */}
+        {scene.videoVersions.length > 0 && (() => {
+          const latest = [...scene.videoVersions].filter((v) => !v.isRejected)[0];
+          if (!latest?.fileUrl) return null;
+          return (
+            <button
+              onClick={() => {
+                fetch(latest.fileUrl).then((r) => r.blob()).then((blob) => {
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `scene${String(scene.sceneOrder).padStart(2, "0")}-video.mp4`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                });
+              }}
+              className="flex items-center gap-1 text-[10px] text-neutral-400 hover:text-neutral-600 transition-colors"
+              title="Download latest video"
+            >
+              <Download className="h-3 w-3" />
+              Video
+            </button>
+          );
+        })()}
       </div>
     </div>
   );
