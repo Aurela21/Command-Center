@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Check, ChevronDown, ChevronRight, Copy, Loader2, Package, Pencil, Plus, Sparkles, Trash2, User, Wand2, X } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Copy, Download, Loader2, Package, Pencil, Plus, Sparkles, Trash2, User, Wand2, X } from "lucide-react";
 import type { SceneProductionState, SeedVersion, HeroImage } from "./types";
 
 // ─── Scene list item (left panel) ────────────────────────────────────────────
@@ -1230,16 +1230,45 @@ function SeedDetailPanel({
                               </div>
                             </div>
                           )}
-                          {/* Trash button */}
-                          {!isApproved && (
-                            <button
-                              onClick={() => handleReject(v.id)}
-                              className="absolute top-1.5 right-1.5 p-1.5 rounded-lg bg-black/40 text-white opacity-0 group-hover/card:opacity-100 transition-opacity hover:bg-red-500/80"
-                              title="Reject"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </button>
-                          )}
+                          {/* Download + Trash buttons */}
+                          <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover/card:opacity-100 transition-opacity">
+                            {v.imageUrl && (
+                              <a
+                                href={v.imageUrl}
+                                download={`seed-scene${String(scene.sceneOrder).padStart(2, "0")}-v${i + 1}.jpg`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1.5 rounded-lg bg-black/40 text-white hover:bg-neutral-700/80 transition-colors"
+                                title="Download"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  // Force download via fetch for cross-origin URLs
+                                  e.preventDefault();
+                                  fetch(v.imageUrl!)
+                                    .then((r) => r.blob())
+                                    .then((blob) => {
+                                      const url = URL.createObjectURL(blob);
+                                      const a = document.createElement("a");
+                                      a.href = url;
+                                      a.download = `seed-scene${String(scene.sceneOrder).padStart(2, "0")}-v${i + 1}.jpg`;
+                                      a.click();
+                                      URL.revokeObjectURL(url);
+                                    });
+                                }}
+                              >
+                                <Download className="h-3 w-3" />
+                              </a>
+                            )}
+                            {!isApproved && (
+                              <button
+                                onClick={() => handleReject(v.id)}
+                                className="p-1.5 rounded-lg bg-black/40 text-white hover:bg-red-500/80 transition-colors"
+                                title="Reject"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </button>
+                            )}
+                          </div>
                         </div>
                         <SeedCardFooter
                           version={v}

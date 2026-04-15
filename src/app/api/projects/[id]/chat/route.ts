@@ -21,10 +21,11 @@ import { eq, asc, desc, sql } from "drizzle-orm";
 import Anthropic from "@anthropic-ai/sdk";
 
 type Params = { params: Promise<{ id: string }> };
-type ChatMessage = { role: "user" | "assistant"; content: string };
+type MediaAttachment = { type: "image" | "video"; mimeType: string; base64: string; name: string };
+type ChatMessage = { role: "user" | "assistant"; content: string; media?: MediaAttachment[] };
 
 export const runtime = "nodejs";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 // ─── GET: List chat sessions ─────────────────────────────────────────────────
 
@@ -42,9 +43,10 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
 export async function POST(req: NextRequest, { params }: Params) {
   const { id: projectId } = await params;
-  const { message, sessionId } = (await req.json()) as {
+  const { message, sessionId, media } = (await req.json()) as {
     message: string;
     sessionId?: string;
+    media?: MediaAttachment[];
   };
 
   if (!message?.trim()) {
@@ -125,8 +127,39 @@ ${productContext ? `\n**Products:**${productContext}` : ""}
 
 When suggesting prompts or script lines, format them in code blocks so they're easy to copy. Always specify which scene a suggestion is for.`;
 
-  // Add user message to history
-  const updatedMessages: ChatMessage[] = [...session.messages, { role: "user", content: message }];
+  // Add user message to history (store media metadata but not full base64 for DB)
+  const userMsg: ChatMessage = {
+    role: "user",
+    content: message,
+    ...(media?.length ? { media: media.map((m) => ({ ...m, base64: "" })) } : {}),
+  };
+  const updatedMessages: ChatMessage[] = [...session.messages, userMsg];
+
+  // Build Claude messages — convert media to vision inputs for the current message
+  const claudeMessages: Anthropic.MessageParam[] = updatedMessages.map((m) => {
+    // For past messages or assistant messages, just send text
+    if (m.role === "assistant" || m !== userMsg) {
+      return { role: m.role as "user" | "assistant", content: m.content };
+    }
+    // For the current user message with media, build multimodal content
+    const parts: Anthropic.ContentBlockParam[] = [];
+    if (media?.length) {
+      for (const att of media) {
+        if (att.type === "image") {
+          parts.push({
+            type: "image",
+            source: { type: "base64", media_type: att.mimeType as "image/jpeg" | "image/png" | "image/gif" | "image/webp", data: att.base64 },
+          });
+        }
+        // For video, extract a note — Claude can't process video directly
+        if (att.type === "video") {
+          parts.push({ type: "text", text: `[User attached a video file: ${att.name}]` });
+        }
+      }
+    }
+    parts.push({ type: "text", text: m.content });
+    return { role: "user" as const, content: parts };
+  });
 
   // Call Claude
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -134,13 +167,13 @@ When suggesting prompts or script lines, format them in code blocks so they're e
     model: "claude-sonnet-4-6",
     max_tokens: 1024,
     system: systemPrompt,
-    messages: updatedMessages.map((m) => ({ role: m.role, content: m.content })),
+    messages: claudeMessages,
   });
 
   const reply = response.content[0].type === "text" ? response.content[0].text : "";
 
-  // Save messages to DB
-  const allMessages = [...updatedMessages, { role: "assistant" as const, content: reply }];
+  // Save messages to DB (media stored without base64 to keep DB small)
+  const allMessages: ChatMessage[] = [...updatedMessages, { role: "assistant", content: reply }];
   await db
     .update(chatSessions)
     .set({

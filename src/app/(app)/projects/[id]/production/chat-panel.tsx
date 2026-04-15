@@ -2,10 +2,11 @@
 
 import { useState, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { Brain, ChevronLeft, Copy, Loader2, MessageSquare, Plus, Send, Trash2, X } from "lucide-react";
+import { Brain, ChevronLeft, Copy, Image as ImageIcon, Loader2, MessageSquare, Paperclip, Plus, Send, Trash2, X } from "lucide-react";
 import type { SceneProductionState } from "./types";
 
-type Message = { role: "user" | "assistant"; content: string };
+type MediaAttachment = { type: "image" | "video"; mimeType: string; base64: string; name: string };
+type Message = { role: "user" | "assistant"; content: string; media?: MediaAttachment[] };
 type Session = { id: string; title: string; createdAt: string; updatedAt: string };
 type ApplyTarget = { sceneId: string; field: "klingPrompt" | "nanoBananaPrompt" };
 
@@ -57,6 +58,18 @@ function MessageBubble({ msg, scenes, onApply }: { msg: Message; scenes: ScenePr
   return (
     <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
       <div className={cn("max-w-[85%] rounded-xl px-3.5 py-2.5 text-sm leading-relaxed", isUser ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-700")}>
+        {/* Show attached media */}
+        {msg.media?.map((att, i) => (
+          <div key={i} className="mb-2">
+            {att.type === "image" && att.base64 ? (
+              <img src={`data:${att.mimeType};base64,${att.base64}`} alt={att.name} className="rounded-lg max-h-40 object-contain" />
+            ) : att.type === "image" ? (
+              <div className="flex items-center gap-1.5 text-xs opacity-70"><ImageIcon className="h-3 w-3" />{att.name}</div>
+            ) : (
+              <div className="flex items-center gap-1.5 text-xs opacity-70"><Paperclip className="h-3 w-3" />{att.name}</div>
+            )}
+          </div>
+        ))}
         {parts.map((part, i) => {
           if (part.startsWith("```")) {
             const code = part.replace(/^```\w*\n?/, "").replace(/\n?```$/, "");
@@ -98,8 +111,10 @@ export function ChatPanel({ open, onClose, projectId, scenes, onApply }: Props) 
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingSessions, setLoadingSessions] = useState(false);
+  const [pendingMedia, setPendingMedia] = useState<MediaAttachment[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load sessions when panel opens
   useEffect(() => {
@@ -166,15 +181,23 @@ export function ChatPanel({ open, onClose, projectId, scenes, onApply }: Props) 
 
   async function handleSend() {
     const text = input.trim();
-    if (!text || loading) return;
-    setMessages((prev) => [...prev, { role: "user", content: text }]);
+    if (!text && pendingMedia.length === 0) return;
+    if (loading) return;
+    const mediaToSend = [...pendingMedia];
+    const userMsg: Message = { role: "user", content: text || "(attached media)", media: mediaToSend.length > 0 ? mediaToSend : undefined };
+    setMessages((prev) => [...prev, userMsg]);
     setInput("");
+    setPendingMedia([]);
     setLoading(true);
     try {
       const res = await fetch(`/api/projects/${projectId}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, sessionId: activeSessionId }),
+        body: JSON.stringify({
+          message: text || "Please analyze the attached image(s).",
+          sessionId: activeSessionId,
+          media: mediaToSend.length > 0 ? mediaToSend : undefined,
+        }),
       });
       if (!res.ok) throw new Error("Chat failed");
       const data = await res.json() as { reply: string; sessionId: string; messages: Message[] };
@@ -300,8 +323,58 @@ export function ChatPanel({ open, onClose, projectId, scenes, onApply }: Props) 
           </div>
 
           {/* Input */}
-          <div className="shrink-0 border-t border-neutral-200 px-4 py-3">
+          <div className="shrink-0 border-t border-neutral-200 px-4 py-3 space-y-2">
+            {/* Attachment previews */}
+            {pendingMedia.length > 0 && (
+              <div className="flex gap-2 flex-wrap">
+                {pendingMedia.map((att, i) => (
+                  <div key={i} className="relative group/att">
+                    {att.type === "image" ? (
+                      <img src={`data:${att.mimeType};base64,${att.base64}`} alt={att.name} className="h-14 w-14 rounded-lg object-cover border border-neutral-200" />
+                    ) : (
+                      <div className="h-14 w-14 rounded-lg bg-neutral-100 border border-neutral-200 flex items-center justify-center">
+                        <Paperclip className="h-4 w-4 text-neutral-400" />
+                      </div>
+                    )}
+                    <button
+                      onClick={() => setPendingMedia((prev) => prev.filter((_, j) => j !== i))}
+                      className="absolute -top-1 -right-1 p-0.5 rounded-full bg-neutral-900 text-white opacity-0 group-hover/att:opacity-100 transition-opacity"
+                    >
+                      <X className="h-2.5 w-2.5" />
+                    </button>
+                    <p className="text-[9px] text-neutral-400 truncate w-14 mt-0.5">{att.name}</p>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="flex gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,video/*"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  const files = Array.from(e.target.files ?? []);
+                  for (const file of files) {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                      const base64 = (reader.result as string).split(",")[1];
+                      const type = file.type.startsWith("video/") ? "video" as const : "image" as const;
+                      setPendingMedia((prev) => [...prev, { type, mimeType: file.type, base64, name: file.name }]);
+                    };
+                    reader.readAsDataURL(file);
+                  }
+                  e.target.value = "";
+                }}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="shrink-0 w-10 h-10 rounded-lg border border-neutral-200 hover:bg-neutral-50 text-neutral-400 hover:text-neutral-600 flex items-center justify-center transition-colors self-end"
+                title="Attach image or video"
+              >
+                <Paperclip className="h-4 w-4" />
+              </button>
               <textarea
                 ref={inputRef}
                 value={input}
@@ -314,7 +387,7 @@ export function ChatPanel({ open, onClose, projectId, scenes, onApply }: Props) 
               />
               <button
                 onClick={handleSend}
-                disabled={loading || !input.trim()}
+                disabled={loading || (!input.trim() && pendingMedia.length === 0)}
                 className="shrink-0 w-10 h-10 rounded-lg bg-violet-600 hover:bg-violet-500 text-white flex items-center justify-center disabled:opacity-40 transition-colors self-end"
               >
                 <Send className="h-4 w-4" />
