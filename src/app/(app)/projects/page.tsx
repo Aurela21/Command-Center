@@ -95,16 +95,31 @@ export default function ProjectsPage() {
               : `${projects?.length ?? 0} project${projects?.length !== 1 ? "s" : ""}`}
           </p>
         </div>
-        <Button
-          onClick={() => {
-            setNewName("");
-            setDialogOpen(true);
-          }}
-          className="bg-neutral-900 hover:bg-neutral-700 text-white gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          New Project
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={() => {
+              setNewName("");
+              setNewType("concept");
+              setDialogOpen(true);
+            }}
+            className="bg-violet-600 hover:bg-violet-500 text-white gap-2"
+          >
+            <Sparkles className="h-4 w-4" />
+            New Concept
+          </Button>
+          <Button
+            onClick={() => {
+              setNewName("");
+              setNewType("reference");
+              setDialogOpen(true);
+            }}
+            variant="outline"
+            className="gap-2"
+          >
+            <Video className="h-4 w-4" />
+            Iteration
+          </Button>
+        </div>
       </div>
 
       {/* Project list */}
@@ -123,16 +138,23 @@ export default function ProjectsPage() {
           <p className="text-sm text-neutral-400 mt-1">
             Create a project to start building your video ad.
           </p>
-          <Button
-            className="mt-6 bg-neutral-900 hover:bg-neutral-700 text-white gap-2"
-            onClick={() => {
-              setNewName("");
-              setDialogOpen(true);
-            }}
-          >
-            <Plus className="h-4 w-4" />
-            New Project
-          </Button>
+          <div className="mt-6 flex gap-2">
+            <Button
+              onClick={() => { setNewName(""); setNewType("concept"); setDialogOpen(true); }}
+              className="bg-violet-600 hover:bg-violet-500 text-white gap-2"
+            >
+              <Sparkles className="h-4 w-4" />
+              New Concept
+            </Button>
+            <Button
+              onClick={() => { setNewName(""); setNewType("reference"); setDialogOpen(true); }}
+              variant="outline"
+              className="gap-2"
+            >
+              <Video className="h-4 w-4" />
+              Iteration
+            </Button>
+          </div>
         </div>
       ) : (
         <div className="space-y-2">
@@ -162,9 +184,19 @@ export default function ProjectsPage() {
                 )}
               />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-neutral-900 truncate">
-                  {project.name}
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium text-neutral-900 truncate">
+                    {project.name}
+                  </p>
+                  <span className={cn(
+                    "text-[10px] font-medium px-1.5 py-0.5 rounded-full shrink-0",
+                    (project as Project & { projectType?: string }).projectType === "concept"
+                      ? "bg-violet-100 text-violet-600"
+                      : "bg-neutral-100 text-neutral-500"
+                  )}>
+                    {(project as Project & { projectType?: string }).projectType === "concept" ? "Concept" : "Iteration"}
+                  </span>
+                </div>
                 <p className="text-xs text-neutral-400 mt-0.5">
                   {STATUS_LABELS[project.status] ?? project.status} ·{" "}
                   {new Date(project.createdAt!).toLocaleDateString()}
