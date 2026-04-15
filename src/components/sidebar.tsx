@@ -10,9 +10,9 @@ import {
   LayoutList,
   Clapperboard,
   BookOpen,
+  Home,
   Lock,
   Circle,
-  FolderOpen,
   LogOut,
   ChevronDown,
   Layers,
@@ -239,6 +239,15 @@ export function Sidebar() {
 
       {/* Project nav */}
       <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
+        <NavLink
+          item={{
+            label: "Home",
+            href: "/projects",
+            icon: <Home className="h-4 w-4" />,
+            locked: false,
+          }}
+          active={pathname === "/projects"}
+        />
         {projectId && (
           <>
             <button
@@ -280,16 +289,6 @@ export function Sidebar() {
           </>
         )}
 
-        {/* Projects list link */}
-        <NavLink
-          item={{
-            label: "All Projects",
-            href: "/projects",
-            icon: <FolderOpen className="h-4 w-4" />,
-            locked: false,
-          }}
-          active={pathname === "/projects"}
-        />
         <NavLink
           item={knowledgeItem}
           active={pathname.startsWith("/knowledge")}
