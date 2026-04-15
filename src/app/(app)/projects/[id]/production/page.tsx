@@ -614,6 +614,19 @@ export default function ProductionPage() {
         onClose={() => setChatOpen(false)}
         projectId={projectId}
         scenes={scenes}
+        onApply={(target, text) => {
+          updateScene(target.sceneId, {
+            [target.field]: text,
+            ...(target.field === "klingPrompt" ? { klingPromptApproved: false } : {}),
+          });
+          // Direct DB save
+          const dbField = target.field === "klingPrompt" ? "scriptSegment" : "nanoBananaPrompt";
+          fetch(`/api/projects/${projectId}/scenes/${target.sceneId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ [dbField]: text }),
+          }).catch(console.error);
+        }}
       />
     </div>
   );

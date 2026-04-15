@@ -257,13 +257,13 @@ export function QueueTracker({ scenes, heroGenerating }: Props) {
   const allJobs = [...activeJobs, ...completedJobs];
   const activeCount = activeJobs.length;
 
-  // Don't render if nothing to show
-  if (allJobs.length === 0) return null;
-
   // Auto-expand when new active job appears
   useEffect(() => {
     if (activeCount > 0) setCollapsed(false);
   }, [activeCount]);
+
+  // Don't render if nothing to show
+  if (allJobs.length === 0) return null;
 
   return (
     <div className="fixed bottom-0 left-60 right-0 z-40 border-t border-neutral-200 bg-white shadow-lg">

@@ -28,10 +28,61 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-function MessageBubble({ msg }: { msg: Message }) {
-  const isUser = msg.role === "user";
+function ApplyDropdown({
+  text,
+  scenes,
+  onApply,
+}: {
+  text: string;
+  scenes: SceneProductionState[];
+  onApply: (target: ApplyTarget, text: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative inline-block">
+      <button
+        onClick={() => setOpen(!open)}
+        className="text-[10px] font-medium text-violet-500 hover:text-violet-700 transition-colors"
+      >
+        Apply to scene
+      </button>
+      {open && (
+        <div className="absolute right-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-lg z-10 py-1 w-48 max-h-48 overflow-y-auto">
+          {scenes.map((s) => (
+            <div key={s.sceneId} className="px-2 py-1">
+              <p className="text-[10px] font-medium text-neutral-500 mb-0.5">
+                Scene {String(s.sceneOrder).padStart(2, "0")}
+              </p>
+              <button
+                onClick={() => { onApply({ sceneId: s.sceneId, field: "klingPrompt" }, text); setOpen(false); }}
+                className="block w-full text-left text-[11px] text-neutral-600 hover:text-violet-600 hover:bg-violet-50 rounded px-1.5 py-0.5 transition-colors"
+              >
+                Kling prompt
+              </button>
+              <button
+                onClick={() => { onApply({ sceneId: s.sceneId, field: "nanoBananaPrompt" }, text); setOpen(false); }}
+                className="block w-full text-left text-[11px] text-neutral-600 hover:text-violet-600 hover:bg-violet-50 rounded px-1.5 py-0.5 transition-colors"
+              >
+                Seed prompt
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
-  // Extract code blocks for copy buttons
+function MessageBubble({
+  msg,
+  scenes,
+  onApply,
+}: {
+  msg: Message;
+  scenes: SceneProductionState[];
+  onApply: (target: ApplyTarget, text: string) => void;
+}) {
+  const isUser = msg.role === "user";
   const parts = msg.content.split(/(```[\s\S]*?```)/);
 
   return (
@@ -49,9 +100,14 @@ function MessageBubble({ msg }: { msg: Message }) {
             const code = part.replace(/^```\w*\n?/, "").replace(/\n?```$/, "");
             return (
               <div key={i} className="my-2">
-                <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center justify-between mb-1 gap-2">
                   <span className="text-[10px] text-neutral-400">Suggestion</span>
-                  <CopyButton text={code} />
+                  <div className="flex items-center gap-2">
+                    <CopyButton text={code} />
+                    {!isUser && (
+                      <ApplyDropdown text={code} scenes={scenes} onApply={onApply} />
+                    )}
+                  </div>
                 </div>
                 <pre className={cn(
                   "text-xs rounded-lg px-3 py-2 overflow-x-auto whitespace-pre-wrap",
@@ -62,7 +118,6 @@ function MessageBubble({ msg }: { msg: Message }) {
               </div>
             );
           }
-          // Regular text — preserve line breaks
           return (
             <span key={i} className="whitespace-pre-wrap">
               {part}
@@ -74,14 +129,17 @@ function MessageBubble({ msg }: { msg: Message }) {
   );
 }
 
+type ApplyTarget = { sceneId: string; field: "klingPrompt" | "nanoBananaPrompt" };
+
 type Props = {
   open: boolean;
   onClose: () => void;
   projectId: string;
   scenes: SceneProductionState[];
+  onApply: (target: ApplyTarget, text: string) => void;
 };
 
-export function ChatPanel({ open, onClose, projectId, scenes }: Props) {
+export function ChatPanel({ open, onClose, projectId, scenes, onApply }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -184,7 +242,7 @@ export function ChatPanel({ open, onClose, projectId, scenes }: Props) {
         )}
 
         {messages.map((msg, i) => (
-          <MessageBubble key={i} msg={msg} />
+          <MessageBubble key={i} msg={msg} scenes={scenes} onApply={onApply} />
         ))}
 
         {loading && (
