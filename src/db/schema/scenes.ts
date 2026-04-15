@@ -51,11 +51,16 @@ export const scenes = pgTable(
     // Nano Banana
     nanoBananaPrompt: text("nano_banana_prompt"),
 
+    // End frame (optional — used as Kling tail image for start→end generation)
+    endFrameUrl: text("end_frame_url"),
+    endFramePrompt: text("end_frame_prompt"),
+
     // Approved asset IDs
     approvedSeedImageId: uuid("approved_seed_image_id"),
     approvedKlingOutputId: uuid("approved_kling_output_id"),
 
     // Per-scene approval states
+    seedSkipped: boolean("seed_skipped").default(false),
     seedImageApproved: boolean("seed_image_approved").default(false),
     klingPromptApproved: boolean("kling_prompt_approved").default(false),
     klingOutputApproved: boolean("kling_output_approved").default(false),

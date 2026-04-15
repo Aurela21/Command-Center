@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { knowledgeDocuments, knowledgeChunks } from "@/db/schema";
+import { knowledgeDocuments } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { presignedGet } from "@/lib/r2";
 import { extractText } from "@/lib/text-extraction";
 import type { SupportedFileType } from "@/lib/text-extraction";
-import { chunkText, embedBatch } from "@/lib/embeddings";
+
+export const maxDuration = 120;
 
 export async function GET() {
   const rows = await db
@@ -36,75 +38,48 @@ export async function POST(req: NextRequest) {
     .values({ name, fileUrl, fileType, category: category ?? "brand", status: "processing" })
     .returning();
 
-  // Images (product assets) skip text extraction — just mark ready with the R2 URL
+  // Images skip text processing
   if ((fileType as string) === "image") {
     await db
       .update(knowledgeDocuments)
       .set({ status: "ready", totalChunks: 0 })
       .where(eq(knowledgeDocuments.id, doc.id));
-    const updated = { ...doc, status: "ready" as const, totalChunks: 0 };
-    console.log(`[knowledge] Image asset ${doc.id} ready — ${doc.name}`);
-    return NextResponse.json(updated, { status: 201 });
+    return NextResponse.json({ ...doc, status: "ready", totalChunks: 0 }, { status: 201 });
   }
 
-  // Kick off extraction + embedding in the background.
-  // setImmediate works on Railway's persistent Node.js process.
-  setImmediate(() => {
-    processDocument(doc.id, fileUrl, fileType as SupportedFileType).catch(
-      async (err: unknown) => {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error(`[knowledge] processDocument ${doc.id} failed: ${msg}`);
-        await db
-          .update(knowledgeDocuments)
-          .set({ status: "error" })
-          .where(eq(knowledgeDocuments.id, doc.id));
-      }
-    );
-  });
+  try {
+    // Download from R2
+    const downloadUrl = await presignedGet(fileUrl, 3600);
+    const res = await fetch(downloadUrl);
+    if (!res.ok) throw new Error(`R2 download failed: ${res.status}`);
+    const buffer = Buffer.from(await res.arrayBuffer());
 
-  return NextResponse.json(doc, { status: 201 });
-}
+    // Extract text (pdftotext for PDFs — native binary, zero JS memory)
+    const text = await extractText(buffer, fileType as SupportedFileType);
+    console.log(`[knowledge] Extracted ${text.length} chars from ${doc.id}`);
 
-async function processDocument(
-  docId: string,
-  fileUrl: string,
-  fileType: SupportedFileType
-) {
-  console.log(`[knowledge] Processing document ${docId} (${fileType})`);
+    // Store raw text directly on the document via raw SQL.
+    // This adds a raw_text column if it doesn't exist (idempotent),
+    // then stores the text. No chunking, no embedding, no extra memory.
+    await db.execute(sql`
+      ALTER TABLE knowledge_documents ADD COLUMN IF NOT EXISTS raw_text text
+    `);
+    await db.execute(sql`
+      UPDATE knowledge_documents
+      SET raw_text = ${text}, status = 'ready', total_chunks = 1
+      WHERE id = ${doc.id}
+    `);
 
-  // 1. Download from R2
-  const downloadUrl = await presignedGet(fileUrl, 3600);
-  const res = await fetch(downloadUrl);
-  if (!res.ok) throw new Error(`Failed to fetch file: ${res.status}`);
-  const arrayBuffer = await res.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
-
-  // 2. Extract text
-  const text = await extractText(buffer, fileType);
-  if (!text.trim()) throw new Error("No text extracted from document");
-
-  // 3. Chunk
-  const chunks = chunkText(text);
-  if (chunks.length === 0) throw new Error("No chunks produced");
-
-  // 4. Embed in batch
-  const embeddings = await embedBatch(chunks);
-
-  // 5. Insert chunks
-  await db.insert(knowledgeChunks).values(
-    chunks.map((content, i) => ({
-      documentId: docId,
-      chunkIndex: i,
-      content,
-      embedding: embeddings[i],
-    }))
-  );
-
-  // 6. Mark ready
-  await db
-    .update(knowledgeDocuments)
-    .set({ status: "ready", totalChunks: chunks.length })
-    .where(eq(knowledgeDocuments.id, docId));
-
-  console.log(`[knowledge] Document ${docId} ready — ${chunks.length} chunks`);
+    console.log(`[knowledge] ${doc.id} ready — ${text.length} chars stored`);
+    return NextResponse.json({ ...doc, status: "ready", totalChunks: 1 }, { status: 201 });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[knowledge] ${doc.id} failed: ${msg}`);
+    await db
+      .update(knowledgeDocuments)
+      .set({ status: "error" })
+      .where(eq(knowledgeDocuments.id, doc.id))
+      .catch(() => {});
+    return NextResponse.json({ ...doc, status: "error" }, { status: 201 });
+  }
 }

@@ -19,19 +19,24 @@ export async function extractText(
     }
 
     case "pdf": {
-      // Dynamic import — pdf-parse has a side-effect on require that some
-      // bundlers trip over; dynamic import avoids the issue at module load time.
-      const pdfModule = await import("pdf-parse");
-      // Handles both CJS default export and ESM named export shapes
-      const pdfParse =
-        typeof pdfModule === "function"
-          ? pdfModule
-          : ("default" in pdfModule
-              ? (pdfModule as unknown as { default: typeof pdfModule })
-                  .default
-              : pdfModule) as unknown as (buf: Buffer) => Promise<{ text: string }>;
-      const data = await pdfParse(buffer);
-      return data.text;
+      // Use pdftotext (poppler) — zero JS memory overhead, runs as a subprocess.
+      const { execFileSync } = await import("child_process");
+      const { writeFileSync, unlinkSync } = await import("fs");
+      const { join } = await import("path");
+      const { tmpdir } = await import("os");
+
+      const tmpPath = join(tmpdir(), `pdf-extract-${Date.now()}.pdf`);
+      writeFileSync(tmpPath, buffer);
+
+      try {
+        const result = execFileSync("pdftotext", ["-layout", tmpPath, "-"], {
+          maxBuffer: 50 * 1024 * 1024,
+          timeout: 30_000,
+        });
+        return result.toString("utf-8");
+      } finally {
+        try { unlinkSync(tmpPath); } catch {}
+      }
     }
 
     case "docx": {

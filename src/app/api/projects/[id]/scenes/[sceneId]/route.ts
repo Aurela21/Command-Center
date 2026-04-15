@@ -1,11 +1,6 @@
 /**
  * PATCH /api/projects/[id]/scenes/[sceneId]
- *
- * Persists per-scene approval state and optional field updates.
- * Accepted fields: approvedSeedImageId, seedImageApproved, klingPromptApproved
- *
- * When approvedSeedImageId changes, the corresponding asset_version.is_approved
- * is toggled so the production-state endpoint reflects it on next load.
+ * DELETE /api/projects/[id]/scenes/[sceneId]
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -23,6 +18,13 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     approvedSeedImageId?: string | null;
     seedImageApproved?: boolean;
     klingPromptApproved?: boolean;
+    referenceFrame?: number;
+    referenceFrameUrl?: string;
+    scriptSegment?: string;
+    nanoBananaPrompt?: string;
+    endFrameUrl?: string | null;
+    endFramePrompt?: string | null;
+    seedSkipped?: boolean;
   };
 
   // Verify scene belongs to this project
@@ -61,6 +63,13 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if ("approvedSeedImageId" in body) patch.approvedSeedImageId = body.approvedSeedImageId ?? null;
   if ("seedImageApproved" in body) patch.seedImageApproved = body.seedImageApproved;
   if ("klingPromptApproved" in body) patch.klingPromptApproved = body.klingPromptApproved;
+  if ("referenceFrame" in body) patch.referenceFrame = body.referenceFrame;
+  if ("referenceFrameUrl" in body) patch.referenceFrameUrl = body.referenceFrameUrl;
+  if ("scriptSegment" in body) patch.scriptSegment = body.scriptSegment;
+  if ("nanoBananaPrompt" in body) patch.nanoBananaPrompt = body.nanoBananaPrompt;
+  if ("endFrameUrl" in body) patch.endFrameUrl = body.endFrameUrl ?? null;
+  if ("endFramePrompt" in body) patch.endFramePrompt = body.endFramePrompt ?? null;
+  if ("seedSkipped" in body) patch.seedSkipped = body.seedSkipped;
 
   const [updated] = await db
     .update(scenes)
@@ -69,4 +78,35 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     .returning();
 
   return NextResponse.json(updated);
+}
+
+export async function DELETE(_req: NextRequest, { params }: Params) {
+  const { id: projectId, sceneId } = await params;
+
+  const [existing] = await db
+    .select({ id: scenes.id })
+    .from(scenes)
+    .where(and(eq(scenes.id, sceneId), eq(scenes.projectId, projectId)));
+
+  if (!existing) {
+    return NextResponse.json({ error: "Scene not found" }, { status: 404 });
+  }
+
+  await db.delete(scenes).where(eq(scenes.id, sceneId));
+
+  // Re-number remaining scenes to keep sceneOrder contiguous
+  const remaining = await db
+    .select({ id: scenes.id })
+    .from(scenes)
+    .where(eq(scenes.projectId, projectId))
+    .orderBy(scenes.sceneOrder);
+
+  for (let i = 0; i < remaining.length; i++) {
+    await db
+      .update(scenes)
+      .set({ sceneOrder: i + 1, updatedAt: sql`NOW()` })
+      .where(eq(scenes.id, remaining[i].id));
+  }
+
+  return NextResponse.json({ deleted: true });
 }

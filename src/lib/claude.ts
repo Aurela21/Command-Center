@@ -222,6 +222,8 @@ export async function generateScript(params: {
     order: number;
     description: string;
     durationMs: number;
+    referenceFrameUrl?: string;
+    originalKlingPrompt?: string;
   }>;
   analysis: VideoAnalysis | null;
   angle: string;
@@ -248,11 +250,25 @@ export async function generateScript(params: {
   const msg = await getClient().messages.create({
     model: DEEP,
     max_tokens: 4096,
-    system: `You are an expert DTC video ad copywriter. You produce two things simultaneously: (1) a punchy voiceover/talking script — the actual words spoken aloud or shown as text on screen during the ad, and (2) per-scene Kling visual prompts — technical motion/camera descriptions used to generate video clips, NOT dialogue.\n\nWhen "Brand & Copy Reference" material is provided, match the brand voice, tone, and copywriting style closely. When "Kling Prompting Reference" material is provided, follow those prompting patterns and best practices for the visual prompts.${knowledgeSection}`,
+    system: `You are an expert DTC video ad copywriter. You produce two things simultaneously:\n\n(1) **fullScript** — a punchy voiceover/talking-head script with the actual words spoken aloud or shown as on-screen text, scene by scene. This is the DIALOGUE — write compelling, natural-sounding lines that a real person would say to camera.\n\n(2) **sceneSegments** — one UNIFIED Kling video prompt per scene that combines visual direction AND the dialogue line. Format: Subject action + camera movement + delivery style + Dialogue: "the line". The dialogue MUST be included in each Kling prompt so the video motion matches the words being spoken.\n\nWhen "Brand & Copy Reference" material is provided, match the brand voice, tone, and copywriting style closely. When "Kling Prompting Reference" material is provided, follow those prompting patterns and best practices for the visual prompts.${knowledgeSection}`,
     messages: [
       {
         role: "user",
-        content: `Write a complete video ad for "${params.projectName}".
+        content: [
+          // Send reference frame images so Claude sees the actual video content
+          ...params.scenes.flatMap((s): Anthropic.ContentBlockParam[] =>
+            s.referenceFrameUrl
+              ? [
+                  { type: "image", source: { type: "url", url: s.referenceFrameUrl } },
+                  { type: "text", text: `↑ Scene ${s.order} reference frame` },
+                ]
+              : []
+          ),
+          {
+            type: "text",
+            text: `Write a complete video ad for "${params.projectName}".
+
+IMPORTANT: Study the reference frame images above carefully. Your prompts MUST match what is ACTUALLY happening in the reference video — the subject, wardrobe, setting, actions, and camera angles you see in those frames. This is an iteration tool — the goal is to recreate and refine what's in the reference video, NOT invent entirely new scenes.
 
 **Script Variables:**
 - Angle: ${params.angle}
@@ -260,20 +276,27 @@ export async function generateScript(params: {
 - Format: ${params.format}
 - Kling element tags (auto-inject into visual prompts): ${params.klingElementTags.join(", ") || "none"}
 
-**Scene Structure (${params.scenes.length} scenes):**
-${params.scenes.map((s) => `Scene ${s.order} (${(s.durationMs / 1000).toFixed(1)}s): ${s.description}`).join("\n")}
+**Scene Structure (${params.scenes.length} scenes) with original visual analysis:**
+${params.scenes.map((s) => `Scene ${s.order} (${(s.durationMs / 1000).toFixed(1)}s):
+  Description: ${s.description}${s.originalKlingPrompt ? `\n  Original motion analysis (from frame-by-frame review): ${s.originalKlingPrompt}` : ""}`).join("\n\n")}
 
 ${params.analysis ? `**Video Analysis:**\n${JSON.stringify(params.analysis, null, 2)}` : ""}
 
 **Requirements:**
 - fullScript = the voiceover/talking script only — the actual words spoken or shown as on-screen text, scene by scene. No visual directions here.
-- sceneSegments = one Kling visual prompt per scene (max 40 words each) — describe camera movement, action, atmosphere, subject. Inject element tags naturally. No dialogue here.
+- sceneSegments = one UNIFIED Kling prompt per scene that combines visuals AND dialogue. Follow this structure: Subject + motion + camera feel + delivery + Dialogue: "line".
+- CRITICAL: Do NOT describe backgrounds, environments, or settings in the Kling prompts. The background comes from the seed image / reference frame automatically. Kling generates video from a seed image — whatever is in the seed IS the background. Writing "white studio" or "minimal backdrop" or any setting description wastes prompt tokens and can conflict with the seed image.
+- CRITICAL: Base each scene's visual prompt on the ACTIONS and MOTION you see in the reference frames. Focus on: what the subject's body does, hand movements, gestures, camera movement, pacing.
+- The dialogue line MUST be included so motion matches the words.
+- Always refer to the subject as "model in reference" or "subject" — never describe demographics.
 
 Return JSON:
 {
   "fullScript": "Scene 1:\\n[voiceover line]\\n\\nScene 2:\\n[voiceover line]\\n\\n...",
-  "sceneSegments": ["kling visual prompt for scene 1", "kling visual prompt for scene 2", ...]
+  "sceneSegments": ["subject + setting + motion + camera + delivery + Dialogue: \\"line\\"", ...]
 }`,
+          },
+        ],
       },
     ],
   });
@@ -315,10 +338,14 @@ export async function refinePrompt(params: {
 
   const targetInstructions =
     params.target === "seed_image"
-      ? `You are refining a prompt for Gemini image generation (seed frame for a video ad).
+      ? `You are refining a prompt for seed frame image generation (first frame of a video ad clip).
 Focus on: composition, camera angle, lighting, subject positioning, color palette, depth of field, and art direction.
 Output a single detailed paragraph — no line breaks, no bullet points. Max 120 words.
 The output image will be 9:16 vertical format.
+
+CRITICAL: Subject reference rules:
+- NEVER describe the subject as "a young girl", "a woman", "a man", or any specific demographic. ALWAYS refer to them as "model in reference", "subject in reference frame", or "subject". The image generator will match the person from the reference frame.
+- Match wardrobe, setting, and lighting from the reference frame unless the user explicitly asks to change them.
 
 CRITICAL: Product fidelity rules:
 - NEVER invent or assume how product features work. Describe features EXACTLY as stated in the product description.

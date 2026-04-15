@@ -14,6 +14,9 @@ import {
   Circle,
   FolderOpen,
   LogOut,
+  ChevronDown,
+  Layers,
+  Sparkles,
 } from "lucide-react";
 import { useRef, useState, useCallback } from "react";
 import type { Project } from "@/db/schema";
@@ -93,6 +96,7 @@ export function Sidebar() {
   // Inline-editable project name
   const [editing, setEditing] = useState(false);
   const [nameValue, setNameValue] = useState("");
+  const [iterationOpen, setIterationOpen] = useState(true);
   const nameRef = useRef<HTMLInputElement>(null);
 
   const renameMutation = useMutation({
@@ -138,29 +142,53 @@ export function Sidebar() {
     return "done";
   }
 
-  const navItems: NavItem[] = projectId
-    ? [
-        {
-          label: "Upload",
-          href: `/projects/${projectId}/upload`,
-          icon: <Upload className="h-4 w-4" />,
-          locked: false,
-          statusDot: uploadDotState(),
-        },
-        {
-          label: "Scene Manifest",
-          href: `/projects/${projectId}/manifest`,
-          icon: <LayoutList className="h-4 w-4" />,
-          locked: !uploadDone,
-        },
-        {
-          label: "Production",
-          href: `/projects/${projectId}/production`,
-          icon: <Clapperboard className="h-4 w-4" />,
-          locked: !manifestDone,
-        },
-      ]
+  const isConcept = (project as Project & { projectType?: string })?.projectType === "concept";
+
+  const iterationSubItems: NavItem[] = projectId
+    ? isConcept
+      ? [
+          {
+            label: "Concept Setup",
+            href: `/projects/${projectId}/concept`,
+            icon: <Sparkles className="h-3.5 w-3.5" />,
+            locked: false,
+          },
+          {
+            label: "Production",
+            href: `/projects/${projectId}/production`,
+            icon: <Clapperboard className="h-3.5 w-3.5" />,
+            locked: !manifestDone,
+          },
+        ]
+      : [
+          {
+            label: "Upload",
+            href: `/projects/${projectId}/upload`,
+            icon: <Upload className="h-3.5 w-3.5" />,
+            locked: false,
+            statusDot: uploadDotState(),
+          },
+          {
+            label: "Scene Manifest",
+            href: `/projects/${projectId}/manifest`,
+            icon: <LayoutList className="h-3.5 w-3.5" />,
+            locked: !uploadDone,
+          },
+          {
+            label: "Production",
+            href: `/projects/${projectId}/production`,
+            icon: <Clapperboard className="h-3.5 w-3.5" />,
+            locked: !manifestDone,
+          },
+        ]
     : [];
+
+  const isInIteration = projectId && (
+    pathname.includes("/upload") ||
+    pathname.includes("/manifest") ||
+    pathname.includes("/production") ||
+    pathname.includes("/concept")
+  );
 
   const knowledgeItem: NavItem = {
     label: "Knowledge Base",
@@ -213,13 +241,35 @@ export function Sidebar() {
       <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
         {projectId && (
           <>
-            {navItems.map((item) => (
-              <NavLink
-                key={item.href}
-                item={item}
-                active={pathname === item.href}
+            <button
+              onClick={() => setIterationOpen((o) => !o)}
+              className={cn(
+                "flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors w-full",
+                isInIteration
+                  ? "bg-neutral-100 text-neutral-900 font-medium"
+                  : "text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100"
+              )}
+            >
+              <Layers className="h-4 w-4 shrink-0" />
+              <span className="flex-1 text-left truncate">Iteration</span>
+              <ChevronDown
+                className={cn(
+                  "h-3.5 w-3.5 shrink-0 transition-transform",
+                  !iterationOpen && "-rotate-90"
+                )}
               />
-            ))}
+            </button>
+            {iterationOpen && (
+              <div className="ml-3 pl-3 border-l border-neutral-100 space-y-0.5 mt-0.5">
+                {iterationSubItems.map((item) => (
+                  <NavLink
+                    key={item.href}
+                    item={item}
+                    active={pathname === item.href}
+                  />
+                ))}
+              </div>
+            )}
             <Separator className="my-2" />
           </>
         )}

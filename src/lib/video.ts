@@ -97,6 +97,33 @@ export function extractThumbnails(
   });
 }
 
+/**
+ * Extract JPEG thumbnails at a given fps from a local video file.
+ * Returns the list of generated file paths.
+ */
+export function extractFramesAtFps(
+  inputPath: string,
+  outputDir: string,
+  fps: number
+): Promise<string[]> {
+  return new Promise((resolve, reject) => {
+    ffmpeg(inputPath)
+      .fps(fps)
+      .outputOptions(["-q:v 4", "-vf", `scale=320:-1`])
+      .output(path.join(outputDir, "frame_%06d.jpg"))
+      .on("end", () => {
+        const { readdirSync } = require("fs") as typeof import("fs");
+        const files = readdirSync(outputDir)
+          .filter((f: string) => f.startsWith("frame_") && f.endsWith(".jpg"))
+          .sort()
+          .map((f: string) => path.join(outputDir, f));
+        resolve(files);
+      })
+      .on("error", reject)
+      .run();
+  });
+}
+
 /** Delete a temp file, silently ignoring errors. */
 export async function cleanupTemp(filePath: string): Promise<void> {
   if (existsSync(filePath)) await unlink(filePath).catch(() => {});

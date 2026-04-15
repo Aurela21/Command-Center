@@ -10,6 +10,7 @@ type Params = { params: Promise<{ id: string }> };
 
 export async function POST(req: NextRequest, { params }: Params) {
   const { id } = await params;
+  const origin = new URL(req.url).origin;
   const { key } = await req.json();
 
   if (!key || typeof key !== "string") {
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   // Fire-and-forget — runs metadata probe then scene analysis
   setImmediate(() => {
-    runVideoProcessing(id, key).catch(async (err: unknown) => {
+    runVideoProcessing(id, key, origin).catch(async (err: unknown) => {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`[process-video] project ${id} failed: ${msg}`);
       await db
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   return NextResponse.json({ status: "analyzing" });
 }
 
-async function runVideoProcessing(projectId: string, key: string) {
+async function runVideoProcessing(projectId: string, key: string, origin: string) {
   // 1. Generate a presigned GET URL
   const downloadUrl = await presignedGet(key, 7200);
 
@@ -84,7 +85,6 @@ async function runVideoProcessing(projectId: string, key: string) {
   // 4. Trigger scene analysis (downloads video again, extracts frames, calls Claude)
   console.log(`[process-video] Starting scene analysis for ${projectId}…`);
 
-  const origin = process.env.NEXTAUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const analyzeRes = await fetch(`${origin}/api/projects/${projectId}/analyze-scenes`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

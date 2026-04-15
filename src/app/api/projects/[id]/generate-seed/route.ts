@@ -22,9 +22,11 @@ export const maxDuration = 120; // Gemini image gen can take up to 30s
 
 export async function POST(req: NextRequest, { params }: Params) {
   const { id: projectId } = await params;
-  const { sceneId, prompt } = (await req.json()) as {
+  const { sceneId, prompt, heroImageUrl, baseImageUrl } = (await req.json()) as {
     sceneId: string;
     prompt: string;
+    heroImageUrl?: string; // approved hero model image — used as base instead of reference frame
+    baseImageUrl?: string; // edit mode — use this existing image as the base for refinement
   };
 
   if (!sceneId || !prompt?.trim()) {
@@ -40,23 +42,34 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Scene not found" }, { status: 404 });
   }
 
-  // Resolve reference image URL — stored URL or computed fallback
-  let imageUrl = scene.referenceFrameUrl ?? scene.startFrameUrl ?? null;
-  if (!imageUrl) {
-    const R2_PUBLIC =
-      process.env.R2_PUBLIC_URL ??
-      process.env.NEXT_PUBLIC_R2_PUBLIC_URL ??
-      "";
-    if (R2_PUBLIC) {
-      const sec = Math.round(scene.referenceFrame / 30);
-      imageUrl = `${R2_PUBLIC}/frames/${projectId}/f${String(sec).padStart(4, "0")}.jpg`;
+  // Determine the base image (priority order):
+  // 1. Edit mode: use the existing generated image as base for refinement
+  // 2. Hero mode: use the approved hero model image
+  // 3. Normal mode: use the scene's reference frame
+  let imageUrl: string | null = null;
+
+  if (baseImageUrl) {
+    // Edit mode — refining an existing generated image
+    imageUrl = baseImageUrl;
+    console.log(`[generate-seed] Edit mode: refining existing image`);
+  } else if (heroImageUrl) {
+    // Hero mode — the hero image IS the base, scene frame is for pose reference
+    imageUrl = heroImageUrl;
+    console.log(`[generate-seed] Hero mode: using approved hero as base`);
+  } else {
+    // Normal mode — use scene reference frame
+    imageUrl = scene.referenceFrameUrl ?? scene.startFrameUrl ?? null;
+    if (!imageUrl) {
+      const R2_PUBLIC =
+        process.env.R2_PUBLIC_URL ??
+        process.env.NEXT_PUBLIC_R2_PUBLIC_URL ??
+        "";
+      if (R2_PUBLIC && scene.referenceFrame > 0) {
+        const sec = Math.round(scene.referenceFrame / 30);
+        imageUrl = `${R2_PUBLIC}/frames/${projectId}/f${String(sec).padStart(4, "0")}.jpg`;
+      }
     }
-  }
-  if (!imageUrl) {
-    return NextResponse.json(
-      { error: "Scene has no reference frame image." },
-      { status: 400 }
-    );
+    // imageUrl can be null for concept projects — text-to-image generation
   }
 
   // Cancel any stuck queued jobs for this scene so they don't pile up
@@ -94,18 +107,18 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   // Parse @tags from prompt and look up product profiles
   const tagMatches = prompt.match(/@[\w-]+/g) ?? [];
-  const refImageUrls: string[] = [];
+  type RefImg = { url: string; label?: string };
+  const refImages: RefImg[] = [];
   let productContext = "";
 
   for (const tag of tagMatches) {
-    const slug = tag.slice(1); // remove @
+    const slug = tag.slice(1);
     const [profile] = await db
       .select()
       .from(productProfiles)
       .where(eq(productProfiles.slug, slug));
 
     if (profile) {
-      // Get all images for this product
       const images = await db
         .select()
         .from(productImages)
@@ -113,11 +126,10 @@ export async function POST(req: NextRequest, { params }: Params) {
         .orderBy(asc(productImages.sortOrder));
 
       for (const img of images) {
-        refImageUrls.push(img.fileUrl);
+        refImages.push({ url: img.fileUrl, label: img.label ?? undefined });
       }
 
-      // Build text context: product description + image labels
-      const labels = images.map((img) => img.label).join(", ");
+      const labels = images.map((img) => img.label).filter(Boolean).join(", ");
       productContext += `\n\nProduct "${profile.name}" (${tag}): ${profile.description || "No description."}`;
       if (labels) productContext += `\nImage angles: ${labels}`;
 
@@ -127,28 +139,55 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
   }
 
-  // Append product context to the prompt for Gemini
+  // In hero mode, add the scene's reference frame as pose reference (no label = pose ref)
+  if (heroImageUrl) {
+    let sceneFrameUrl = scene.referenceFrameUrl ?? scene.startFrameUrl ?? null;
+    if (!sceneFrameUrl) {
+      const R2_PUBLIC = process.env.R2_PUBLIC_URL ?? process.env.NEXT_PUBLIC_R2_PUBLIC_URL ?? "";
+      if (R2_PUBLIC) {
+        const sec = Math.round(scene.referenceFrame / 30);
+        sceneFrameUrl = `${R2_PUBLIC}/frames/${projectId}/f${String(sec).padStart(4, "0")}.jpg`;
+      }
+    }
+    if (sceneFrameUrl) {
+      refImages.unshift({ url: sceneFrameUrl }); // no label = pose ref
+    }
+  }
+
+  // Deduplicate by URL, cap at 6 (1 pose + 5 product = safe for Gemini)
+  const seenUrls = new Set<string>();
+  const uniqueRefs = refImages.filter((r) => {
+    if (seenUrls.has(r.url)) return false;
+    seenUrls.add(r.url);
+    return true;
+  }).slice(0, 6);
+
+  // Enrich prompt with product text context
   const enrichedPrompt = productContext
-    ? `${prompt}\n\n--- Product Reference ---${productContext}\n\nUse the product reference images above to accurately represent the product. Match colors, details, and features exactly as shown.`
+    ? `${prompt}\n\n--- Product Reference ---${productContext}`
     : prompt;
 
-  // Generate image synchronously via Gemini
+  // Generate image via Nano Banana Pro
   try {
-    console.log(`[generate-seed] Calling Gemini for scene ${sceneId} with ${refImageUrls.length} product ref(s)…`);
-    const { imageBase64, mimeType } = await generateSeedImage({
+    console.log(`[generate-seed] Generating for scene ${sceneId} with ${uniqueRefs.length} ref image(s)`);
+    const { imageBase64 } = await generateSeedImage({
       imageUrl,
       prompt: enrichedPrompt,
-      referenceImageUrls: refImageUrls.length > 0 ? refImageUrls : undefined,
+      referenceImages: uniqueRefs.length > 0 ? uniqueRefs : undefined,
     });
 
+    // Enforce 9:16 aspect ratio — crop/resize to 720x1280
+    const sharp = (await import("sharp")).default;
+    const rawBuffer = Buffer.from(imageBase64, "base64");
+    const resizedBuffer = await sharp(rawBuffer)
+      .resize(720, 1280, { fit: "cover", position: "centre" })
+      .jpeg({ quality: 90 })
+      .toBuffer();
+    console.log(`[generate-seed] Resized to 720x1280 (9:16)`);
+
     // Upload to R2
-    const ext = mimeType.includes("png") ? "png" : "jpg";
-    const key = `seed-images/${sceneId}/${Date.now()}.${ext}`;
-    const fileUrl = await uploadBuffer(
-      key,
-      Buffer.from(imageBase64, "base64"),
-      mimeType
-    );
+    const key = `seed-images/${sceneId}/${Date.now()}.jpg`;
+    const fileUrl = await uploadBuffer(key, resizedBuffer, "image/jpeg");
     console.log(`[generate-seed] Uploaded to R2: ${key}`);
 
     // Count existing versions

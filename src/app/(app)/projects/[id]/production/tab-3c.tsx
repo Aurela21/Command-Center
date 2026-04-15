@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +25,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { SceneProductionState, VideoJobStatus, VideoVersion } from "./types";
+import { PromptWithMentions } from "./tab-3a";
+import type { ProductTag } from "./tab-3a";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -155,8 +157,15 @@ function SceneGenerationCard({
   const [refinedPrompt, setRefinedPrompt] = useState("");
   const [refining, setRefining] = useState(false);
   const [aiInstruction, setAiInstruction] = useState("");
-  const [clipDuration, setClipDuration] = useState<5 | 10>(
-    scene.targetClipDurationS <= 7.5 ? 5 : 10
+  const [productTags, setProductTags] = useState<ProductTag[]>([]);
+  useEffect(() => {
+    fetch("/api/products")
+      .then((r) => r.json())
+      .then((products: ProductTag[]) => setProductTags(products.filter((p) => (p.imageCount ?? 0) > 0)))
+      .catch(() => {});
+  }, []);
+  const [clipDuration, setClipDuration] = useState(
+    Math.max(3, Math.min(7, Math.round(scene.targetClipDurationS ?? 5)))
   );
   const colors = statusColor(scene.videoJobStatus);
   const canGenerate =
@@ -170,13 +179,16 @@ function SceneGenerationCard({
     scene.qualityScore.overall < 60;
 
   function handleGenerate() {
+    // Start from last generation's prompt if available, otherwise base prompt
+    const lastPrompt = [...scene.videoVersions].filter((v) => !v.isRejected).reverse()[0]?.prompt;
     setEnhanceOpen(true);
-    setRefinedPrompt(scene.klingPrompt);
+    setRefinedPrompt(lastPrompt || scene.klingPrompt);
   }
 
   function handleRetry() {
+    const lastPrompt = [...scene.videoVersions].filter((v) => !v.isRejected).reverse()[0]?.prompt;
     setEnhanceOpen(true);
-    setRefinedPrompt(scene.klingPrompt);
+    setRefinedPrompt(lastPrompt || scene.klingPrompt);
   }
 
   async function handleEnhance() {
@@ -610,9 +622,24 @@ function SceneGenerationCard({
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
+            {/* Show the prompt from the latest generation if different from base */}
+            {(() => {
+              const latestVersion = [...scene.videoVersions].filter((v) => !v.isRejected).reverse()[0];
+              const lastPrompt = latestVersion?.prompt;
+              return lastPrompt && lastPrompt !== scene.klingPrompt ? (
+                <div>
+                  <p className="text-xs font-medium text-blue-500 mb-1.5">
+                    Last generation prompt
+                  </p>
+                  <p className="text-xs text-blue-600 bg-blue-50 rounded px-3 py-2 leading-relaxed">
+                    {lastPrompt}
+                  </p>
+                </div>
+              ) : null;
+            })()}
             <div>
               <p className="text-xs font-medium text-neutral-500 mb-1.5">
-                Original prompt
+                Base scene prompt
               </p>
               <p className="text-xs text-neutral-400 bg-neutral-50 rounded px-3 py-2 leading-relaxed">
                 {scene.klingPrompt}
@@ -623,18 +650,15 @@ function SceneGenerationCard({
                 AI direction (optional)
               </p>
               <div className="flex gap-2">
-                <input
-                  value={aiInstruction}
-                  onChange={(e) => setAiInstruction(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey && !refining) {
-                      e.preventDefault();
-                      handleEnhance();
-                    }
-                  }}
-                  placeholder="e.g. add more realism, slow down the camera, make it more cinematic..."
-                  className="flex-1 text-sm border border-neutral-200 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-300 transition-all placeholder:text-neutral-300"
-                />
+                <div className="flex-1">
+                  <PromptWithMentions
+                    value={aiInstruction}
+                    onChange={setAiInstruction}
+                    products={productTags}
+                    placeholder="e.g. add @product-name, slow down the camera..."
+                    rows={1}
+                  />
+                </div>
                 <Button
                   onClick={handleEnhance}
                   disabled={refining}
@@ -685,28 +709,21 @@ function SceneGenerationCard({
             <div className="flex items-center gap-2">
               <p className="text-xs text-neutral-500">Clip length:</p>
               <div className="flex rounded-md border border-neutral-200 overflow-hidden">
-                <button
-                  onClick={() => setClipDuration(5)}
-                  className={cn(
-                    "px-3 py-1 text-xs font-medium transition-colors",
-                    clipDuration === 5
-                      ? "bg-neutral-900 text-white"
-                      : "bg-white text-neutral-500 hover:bg-neutral-50"
-                  )}
-                >
-                  5s
-                </button>
-                <button
-                  onClick={() => setClipDuration(10)}
-                  className={cn(
-                    "px-3 py-1 text-xs font-medium transition-colors border-l border-neutral-200",
-                    clipDuration === 10
-                      ? "bg-neutral-900 text-white"
-                      : "bg-white text-neutral-500 hover:bg-neutral-50"
-                  )}
-                >
-                  10s
-                </button>
+                {[3, 4, 5, 6, 7].map((d, i) => (
+                  <button
+                    key={d}
+                    onClick={() => setClipDuration(d)}
+                    className={cn(
+                      "px-3 py-1 text-xs font-medium transition-colors",
+                      i > 0 && "border-l border-neutral-200",
+                      clipDuration === d
+                        ? "bg-neutral-900 text-white"
+                        : "bg-white text-neutral-500 hover:bg-neutral-50"
+                    )}
+                  >
+                    {d}s
+                  </button>
+                ))}
               </div>
             </div>
             <div className="flex items-center gap-2">

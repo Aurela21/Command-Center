@@ -10,5 +10,33 @@ export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
     const { startCronPoller } = await import("./lib/cron");
     startCronPoller();
+
+    // Ensure all schema columns exist (avoids formal migrations)
+    try {
+      const { db } = await import("@/db");
+      const { sql } = await import("drizzle-orm");
+      await db.execute(sql`
+        ALTER TABLE projects
+          ADD COLUMN IF NOT EXISTS hero_source_frame INTEGER,
+          ADD COLUMN IF NOT EXISTS hero_images JSONB,
+          ADD COLUMN IF NOT EXISTS approved_hero_url TEXT,
+          ADD COLUMN IF NOT EXISTS project_type TEXT NOT NULL DEFAULT 'reference';
+        ALTER TABLE scenes
+          ADD COLUMN IF NOT EXISTS end_frame_url TEXT,
+          ADD COLUMN IF NOT EXISTS end_frame_prompt TEXT,
+          ADD COLUMN IF NOT EXISTS seed_skipped BOOLEAN DEFAULT FALSE;
+      `);
+    } catch {}
+
+    // Clean up knowledge docs stuck in "processing" from a previous crash
+    try {
+      const { db } = await import("@/db");
+      const { knowledgeDocuments } = await import("@/db/schema");
+      const { eq } = await import("drizzle-orm");
+      await db
+        .update(knowledgeDocuments)
+        .set({ status: "error" })
+        .where(eq(knowledgeDocuments.status, "processing"));
+    } catch {}
   }
 }

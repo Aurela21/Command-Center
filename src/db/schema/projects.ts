@@ -13,8 +13,10 @@ import { sql } from "drizzle-orm";
 export const projects = pgTable("projects", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
+  projectType: text("project_type").notNull().default("reference"),
+  // reference | concept
   status: text("status").notNull().default("uploading"),
-  // uploading | analyzing | manifest_review | producing | complete
+  // uploading | analyzing | manifest_review | producing | complete | concept_setup
 
   // Reference video
   referenceVideoUrl: text("reference_video_url"),
@@ -37,6 +39,12 @@ export const projects = pgTable("projects", {
   klingElementTags: text("kling_element_tags")
     .array()
     .default(sql`'{}'`),
+
+  // Hero model image (base model + setting, used as reference for all scene seeds)
+  heroSourceFrame: integer("hero_source_frame"),
+  heroImages: jsonb("hero_images"),
+  // [{ id, url, prompt, sourceFrame, createdAt }]
+  approvedHeroUrl: text("approved_hero_url"),
 
   // Sub-stage tracking
   stage3aStatus: text("stage_3a_status").default("pending"),

@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, Check, Loader2, Sparkles, Zap } from "lucide-react";
+import { AlertTriangle, Check, Loader2, RefreshCw, Sparkles, Zap } from "lucide-react";
 import type { SceneProductionState } from "./types";
+import { PromptWithMentions, type ProductTag } from "./tab-3a";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -25,9 +26,11 @@ function hasLipSyncRisk(description: string, durationS: number): boolean {
 function ScenePromptCard({
   scene,
   updateScene,
+  productTags,
 }: {
   scene: SceneProductionState;
   updateScene: (sceneId: string, patch: Partial<SceneProductionState>) => void;
+  productTags: ProductTag[];
 }) {
   const wc = wordCount(scene.klingPrompt);
   const lipSync = hasLipSyncRisk(scene.description, scene.targetClipDurationS);
@@ -91,18 +94,18 @@ function ScenePromptCard({
         {scene.description}
       </p>
 
-      {/* Kling prompt textarea */}
-      <textarea
+      {/* Kling prompt textarea with @mentions */}
+      <PromptWithMentions
         value={scene.klingPrompt}
-        onChange={(e) => {
+        onChange={(val) => {
           updateScene(scene.sceneId, {
-            klingPrompt: e.target.value,
+            klingPrompt: val,
             klingPromptApproved: false,
           });
         }}
+        products={productTags}
+        placeholder="Kling generation prompt for this scene… (type @ for products)"
         rows={3}
-        placeholder="Kling generation prompt for this scene…"
-        className="w-full text-sm rounded-md border border-neutral-200 px-3 py-2.5 bg-neutral-50 resize-none focus:outline-none focus:ring-2 focus:ring-neutral-200 focus:border-neutral-300 focus:bg-white transition-all placeholder:text-neutral-400"
       />
 
       {/* Warnings */}
@@ -203,7 +206,72 @@ export function Tab3B({
   const [tonality, setTonality] = useState("Energetic");
   const [format, setFormat] = useState("DTC Product");
   const [generating, setGenerating] = useState(false);
+  const [reoptimizing, setReoptimizing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [bulkInstruction, setBulkInstruction] = useState("");
+  const [bulkApplying, setBulkApplying] = useState(false);
+  const [bulkSelected, setBulkSelected] = useState<Set<string>>(() => new Set(scenes.map((s) => s.sceneId)));
+
+  // Fetch product tags for @mentions
+  const [productTags, setProductTags] = useState<ProductTag[]>([]);
+  useEffect(() => {
+    fetch("/api/products")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: Array<{ slug: string; name: string; imageCount?: number }>) =>
+        setProductTags(data.map((p) => ({ slug: p.slug, name: p.name, imageCount: p.imageCount ?? 0 })))
+      )
+      .catch(() => {});
+  }, []);
+
+  function toggleBulkScene(sceneId: string) {
+    setBulkSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(sceneId)) next.delete(sceneId);
+      else next.add(sceneId);
+      return next;
+    });
+  }
+
+  function toggleBulkAll() {
+    setBulkSelected((prev) =>
+      prev.size === scenes.length ? new Set() : new Set(scenes.map((s) => s.sceneId))
+    );
+  }
+
+  async function handleBulkEdit() {
+    if (!bulkInstruction.trim() || bulkSelected.size === 0) return;
+    setBulkApplying(true);
+    try {
+      const selected = scenes.filter((s) => bulkSelected.has(s.sceneId));
+      const res = await fetch(`/api/projects/${projectId}/bulk-edit-prompts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          instruction: bulkInstruction,
+          prompts: selected.map((s) => ({
+            sceneId: s.sceneId,
+            sceneOrder: s.sceneOrder,
+            prompt: s.klingPrompt,
+          })),
+        }),
+      });
+      if (!res.ok) throw new Error("Bulk edit failed");
+      const { results } = (await res.json()) as { results: Array<{ sceneId: string; prompt: string }> };
+      for (const r of results) {
+        updateScene(r.sceneId, { klingPrompt: r.prompt, klingPromptApproved: false });
+        fetch(`/api/projects/${projectId}/scenes/${r.sceneId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ scriptSegment: r.prompt, klingPromptApproved: false }),
+        }).catch(console.error);
+      }
+      setBulkInstruction("");
+    } catch (err) {
+      console.error("[bulk-edit]", err);
+    } finally {
+      setBulkApplying(false);
+    }
+  }
 
   const approvedCount = scenes.filter((s) => s.klingPromptApproved).length;
 
@@ -228,10 +296,12 @@ export function Tab3B({
       scenes.forEach((scene, i) => {
         const prompt = data.sceneSegments[i] ?? "";
         if (prompt) {
-          updateScene(scene.sceneId, {
-            klingPrompt: prompt,
-            klingPromptApproved: false,
-          });
+          updateScene(scene.sceneId, { klingPrompt: prompt, klingPromptApproved: false });
+          fetch(`/api/projects/${projectId}/scenes/${scene.sceneId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ scriptSegment: prompt, klingPromptApproved: false }),
+          }).catch(console.error);
         }
       });
     } catch (err) {
@@ -240,6 +310,42 @@ export function Tab3B({
       setError(msg);
     } finally {
       setGenerating(false);
+    }
+  }
+
+  async function handleReoptimize() {
+    if (scenes.every((s) => !s.klingPrompt.trim())) return;
+    setReoptimizing(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/bulk-edit-prompts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          instruction: "Re-optimize these Kling prompts. Keep the same scene structure, subject, actions, and dialogue. Improve clarity, remove redundancy, tighten motion descriptions, and follow Kling prompting best practices. Do NOT change what happens in each scene — only improve HOW it's described. REMOVE all background/environment/setting descriptions (white studio, minimal backdrop, etc.) — backgrounds come from the seed image. Focus prompts on: subject actions, body movement, camera movement, pacing, and dialogue.",
+          prompts: scenes.map((s) => ({
+            sceneId: s.sceneId,
+            sceneOrder: s.sceneOrder,
+            prompt: s.klingPrompt,
+          })),
+        }),
+      });
+      if (!res.ok) throw new Error("Re-optimize failed");
+      const { results } = (await res.json()) as { results: Array<{ sceneId: string; prompt: string }> };
+      for (const r of results) {
+        updateScene(r.sceneId, { klingPrompt: r.prompt, klingPromptApproved: false });
+        fetch(`/api/projects/${projectId}/scenes/${r.sceneId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ scriptSegment: r.prompt, klingPromptApproved: false }),
+        }).catch(console.error);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[reoptimize]", msg);
+      setError(msg);
+    } finally {
+      setReoptimizing(false);
     }
   }
 
@@ -289,7 +395,7 @@ export function Tab3B({
           </div>
           <Button
             onClick={handleGenerateScript}
-            disabled={generating}
+            disabled={generating || reoptimizing}
             className="gap-2 bg-neutral-900 hover:bg-neutral-700 text-white h-9 text-sm disabled:opacity-40"
           >
             {generating ? (
@@ -304,6 +410,26 @@ export function Tab3B({
               </>
             )}
           </Button>
+          {scenes.some((s) => s.klingPrompt.trim()) && (
+            <Button
+              onClick={handleReoptimize}
+              disabled={reoptimizing || generating}
+              variant="outline"
+              className="gap-2 h-9 text-sm disabled:opacity-40"
+            >
+              {reoptimizing ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Re-optimizing…
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Re-optimize Prompts
+                </>
+              )}
+            </Button>
+          )}
         </div>
 
         {/* Error message */}
@@ -335,9 +461,114 @@ export function Tab3B({
           <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">
             Scene Prompts
           </p>
-          <p className="text-xs text-neutral-400">
-            {approvedCount}/{scenes.length} approved
-          </p>
+          <div className="flex items-center gap-3">
+            <p className="text-xs text-neutral-400">
+              {approvedCount}/{scenes.length} approved
+            </p>
+            {approvedCount < scenes.length ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  scenes.forEach((s) => {
+                    if (!s.klingPromptApproved && s.klingPrompt.trim()) {
+                      updateScene(s.sceneId, { klingPromptApproved: true });
+                    }
+                  });
+                }}
+                className="h-7 text-[11px] gap-1.5"
+              >
+                <Check className="h-3 w-3" />
+                Approve All
+              </Button>
+            ) : (
+              <button
+                onClick={() => {
+                  scenes.forEach((s) => {
+                    updateScene(s.sceneId, { klingPromptApproved: false });
+                  });
+                }}
+                className="text-[11px] text-neutral-400 hover:text-neutral-600 transition-colors"
+              >
+                Unapprove all
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Full script (read-only reference) */}
+        {script && (
+          <div className="mb-4 rounded-xl border border-neutral-100 bg-neutral-50/50 p-4 space-y-2">
+            <p className="text-[10px] font-medium uppercase tracking-widest text-neutral-400">
+              Full Script
+            </p>
+            <p className="text-xs text-neutral-600 leading-relaxed whitespace-pre-line">
+              {script}
+            </p>
+          </div>
+        )}
+
+        {/* Bulk edit prompts */}
+        <div className="mb-4 rounded-xl border border-violet-100 bg-violet-50/30 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-medium uppercase tracking-widest text-violet-400">
+              Bulk Edit Prompts
+            </p>
+            <button
+              onClick={toggleBulkAll}
+              className="text-[10px] text-violet-400 hover:text-violet-600 transition-colors"
+            >
+              {bulkSelected.size === scenes.length ? "Deselect all" : "Select all"}
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {scenes.map((s) => (
+              <button
+                key={s.sceneId}
+                onClick={() => toggleBulkScene(s.sceneId)}
+                className={cn(
+                  "px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
+                  bulkSelected.has(s.sceneId)
+                    ? "bg-violet-600 text-white"
+                    : "bg-white border border-violet-200 text-neutral-400 hover:border-violet-300"
+                )}
+              >
+                Scene {String(s.sceneOrder).padStart(2, "0")}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <input
+              value={bulkInstruction}
+              onChange={(e) => setBulkInstruction(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !bulkApplying) {
+                  e.preventDefault();
+                  handleBulkEdit();
+                }
+              }}
+              placeholder="e.g. remove background descriptions, backgrounds come from seed images..."
+              className="flex-1 text-sm border border-violet-200 rounded-md px-3 py-1.5 h-9 bg-white focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-300 transition-all placeholder:text-neutral-300"
+            />
+            <Button
+              onClick={handleBulkEdit}
+              disabled={bulkApplying || !bulkInstruction.trim() || bulkSelected.size === 0}
+              variant="outline"
+              className="gap-2 h-9 text-sm border-violet-200 text-violet-700 hover:bg-violet-50 disabled:opacity-40 shrink-0"
+            >
+              {bulkApplying ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Applying…
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Apply ({bulkSelected.size})
+                </>
+              )}
+            </Button>
+          </div>
         </div>
         <div className="space-y-3">
           {scenes.map((scene) => (
@@ -345,6 +576,7 @@ export function Tab3B({
               key={scene.sceneId}
               scene={scene}
               updateScene={updateScene}
+              productTags={productTags}
             />
           ))}
         </div>

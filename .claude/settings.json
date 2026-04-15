@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c ':*)",
+      "Bash(python3 -c \" import json,sys,subprocess for d in json.load\\(sys.stdin\\): if d['status'] in \\('processing','error'\\): subprocess.run\\(['curl','-s','-X','DELETE',f'http://localhost:3001/api/knowledge/documents/{d[\\\\\"id\\\\\"]}'],capture_output=True\\) \")",
+      "Bash(NODE_OPTIONS=\"--max-old-space-size=2048\" npx next dev -p 3001)",
+      "Bash(python3 -c \" import json,sys,subprocess for d in json.load\\(sys.stdin\\): if d['status'] == 'processing': subprocess.run\\(['curl','-s','-X','DELETE',f'http://localhost:3001/api/knowledge/documents/{d[\\\\\"id\\\\\"]}'],capture_output=True\\) print\\(f'Cleaned {d[\\\\\"name\\\\\"]}'\\) \")",
+      "Bash(curl -s http://localhost:3001/api/projects/7ccf5a79-cc23-4ab1-8683-0cba45e4abbb/production-state)",
+      "Bash(curl -s -X POST https://platform.higgsfield.ai/bytedance/seedream/v4/edit -H 'Authorization: Key e2dfb867-2e5a-4a4d-a2b6-93e9c4a33395:7b1b4d3ab1f6f30a2417c70f0cb8e7fe654b6234e415757aea0257b5a036480c' -H 'Content-Type: application/json' -d '{\"image_urls\":[\"https://pub-c0c093387b0846af862d7b611c0249f3.r2.dev/frames/7ccf5a79-cc23-4ab1-8683-0cba45e4abbb/f0002.jpg\"],\"prompt\":\"test\"}')",
+      "Bash(python3 -c \" import json,sys docs = json.load\\(sys.stdin\\) kling = [d for d in docs if d['category'] == 'kling_prompts'][0] print\\(kling['id']\\) \")",
+      "Bash(node -e ':*)",
+      "Bash(curl -s \"https://pub-c0c093387b0846af862d7b611c0249f3.r2.dev/frames/7ccf5a79-cc23-4ab1-8683-0cba45e4abbb/f0002.jpg\" -o /tmp/test_frame.jpg -w \"%{http_code}\")",
+      "Read(//tmp/**)",
+      "Read(//private/tmp/**)",
+      "Read(//private/var/folders/**)",
+      "Bash(ls -lt /tmp/claude-*)",
+      "WebFetch(domain:higgsfield.ai)",
+      "Bash(curl -s -X POST 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=AIzaSyC_wS1AL1NdrTkA-a9KdcG91Yp1Ne0pg84' -H 'Content-Type: application/json' -d '{:*)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\({k:v for k,v in d.items\\(\\) if k!='candidates'}, indent=2\\)\\); [print\\(f'Part type: {list\\(p.keys\\(\\)\\)}'\\) for c in d.get\\('candidates',[]\\) for p in c.get\\('content',{}\\).get\\('parts',[]\\)]\")",
+      "Bash(curl -s 'https://generativelanguage.googleapis.com/v1beta/models?key=AIzaSyC_wS1AL1NdrTkA-a9KdcG91Yp1Ne0pg84')",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(m['name']\\) for m in data.get\\('models',[]\\) if '3.1' in m.get\\('name',''\\) and 'image' in m.get\\('name',''\\).lower\\(\\)]\")",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(m['name'], '-', m.get\\('displayName',''\\)\\) for m in data.get\\('models',[]\\) if 'image' in m.get\\('name',''\\).lower\\(\\) and \\('3' in m.get\\('name',''\\) or 'pro' in m.get\\('name',''\\).lower\\(\\)\\)]\")",
+      "Bash(curl -s \"https://pub-c0c093387b0846af862d7b611c0249f3.r2.dev/frames/7ccf5a79-cc23-4ab1-8683-0cba45e4abbb/f0014.jpg\")",
+      "Bash(curl -s \"http://localhost:3001/api/projects/7ccf5a79-cc23-4ab1-8683-0cba45e4abbb/production-state\")",
+      "Bash(curl -s 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=AIzaSyC_wS1AL1NdrTkA-a9KdcG91Yp1Ne0pg84' -H 'Content-Type: application/json' -d '{:*)",
+      "Bash(curl -s \"http://localhost:3001/api/products\")",
+      "Bash(python3 -c \" import sys, json d = json.load\\(sys.stdin\\) for p in d: print\\(f'Product: {p[\\\\\"name\\\\\"]} \\(@{p[\\\\\"slug\\\\\"]}\\)'\\) \")",
+      "Bash(curl -s \"http://localhost:3001/api/products/071adf53-4e08-4305-89e0-985286523355/images\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3001)",
+      "Bash(curl -s \"http://localhost:3001/api/projects\")",
+      "Bash(curl -s \"http://localhost:3001/api/projects/31462658-076b-40d8-8a68-0a2d2f16f48d/production-state\")",
+      "Bash(curl -s \"http://localhost:3001/api/projects/31462658-076a-4032-a104-083e06ff5553/production-state\")"
+    ],
+    "additionalDirectories": [
+      "/Users/nicorobinson/Desktop/Command Center Higgs/src/app/api/projects/[id]/asset-versions",
+      "/Users/nicorobinson/.claude/plans",
+      "/Users/nicorobinson/Desktop/Command Center Higgs/src/app/api/projects/[id]",
+      "/Users/nicorobinson/Desktop/Command Center Higgs/src/app/(app)/projects/[id]"
+    ]
+  }
+}

@@ -12,18 +12,26 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const { name, klingElementTags } = await req.json();
+  const { name, klingElementTags, type } = await req.json() as {
+    name: string;
+    klingElementTags?: string[];
+    type?: "reference" | "concept";
+  };
 
   if (!name?.trim()) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
   }
 
+  const projectType = type === "concept" ? "concept" : "reference";
+  const status = projectType === "concept" ? "concept_setup" : "uploading";
+
   const [project] = await db
     .insert(projects)
     .values({
       name: name.trim(),
+      projectType,
       klingElementTags: klingElementTags ?? [],
-      status: "uploading",
+      status,
     })
     .returning();
 

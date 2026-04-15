@@ -13,6 +13,7 @@ import { projects, scenes } from "@/db/schema";
 import { eq, asc, sql } from "drizzle-orm";
 import { embed } from "@/lib/embeddings";
 import { generateScript } from "@/lib/claude";
+import type { VideoAnalysis } from "@/lib/claude";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -64,29 +65,50 @@ export async function POST(req: NextRequest, { params }: Params) {
     const scriptCategories = ["brand", "voice", "script_copy"];
     const klingCategories = ["kling_prompts", "style"];
 
-    const [scriptRows, klingRows] = await Promise.all([
+    // Try chunks first, fall back to raw_text on documents
+    const [scriptChunkRows, klingChunkRows] = await Promise.all([
       db.execute<{ content: string; section_title: string | null; similarity: number }>(sql`
-        SELECT kc.content, kc.section_title,
-          (1 - (kc.embedding <=> ${scriptEmbStr}::vector))::float AS similarity
+        SELECT kc.content, kc.section_title, 0.5::float AS similarity
         FROM knowledge_chunks kc
         JOIN knowledge_documents kd ON kc.document_id = kd.id
         WHERE kd.status = 'ready' AND kd.category = ANY(${scriptCategories}::text[])
-        ORDER BY kc.embedding <=> ${scriptEmbStr}::vector
+        ORDER BY CASE WHEN kc.embedding IS NOT NULL THEN kc.embedding <=> ${scriptEmbStr}::vector ELSE 1 END, kc.chunk_index
         LIMIT 5
       `),
       db.execute<{ content: string; section_title: string | null; similarity: number }>(sql`
-        SELECT kc.content, kc.section_title,
-          (1 - (kc.embedding <=> ${klingEmbStr}::vector))::float AS similarity
+        SELECT kc.content, kc.section_title, 0.5::float AS similarity
         FROM knowledge_chunks kc
         JOIN knowledge_documents kd ON kc.document_id = kd.id
         WHERE kd.status = 'ready' AND kd.category = ANY(${klingCategories}::text[])
-        ORDER BY kc.embedding <=> ${klingEmbStr}::vector
+        ORDER BY CASE WHEN kc.embedding IS NOT NULL THEN kc.embedding <=> ${klingEmbStr}::vector ELSE 1 END, kc.chunk_index
         LIMIT 5
       `),
     ]);
 
-    scriptKnowledge = scriptRows.map((r) => ({ content: r.content, sectionTitle: r.section_title }));
-    klingKnowledge = klingRows.map((r) => ({ content: r.content, sectionTitle: r.section_title }));
+    type KRow = { content: string; section_title: string | null; similarity: number };
+    let scriptRowsFinal: KRow[] = [...scriptChunkRows];
+    let klingRowsFinal: KRow[] = [...klingChunkRows];
+
+    // Fall back to raw_text on documents if no chunks
+    if (scriptRowsFinal.length === 0) {
+      const docRows = await db.execute<{ raw_text: string; name: string }>(sql`
+        SELECT raw_text, name FROM knowledge_documents
+        WHERE status = 'ready' AND category = ANY(${scriptCategories}::text[]) AND raw_text IS NOT NULL
+        LIMIT 5
+      `);
+      scriptRowsFinal = docRows.map((r) => ({ content: r.raw_text, section_title: r.name, similarity: 0.5 }));
+    }
+    if (klingRowsFinal.length === 0) {
+      const docRows = await db.execute<{ raw_text: string; name: string }>(sql`
+        SELECT raw_text, name FROM knowledge_documents
+        WHERE status = 'ready' AND category = ANY(${klingCategories}::text[]) AND raw_text IS NOT NULL
+        LIMIT 5
+      `);
+      klingRowsFinal = docRows.map((r) => ({ content: r.raw_text, section_title: r.name, similarity: 0.5 }));
+    }
+
+    scriptKnowledge = scriptRowsFinal.map((r) => ({ content: r.content, sectionTitle: r.section_title }));
+    klingKnowledge = klingRowsFinal.map((r) => ({ content: r.content, sectionTitle: r.section_title }));
   } catch {
     console.log("[generate-script] Knowledge base search skipped (no docs or error)");
   }
@@ -98,14 +120,26 @@ export async function POST(req: NextRequest, { params }: Params) {
   ];
 
   // 3. Generate script via Claude
+  const R2_PUBLIC = process.env.R2_PUBLIC_URL ?? process.env.NEXT_PUBLIC_R2_PUBLIC_URL ?? "";
+
   const result = await generateScript({
     projectName: project.name,
-    scenes: sceneRows.map((s) => ({
-      order: s.sceneOrder,
-      description: s.description ?? "",
-      durationMs: s.endTimeMs - s.startTimeMs,
-    })),
-    analysis: null, // could pass project.aiAnalysis if available
+    scenes: sceneRows.map((s) => {
+      // Build reference frame URL
+      let frameUrl = s.referenceFrameUrl;
+      if (!frameUrl && R2_PUBLIC) {
+        const idx = s.referenceFrame < 20 ? s.referenceFrame : Math.round(s.referenceFrame / 30);
+        frameUrl = `${R2_PUBLIC}/frames/${projectId}/f${String(idx).padStart(4, "0")}.jpg`;
+      }
+      return {
+        order: s.sceneOrder,
+        description: s.description ?? "",
+        durationMs: s.endTimeMs - s.startTimeMs,
+        referenceFrameUrl: frameUrl ?? undefined,
+        originalKlingPrompt: s.scenePrompt ?? undefined,
+      };
+    }),
+    analysis: (project.aiAnalysis as VideoAnalysis) ?? null,
     angle,
     tonality,
     format,

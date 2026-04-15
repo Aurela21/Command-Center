@@ -72,41 +72,58 @@ export async function POST(req: NextRequest, { params }: Params) {
     const embStr = `[${queryEmbedding.join(",")}]`;
 
     if (target === "seed_image") {
-      const rows = await db.execute<{ content: string }>(sql`
-        SELECT kc.content
-        FROM knowledge_chunks kc
+      // Try chunks first, fall back to raw_text on documents
+      const chunkRows = await db.execute<{ content: string }>(sql`
+        SELECT kc.content FROM knowledge_chunks kc
         JOIN knowledge_documents kd ON kc.document_id = kd.id
         WHERE kd.status = 'ready' AND kd.category = 'style'
-        ORDER BY kc.embedding <=> ${embStr}::vector
+        ORDER BY CASE WHEN kc.embedding IS NOT NULL THEN kc.embedding <=> ${embStr}::vector ELSE 1 END, kc.chunk_index
         LIMIT 3
       `);
-      styleKnowledge = rows.map((r) => r.content).join("\n\n");
+      if (chunkRows.length > 0) {
+        styleKnowledge = chunkRows.map((r) => r.content).join("\n\n");
+      } else {
+        const docRows = await db.execute<{ raw_text: string }>(sql`
+          SELECT raw_text FROM knowledge_documents
+          WHERE status = 'ready' AND category = 'style' AND raw_text IS NOT NULL
+          LIMIT 3
+        `);
+        styleKnowledge = docRows.map((r) => r.raw_text).join("\n\n");
+      }
     }
 
     if (target === "kling_video") {
-      const rows = await db.execute<{ content: string }>(sql`
-        SELECT kc.content
-        FROM knowledge_chunks kc
+      const chunkRows = await db.execute<{ content: string }>(sql`
+        SELECT kc.content FROM knowledge_chunks kc
         JOIN knowledge_documents kd ON kc.document_id = kd.id
         WHERE kd.status = 'ready' AND kd.category = 'kling_prompts'
-        ORDER BY kc.embedding <=> ${embStr}::vector
+        ORDER BY CASE WHEN kc.embedding IS NOT NULL THEN kc.embedding <=> ${embStr}::vector ELSE 1 END, kc.chunk_index
         LIMIT 3
       `);
-      klingKnowledge = rows.map((r) => r.content).join("\n\n");
+      if (chunkRows.length > 0) {
+        klingKnowledge = chunkRows.map((r) => r.content).join("\n\n");
+      } else {
+        const docRows = await db.execute<{ raw_text: string }>(sql`
+          SELECT raw_text FROM knowledge_documents
+          WHERE status = 'ready' AND category = 'kling_prompts' AND raw_text IS NOT NULL
+          LIMIT 3
+        `);
+        klingKnowledge = docRows.map((r) => r.raw_text).join("\n\n");
+      }
     }
   } catch {
     // Knowledge base optional
   }
 
-  // Resolve reference frame URL for visual context
+  // Resolve reference frame URL for visual context (skip for concept projects with no frames)
   let referenceFrameUrl: string | undefined;
   if (target === "seed_image") {
     referenceFrameUrl = scene.referenceFrameUrl ?? undefined;
-    if (!referenceFrameUrl) {
+    if (!referenceFrameUrl && scene.referenceFrame > 0) {
       const R2_PUBLIC = process.env.R2_PUBLIC_URL ?? process.env.NEXT_PUBLIC_R2_PUBLIC_URL ?? "";
       if (R2_PUBLIC) {
-        const sec = Math.round(scene.referenceFrame / 30);
-        referenceFrameUrl = `${R2_PUBLIC}/frames/${projectId}/f${String(sec).padStart(4, "0")}.jpg`;
+        const idx = scene.referenceFrame < 20 ? scene.referenceFrame : Math.round(scene.referenceFrame / 30);
+        referenceFrameUrl = `${R2_PUBLIC}/frames/${projectId}/f${String(idx).padStart(4, "0")}.jpg`;
       }
     }
   }

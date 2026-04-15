@@ -95,6 +95,18 @@ export async function POST(req: NextRequest) {
     seedImageUrl = av?.fileUrl ?? null;
   }
 
+  // If seed is skipped, use the reference frame directly
+  if (!seedImageUrl && scene.seedSkipped) {
+    seedImageUrl = scene.referenceFrameUrl ?? scene.startFrameUrl ?? null;
+    if (!seedImageUrl) {
+      const R2_PUBLIC = process.env.R2_PUBLIC_URL ?? process.env.NEXT_PUBLIC_R2_PUBLIC_URL ?? "";
+      if (R2_PUBLIC) {
+        const sec = Math.round(scene.referenceFrame / 30);
+        seedImageUrl = `${R2_PUBLIC}/frames/${projectId}/f${String(sec).padStart(4, "0")}.jpg`;
+      }
+    }
+  }
+
   if (!seedImageUrl) {
     return NextResponse.json(
       { error: "No approved seed image found for scene" },
@@ -121,10 +133,9 @@ export async function POST(req: NextRequest) {
       .where(eq(jobsTable.id, j.id));
   }
 
-  // Kling only accepts 5 or 10
-  const durationSeconds = durationOverride === 10 ? 10
-    : durationOverride === 5 ? 5
-    : (scene.targetClipDurationS ?? 5) <= 7.5 ? 5 : 10;
+  const durationSeconds = durationOverride
+    ? Math.max(3, Math.min(7, durationOverride))
+    : Math.max(3, Math.min(7, Math.round(scene.targetClipDurationS ?? 5)));
 
   const elementTags = (project.klingElementTags as string[]) ?? [];
 
@@ -137,13 +148,14 @@ export async function POST(req: NextRequest) {
     resultData: { prompt, seed_image_url: seedImageUrl },
   });
 
-  // Submit to Kling
+  // Submit to Kling (with optional end frame)
   try {
     const externalJobId = await submitKlingJob({
       imageUrl: seedImageUrl,
       prompt,
       elementTags: elementTags.length > 0 ? elementTags : undefined,
       durationSeconds,
+      tailImageUrl: scene.endFrameUrl ?? undefined,
     });
     await submitJob(job.id, externalJobId);
     return NextResponse.json({ jobId: job.id, externalJobId });

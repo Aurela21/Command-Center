@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { SCENE_COLORS } from "../manifest/mock-data";
@@ -10,12 +10,14 @@ import type {
   VideoVersion,
   SSEEvent,
   ProductionTab,
+  HeroImage,
 } from "./types";
 import { Tab3A } from "./tab-3a";
 import { Tab3B } from "./tab-3b";
 import { TabReview } from "./tab-review";
 import { Tab3C } from "./tab-3c";
-import { Loader2 } from "lucide-react";
+import { QueueTracker } from "./queue-tracker";
+import { Image as ImageIcon, Loader2, Video } from "lucide-react";
 
 // ─── DB row types (mirrors what production-state returns) ────────────────────
 
@@ -35,6 +37,9 @@ type DbScene = {
   klingPromptApproved: boolean | null;
   startTimeMs: number;
   endTimeMs: number;
+  endFrameUrl: string | null;
+  endFramePrompt: string | null;
+  seedSkipped: boolean | null;
 };
 
 type DbAssetVersion = {
@@ -104,6 +109,7 @@ function dbToState(
       qualityScore: score,
       color,
       imageUrl: a.fileUrl,
+      prompt: a.generationPrompt ?? undefined,
       isRejected: a.isRejected ?? false,
       rejectionReason: a.rejectionReason ?? undefined,
     };
@@ -170,6 +176,9 @@ function dbToState(
     targetClipDurationS: scene.targetClipDurationS ?? 5,
     color,
     nanoBananaPrompt: scene.nanoBananaPrompt ?? "",
+    endFrameUrl: scene.endFrameUrl ?? null,
+    endFramePrompt: scene.endFramePrompt ?? null,
+    seedSkipped: scene.seedSkipped ?? false,
     seedVersions,
     approvedSeedVersionId: approvedSeed?.id ?? null,
     seedImageApproved: scene.seedImageApproved ?? false,
@@ -188,8 +197,8 @@ function dbToState(
 // ─── Tab config ──────────────────────────────────────────────────────────────
 
 const TABS: { id: ProductionTab; label: string }[] = [
-  { id: "3a", label: "3A — Seed Images" },
-  { id: "3b", label: "3B — Script & Prompts" },
+  { id: "3b", label: "3A — Script & Motion" },
+  { id: "3a", label: "3B — Seed Images" },
   { id: "review", label: "Review Pairs" },
   { id: "3c", label: "3C — Video Generation" },
 ];
@@ -198,19 +207,105 @@ const TABS: { id: ProductionTab; label: string }[] = [
 
 export default function ProductionPage() {
   const { id: projectId } = useParams<{ id: string }>();
-  const [activeTab, setActiveTab] = useState<ProductionTab>("3a");
+  const [activeTab, setActiveTab] = useState<ProductionTab>("3b");
   const [scenes, setScenes] = useState<SceneProductionState[]>([]);
   const [script, setScript] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const [extractedFrameCount, setExtractedFrameCount] = useState(0);
+  const [r2PublicUrl, setR2PublicUrl] = useState("");
+  const [projectType, setProjectType] = useState<"reference" | "concept">("reference");
+  const [heroImages, setHeroImages] = useState<HeroImage[]>([]);
+  const [approvedHeroUrl, setApprovedHeroUrl] = useState<string | null>(null);
+  const [heroGenerating, setHeroGenerating] = useState(false);
+
+  const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const updateScene = useCallback(
     (sceneId: string, patch: Partial<SceneProductionState>) => {
       setScenes((prev) =>
         prev.map((s) => (s.sceneId === sceneId ? { ...s, ...patch } : s))
       );
+
+      // Auto-save persistable fields to DB (debounced)
+      const dbPatch: Record<string, unknown> = {};
+      if ("klingPrompt" in patch) dbPatch.scriptSegment = patch.klingPrompt;
+      if ("klingPromptApproved" in patch) dbPatch.klingPromptApproved = patch.klingPromptApproved;
+      if ("nanoBananaPrompt" in patch) dbPatch.nanoBananaPrompt = patch.nanoBananaPrompt;
+      if ("seedImageApproved" in patch) dbPatch.seedImageApproved = patch.seedImageApproved;
+      if ("approvedSeedVersionId" in patch) dbPatch.approvedSeedImageId = patch.approvedSeedVersionId;
+      if ("referenceFrame" in patch) dbPatch.referenceFrame = patch.referenceFrame;
+      if ("referenceFrameUrl" in patch) dbPatch.referenceFrameUrl = patch.referenceFrameUrl;
+      if ("endFrameUrl" in patch) dbPatch.endFrameUrl = patch.endFrameUrl;
+      if ("endFramePrompt" in patch) dbPatch.endFramePrompt = patch.endFramePrompt;
+      if ("seedSkipped" in patch) dbPatch.seedSkipped = patch.seedSkipped;
+
+      if (Object.keys(dbPatch).length > 0) {
+        // Debounce — text fields get 500ms, booleans save immediately
+        const hasText = "scriptSegment" in dbPatch || "nanoBananaPrompt" in dbPatch || "endFramePrompt" in dbPatch;
+        const delay = hasText ? 500 : 0;
+
+        if (saveTimers.current[sceneId]) clearTimeout(saveTimers.current[sceneId]);
+        saveTimers.current[sceneId] = setTimeout(() => {
+          fetch(`/api/projects/${projectId}/scenes/${sceneId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(dbPatch),
+          }).catch(console.error);
+        }, delay);
+      }
     },
-    []
+    [projectId]
   );
+
+  const addScene = useCallback(async () => {
+    const nextOrder = scenes.length + 1;
+    const res = await fetch(`/api/projects/${projectId}/scenes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sceneOrder: nextOrder,
+        startFrame: 0,
+        endFrame: 0,
+        startTimeMs: 0,
+        endTimeMs: 0,
+        referenceFrame: 0,
+        description: "New scene",
+        targetClipDurationS: 5,
+      }),
+    });
+    if (!res.ok) return;
+    const created = await res.json();
+    const newScene: SceneProductionState = {
+      sceneId: created.id,
+      sceneOrder: nextOrder,
+      description: created.description ?? "New scene",
+      referenceFrame: 0,
+      referenceFrameUrl: frameUrl(projectId, 0),
+      targetClipDurationS: 5,
+      color: SCENE_COLORS[(scenes.length) % SCENE_COLORS.length],
+      nanoBananaPrompt: "",
+      seedVersions: [],
+      approvedSeedVersionId: null,
+      seedImageApproved: false,
+      klingPrompt: "",
+      klingPromptApproved: false,
+      videoJobStatus: "idle",
+      videoJobProgress: 0,
+      videoVersions: [],
+    };
+    setScenes((prev) => [...prev, newScene]);
+  }, [scenes.length, projectId]);
+
+  const removeScene = useCallback(async (sceneId: string) => {
+    const res = await fetch(`/api/projects/${projectId}/scenes/${sceneId}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) return;
+    setScenes((prev) => {
+      const filtered = prev.filter((s) => s.sceneId !== sceneId);
+      return filtered.map((s, i) => ({ ...s, sceneOrder: i + 1 }));
+    });
+  }, [projectId]);
 
   // Append a seed version using functional update (avoids stale closures)
   const addSeedVersion = useCallback(
@@ -218,6 +313,10 @@ export default function ProductionPage() {
       setScenes((prev) =>
         prev.map((s) => {
           if (s.sceneId !== sceneId) return s;
+          // Deduplicate by ID
+          if (s.seedVersions.some((v) => v.id === version.id)) {
+            return { ...s, seedGenerating: false };
+          }
           return {
             ...s,
             seedGenerating: false,
@@ -238,6 +337,11 @@ export default function ProductionPage() {
           scenes: DbScene[];
           assetVersions: DbAssetVersion[];
           jobs: DbJob[];
+          extractedFrameCount: number;
+          r2PublicUrl: string;
+          projectType: "reference" | "concept";
+          heroImages: HeroImage[];
+          approvedHeroUrl: string | null;
         }) => {
           const mapped = data.scenes.map((s, i) =>
             dbToState(
@@ -249,6 +353,11 @@ export default function ProductionPage() {
             )
           );
           setScenes(mapped);
+          setExtractedFrameCount(data.extractedFrameCount);
+          setR2PublicUrl(data.r2PublicUrl);
+          setProjectType(data.projectType ?? "reference");
+          setHeroImages(data.heroImages ?? []);
+          setApprovedHeroUrl(data.approvedHeroUrl ?? null);
           setLoading(false);
         }
       )
@@ -322,6 +431,26 @@ export default function ProductionPage() {
                 videoUrl: event.fileUrl ?? undefined,
                 qualityScore: qs,
               });
+              // Refetch production state to get the new video version with its prompt
+              fetch(`/api/projects/${projectId}/production-state`)
+                .then((r) => r.json())
+                .then((data: { scenes: DbScene[]; assetVersions: DbAssetVersion[]; jobs: DbJob[]; extractedFrameCount: number; r2PublicUrl: string }) => {
+                  const refreshed = data.scenes.map((s, i) =>
+                    dbToState(s, data.assetVersions, data.jobs, SCENE_COLORS[i % SCENE_COLORS.length], projectId)
+                  );
+                  // Only update video versions for the completed scene to avoid resetting other state
+                  const updated = refreshed.find((s) => s.sceneId === event.sceneId);
+                  if (updated) {
+                    setScenes((prev) =>
+                      prev.map((s) =>
+                        s.sceneId === event.sceneId
+                          ? { ...s, videoVersions: updated.videoVersions }
+                          : s
+                      )
+                    );
+                  }
+                })
+                .catch(() => {});
             }
           }
           break;
@@ -400,17 +529,9 @@ export default function ProductionPage() {
         </div>
       </div>
 
-      {/* ── Tab content ── */}
+      {/* ── Tab content — all tabs stay mounted so state syncs instantly ── */}
       <div className="flex-1 overflow-hidden">
-        {activeTab === "3a" && (
-          <Tab3A
-            scenes={scenes}
-            updateScene={updateScene}
-            addSeedVersion={addSeedVersion}
-            projectId={projectId}
-          />
-        )}
-        {activeTab === "3b" && (
+        <div className={activeTab === "3b" ? "h-full" : "hidden"}>
           <Tab3B
             scenes={scenes}
             updateScene={updateScene}
@@ -418,22 +539,45 @@ export default function ProductionPage() {
             script={script}
             onScriptChange={setScript}
           />
-        )}
-        {activeTab === "review" && (
+        </div>
+        <div className={activeTab === "3a" ? "h-full" : "hidden"}>
+          <Tab3A
+            scenes={scenes}
+            updateScene={updateScene}
+            addSeedVersion={addSeedVersion}
+            addScene={addScene}
+            removeScene={removeScene}
+            projectId={projectId}
+            extractedFrameCount={extractedFrameCount}
+            r2PublicUrl={r2PublicUrl}
+            projectType={projectType}
+            heroImages={heroImages}
+            approvedHeroUrl={approvedHeroUrl}
+            onHeroImagesChange={setHeroImages}
+            onApprovedHeroChange={setApprovedHeroUrl}
+            onHeroGeneratingChange={setHeroGenerating}
+          />
+        </div>
+        <div className={activeTab === "review" ? "h-full" : "hidden"}>
           <TabReview
             scenes={scenes}
+            updateScene={updateScene}
+            projectId={projectId}
             onGoTo3A={() => setActiveTab("3a")}
             onGoTo3B={() => setActiveTab("3b")}
           />
-        )}
-        {activeTab === "3c" && (
+        </div>
+        <div className={activeTab === "3c" ? "h-full" : "hidden"}>
           <Tab3C
             scenes={scenes}
             updateScene={updateScene}
             projectId={projectId}
           />
-        )}
+        </div>
       </div>
+
+      {/* Global queue tracker */}
+      <QueueTracker scenes={scenes} heroGenerating={heroGenerating} />
     </div>
   );
 }

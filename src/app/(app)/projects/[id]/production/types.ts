@@ -4,6 +4,7 @@ export type SeedVersion = {
   qualityScore: number; // 0–100
   color: string;
   imageUrl?: string; // R2 public URL (undefined for mock/placeholder)
+  prompt?: string; // the generation prompt used to create this seed
   isRejected?: boolean;
   rejectionReason?: string;
 };
@@ -37,7 +38,11 @@ export type SceneProductionState = {
   seedVersions: SeedVersion[];
   approvedSeedVersionId: string | null;
   seedImageApproved: boolean;
+  seedSkipped?: boolean; // true = skip seed generation, use reference frame directly
   seedGenerating?: boolean; // true while a nano_banana job is queued/processing
+  // End frame (optional — Kling tail image)
+  endFrameUrl?: string | null;
+  endFramePrompt?: string | null;
   // Step 3B — Kling prompts
   klingPrompt: string;
   klingPromptApproved: boolean;
@@ -96,3 +101,11 @@ export type SSEEvent =
     };
 
 export type ProductionTab = "3a" | "3b" | "review" | "3c";
+
+export type HeroImage = {
+  id: string;
+  url: string;
+  prompt: string;
+  sourceFrame: number;
+  createdAt: string;
+};

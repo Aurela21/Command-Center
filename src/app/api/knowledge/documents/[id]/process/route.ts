@@ -2,10 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { knowledgeDocuments, knowledgeChunks } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { presignedGet } from "@/lib/r2";
-import { extractText } from "@/lib/text-extraction";
-import type { SupportedFileType } from "@/lib/text-extraction";
-import { chunkText, embedBatch } from "@/lib/embeddings";
+import { spawn } from "child_process";
+import { resolve } from "path";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -23,9 +21,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
   if (!doc.fileUrl) {
     return NextResponse.json({ error: "No file URL on document" }, { status: 422 });
   }
-
-  const fileType = doc.fileType as SupportedFileType | null;
-  if (!fileType) {
+  if (!doc.fileType) {
     return NextResponse.json({ error: "Unknown file type" }, { status: 422 });
   }
 
@@ -40,45 +36,15 @@ export async function POST(_req: NextRequest, { params }: Params) {
     .delete(knowledgeChunks)
     .where(eq(knowledgeChunks.documentId, id));
 
-  setImmediate(() => {
-    runProcess(id, doc.fileUrl!, fileType).catch(async (err: unknown) => {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[knowledge/process] ${id} failed: ${msg}`);
-      await db
-        .update(knowledgeDocuments)
-        .set({ status: "error" })
-        .where(eq(knowledgeDocuments.id, id));
-    });
+  // Spawn subprocess
+  const scriptPath = resolve(process.cwd(), "scripts/process-document.mjs");
+  const child = spawn("node", ["--max-old-space-size=1024", scriptPath, id, doc.fileUrl, doc.fileType], {
+    stdio: "inherit",
+    detached: true,
+    env: { ...process.env },
   });
+  child.unref();
+  console.log(`[knowledge/process] Spawned processor for ${id} (pid ${child.pid})`);
 
   return NextResponse.json({ status: "processing" });
-}
-
-async function runProcess(docId: string, fileUrl: string, fileType: SupportedFileType) {
-  const downloadUrl = await presignedGet(fileUrl, 3600);
-  const res = await fetch(downloadUrl);
-  if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
-  const buffer = Buffer.from(await res.arrayBuffer());
-
-  const text = await extractText(buffer, fileType);
-  if (!text.trim()) throw new Error("No text extracted");
-
-  const chunks = chunkText(text);
-  const embeddings = await embedBatch(chunks);
-
-  await db.insert(knowledgeChunks).values(
-    chunks.map((content, i) => ({
-      documentId: docId,
-      chunkIndex: i,
-      content,
-      embedding: embeddings[i],
-    }))
-  );
-
-  await db
-    .update(knowledgeDocuments)
-    .set({ status: "ready", totalChunks: chunks.length })
-    .where(eq(knowledgeDocuments.id, docId));
-
-  console.log(`[knowledge/process] ${docId} ready — ${chunks.length} chunks`);
 }
