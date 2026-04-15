@@ -179,16 +179,14 @@ function SceneGenerationCard({
     scene.qualityScore.overall < 60;
 
   function handleGenerate() {
-    // Start from last generation's prompt if available, otherwise base prompt
-    const lastPrompt = [...scene.videoVersions].filter((v) => !v.isRejected).reverse()[0]?.prompt;
+    // Always use the current scene prompt (reflects edits from 3A)
     setEnhanceOpen(true);
-    setRefinedPrompt(lastPrompt || scene.klingPrompt);
+    setRefinedPrompt(scene.klingPrompt);
   }
 
   function handleRetry() {
-    const lastPrompt = [...scene.videoVersions].filter((v) => !v.isRejected).reverse()[0]?.prompt;
     setEnhanceOpen(true);
-    setRefinedPrompt(lastPrompt || scene.klingPrompt);
+    setRefinedPrompt(scene.klingPrompt);
   }
 
   async function handleEnhance() {
