@@ -250,8 +250,14 @@ export function Sidebar() {
                   : "text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100"
               )}
             >
-              <Layers className="h-4 w-4 shrink-0" />
-              <span className="flex-1 text-left truncate">Iteration</span>
+              {isConcept ? (
+                <Sparkles className="h-4 w-4 shrink-0" />
+              ) : (
+                <Layers className="h-4 w-4 shrink-0" />
+              )}
+              <span className="flex-1 text-left truncate">
+                {isConcept ? "New Concept" : "Iteration"}
+              </span>
               <ChevronDown
                 className={cn(
                   "h-3.5 w-3.5 shrink-0 transition-transform",
