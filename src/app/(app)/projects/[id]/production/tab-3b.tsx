@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, Check, Loader2, RefreshCw, Sparkles, Zap } from "lucide-react";
@@ -193,6 +193,7 @@ type Props = {
   projectId: string;
   script: string;
   onScriptChange: (script: string) => void;
+  productTags: ProductTag[];
 };
 
 export function Tab3B({
@@ -201,6 +202,7 @@ export function Tab3B({
   projectId,
   script,
   onScriptChange,
+  productTags,
 }: Props) {
   const [angle, setAngle] = useState("Dynamic");
   const [tonality, setTonality] = useState("Energetic");
@@ -211,17 +213,6 @@ export function Tab3B({
   const [bulkInstruction, setBulkInstruction] = useState("");
   const [bulkApplying, setBulkApplying] = useState(false);
   const [bulkSelected, setBulkSelected] = useState<Set<string>>(() => new Set(scenes.map((s) => s.sceneId)));
-
-  // Fetch product tags for @mentions
-  const [productTags, setProductTags] = useState<ProductTag[]>([]);
-  useEffect(() => {
-    fetch("/api/products")
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data: Array<{ slug: string; name: string; imageCount?: number }>) =>
-        setProductTags(data.map((p) => ({ slug: p.slug, name: p.name, imageCount: p.imageCount ?? 0 })))
-      )
-      .catch(() => {});
-  }, []);
 
   function toggleBulkScene(sceneId: string) {
     setBulkSelected((prev) => {

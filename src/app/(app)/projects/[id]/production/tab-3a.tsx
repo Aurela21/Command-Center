@@ -681,6 +681,7 @@ function SeedDetailPanel({
   extractedFrameCount,
   r2PublicUrl,
   approvedHeroUrl,
+  productTags,
 }: {
   scene: SceneProductionState;
   allScenes: SceneProductionState[];
@@ -690,6 +691,7 @@ function SeedDetailPanel({
   extractedFrameCount: number;
   r2PublicUrl: string;
   approvedHeroUrl: string | null;
+  productTags: ProductTag[];
 }) {
   const [localGenerating, setLocalGenerating] = useState(false);
   const generating = localGenerating || (scene.seedGenerating ?? false);
@@ -768,16 +770,6 @@ function SeedDetailPanel({
     return () => clearInterval(timer);
   }, [generating]);
 
-  // Fetch available @tags from product profiles
-  const [productTags, setProductTags] = useState<Array<{ slug: string; name: string; imageCount: number }>>([]);
-  useEffect(() => {
-    fetch("/api/products")
-      .then((r) => r.json())
-      .then((products: Array<{ slug: string; name: string; imageCount: number }>) => {
-        setProductTags(products.filter((p) => (p.imageCount ?? 0) > 0));
-      })
-      .catch(() => {});
-  }, []);
 
   // Clear refined prompt when user edits the brief prompt
   useEffect(() => {
@@ -1351,6 +1343,7 @@ type Props = {
   onHeroImagesChange: (imgs: HeroImage[]) => void;
   onApprovedHeroChange: (url: string | null) => void;
   onHeroGeneratingChange: (generating: boolean) => void;
+  productTags: ProductTag[];
 };
 
 // ─── Hero Model Setup Panel ──────────────────────────────────────────────────
@@ -1365,6 +1358,7 @@ function HeroModelPanel({
   onHeroImagesChange,
   onApprovedHeroChange,
   onGeneratingChange,
+  productTags,
 }: {
   projectId: string;
   extractedFrameCount: number;
@@ -1375,6 +1369,7 @@ function HeroModelPanel({
   onHeroImagesChange: (imgs: HeroImage[]) => void;
   onApprovedHeroChange: (url: string | null) => void;
   onGeneratingChange: (generating: boolean) => void;
+  productTags: ProductTag[];
 }) {
   const isConcept = projectType === "concept";
   const [expanded, setExpanded] = useState(!approvedHeroUrl);
@@ -1386,16 +1381,7 @@ function HeroModelPanel({
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Product tags for @mentions
-  const [productTags, setProductTags] = useState<Array<{ slug: string; name: string; imageCount: number }>>([]);
-  useEffect(() => {
-    fetch("/api/products")
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data: Array<{ slug: string; name: string; imageCount?: number }>) =>
-        setProductTags(data.map((p) => ({ slug: p.slug, name: p.name, imageCount: p.imageCount ?? 0 })))
-      )
-      .catch(() => {});
-  }, []);
+
 
   const frames = allFrameUrls(r2PublicUrl, projectId, extractedFrameCount);
 
@@ -1781,6 +1767,7 @@ export function Tab3A({
   scenes, updateScene, addSeedVersion, addScene, removeScene,
   projectId, extractedFrameCount, r2PublicUrl, projectType,
   heroImages, approvedHeroUrl, onHeroImagesChange, onApprovedHeroChange, onHeroGeneratingChange,
+  productTags,
 }: Props) {
   const [selectedId, setSelectedId] = useState<string>(
     scenes[0]?.sceneId ?? ""
@@ -1801,6 +1788,7 @@ export function Tab3A({
         onHeroImagesChange={onHeroImagesChange}
         onApprovedHeroChange={onApprovedHeroChange}
         onGeneratingChange={onHeroGeneratingChange}
+        productTags={productTags}
       />
 
       {/* Scene split: list + detail */}
@@ -1862,6 +1850,7 @@ export function Tab3A({
               extractedFrameCount={extractedFrameCount}
               r2PublicUrl={r2PublicUrl}
               approvedHeroUrl={approvedHeroUrl}
+              productTags={productTags}
             />
           )}
         </div>

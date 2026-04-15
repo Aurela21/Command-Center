@@ -436,25 +436,15 @@ type Props = {
   projectId: string;
   onGoTo3A: () => void;
   onGoTo3B: () => void;
+  productTags: ProductTag[];
 };
 
-export function TabReview({ scenes, updateScene, projectId, onGoTo3A, onGoTo3B }: Props) {
+export function TabReview({ scenes, updateScene, projectId, onGoTo3A, onGoTo3B, productTags }: Props) {
   const [reoptimizing, setReoptimizing] = useState(false);
   const [bulkInstruction, setBulkInstruction] = useState("");
   const [bulkApplying, setBulkApplying] = useState(false);
   const [bulkSelected, setBulkSelected] = useState<Set<string>>(() => new Set(scenes.map((s) => s.sceneId)));
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; msg: string } | null>(null);
-
-  // Fetch product tags for @mentions
-  const [productTags, setProductTags] = useState<ProductTag[]>([]);
-  useEffect(() => {
-    fetch("/api/products")
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data: Array<{ slug: string; name: string; imageCount?: number }>) =>
-        setProductTags(data.map((p) => ({ slug: p.slug, name: p.name, imageCount: p.imageCount ?? 0 })))
-      )
-      .catch(() => {});
-  }, []);
 
   async function handleReoptimize() {
     const withPrompts = scenes.filter((s) => s.klingPrompt.trim());

@@ -12,12 +12,12 @@ import type {
   ProductionTab,
   HeroImage,
 } from "./types";
-import { Tab3A } from "./tab-3a";
+import { Tab3A, type ProductTag } from "./tab-3a";
 import { Tab3B } from "./tab-3b";
 import { TabReview } from "./tab-review";
 import { Tab3C } from "./tab-3c";
 import { QueueTracker } from "./queue-tracker";
-import { Image as ImageIcon, Loader2, Video } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 // ─── DB row types (mirrors what production-state returns) ────────────────────
 
@@ -217,6 +217,7 @@ export default function ProductionPage() {
   const [heroImages, setHeroImages] = useState<HeroImage[]>([]);
   const [approvedHeroUrl, setApprovedHeroUrl] = useState<string | null>(null);
   const [heroGenerating, setHeroGenerating] = useState(false);
+  const [productTags, setProductTags] = useState<ProductTag[]>([]);
 
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
@@ -287,6 +288,7 @@ export default function ProductionPage() {
       seedVersions: [],
       approvedSeedVersionId: null,
       seedImageApproved: false,
+      seedSkipped: false,
       klingPrompt: "",
       klingPromptApproved: false,
       videoJobStatus: "idle",
@@ -327,6 +329,16 @@ export default function ProductionPage() {
     },
     []
   );
+
+  // Load product tags once
+  useEffect(() => {
+    fetch("/api/products")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: Array<{ slug: string; name: string; imageCount?: number }>) =>
+        setProductTags(data.map((p) => ({ slug: p.slug, name: p.name, imageCount: p.imageCount ?? 0 })))
+      )
+      .catch(() => {});
+  }, []);
 
   // Load initial production state
   useEffect(() => {
@@ -538,6 +550,7 @@ export default function ProductionPage() {
             projectId={projectId}
             script={script}
             onScriptChange={setScript}
+            productTags={productTags}
           />
         </div>
         <div className={activeTab === "3a" ? "h-full" : "hidden"}>
@@ -556,6 +569,7 @@ export default function ProductionPage() {
             onHeroImagesChange={setHeroImages}
             onApprovedHeroChange={setApprovedHeroUrl}
             onHeroGeneratingChange={setHeroGenerating}
+            productTags={productTags}
           />
         </div>
         <div className={activeTab === "review" ? "h-full" : "hidden"}>
@@ -565,6 +579,7 @@ export default function ProductionPage() {
             projectId={projectId}
             onGoTo3A={() => setActiveTab("3a")}
             onGoTo3B={() => setActiveTab("3b")}
+            productTags={productTags}
           />
         </div>
         <div className={activeTab === "3c" ? "h-full" : "hidden"}>

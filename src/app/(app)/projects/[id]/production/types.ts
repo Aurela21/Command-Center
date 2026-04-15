@@ -38,7 +38,7 @@ export type SceneProductionState = {
   seedVersions: SeedVersion[];
   approvedSeedVersionId: string | null;
   seedImageApproved: boolean;
-  seedSkipped?: boolean; // true = skip seed generation, use reference frame directly
+  seedSkipped: boolean; // true = skip seed generation, use reference frame directly
   seedGenerating?: boolean; // true while a nano_banana job is queued/processing
   // End frame (optional — Kling tail image)
   endFrameUrl?: string | null;
