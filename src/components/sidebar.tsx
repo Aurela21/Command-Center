@@ -17,6 +17,7 @@ import {
   ChevronDown,
   Layers,
   Sparkles,
+  ImagePlus,
 } from "lucide-react";
 import { useRef, useState, useCallback } from "react";
 import type { Project } from "@/db/schema";
@@ -292,6 +293,16 @@ export function Sidebar() {
         <NavLink
           item={knowledgeItem}
           active={pathname.startsWith("/knowledge")}
+        />
+
+        <NavLink
+          item={{
+            label: "Static Ads",
+            href: "/static-ads",
+            icon: <ImagePlus className="h-4 w-4" />,
+            locked: false,
+          }}
+          active={pathname.startsWith("/static-ads")}
         />
       </nav>
 

@@ -33,6 +33,21 @@ export async function register() {
           created_at TIMESTAMPTZ DEFAULT NOW(),
           updated_at TIMESTAMPTZ DEFAULT NOW()
         );
+        CREATE TABLE IF NOT EXISTS static_ad_jobs (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          status TEXT NOT NULL DEFAULT 'uploading',
+          product_id UUID REFERENCES product_profiles(id) ON DELETE SET NULL,
+          input_image_url TEXT,
+          psych_analysis JSONB,
+          extracted_copy JSONB,
+          final_copy JSONB,
+          output_image_url TEXT,
+          output_file_size_bytes INTEGER,
+          generation_prompt TEXT,
+          last_error TEXT,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        );
       `);
     } catch {}
 

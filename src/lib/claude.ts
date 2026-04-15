@@ -311,6 +311,117 @@ Return JSON:
       };
 }
 
+// ─── Static Ad Analysis ─────────────────────────────────────────────────────
+
+export type StaticAdAnalysis = {
+  visualHierarchy: string;
+  colorPsychology: string;
+  copyFraming: string;
+  emotionalTriggers: string[];
+  ctaAnalysis: string;
+  attentionMechanics: string;
+  overallStrategy: string;
+  extractedCopy: { headline: string; body: string; cta: string };
+};
+
+export async function analyzeStaticAd(
+  imageUrl: string
+): Promise<StaticAdAnalysis> {
+  const msg = await getClient().messages.create({
+    model: FAST,
+    max_tokens: 2048,
+    system:
+      "You are an expert direct-response advertising analyst specializing in visual persuasion, copy psychology, and conversion optimization. You analyze static ad creatives with surgical precision — identifying every psychological lever, visual hierarchy choice, and copywriting technique used.",
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "image", source: { type: "url", url: imageUrl } },
+          {
+            type: "text",
+            text: `Analyze this static ad image. Provide a comprehensive psychological and strategic breakdown.
+
+Extract ALL visible text from the ad — headlines, body copy, and CTA button text — as separate fields.
+
+Return JSON:
+{
+  "visualHierarchy": "what the eye hits first, second, third — describe the visual flow and focal points",
+  "colorPsychology": "color choices and their emotional/psychological effects on the viewer",
+  "copyFraming": "how the copy is framed — urgency, social proof, benefit-led, feature-led, pain/gain, etc.",
+  "emotionalTriggers": ["list", "of", "triggers", "used"],
+  "ctaAnalysis": "CTA placement, language, color contrast, and urgency mechanics",
+  "attentionMechanics": "contrast, whitespace, visual weight distribution, reading pattern (Z/F)",
+  "overallStrategy": "synthesis — why this ad works as a whole, what makes it effective or ineffective",
+  "extractedCopy": {
+    "headline": "exact headline text from the ad",
+    "body": "exact body copy from the ad",
+    "cta": "exact CTA button/link text from the ad"
+  }
+}`,
+          },
+        ],
+      },
+    ],
+  });
+
+  const text = msg.content[0].type === "text" ? msg.content[0].text : "";
+  const json = text.match(/\{[\s\S]*\}/)?.[0];
+  return json
+    ? (JSON.parse(json) as StaticAdAnalysis)
+    : {
+        visualHierarchy: "",
+        colorPsychology: "",
+        copyFraming: "",
+        emotionalTriggers: [],
+        ctaAnalysis: "",
+        attentionMechanics: "",
+        overallStrategy: "",
+        extractedCopy: { headline: "", body: "", cta: "" },
+      };
+}
+
+export async function generateAdCopy(params: {
+  productName: string;
+  psychAnalysis: StaticAdAnalysis;
+  angle?: string;
+}): Promise<{ headline: string; body: string; cta: string }> {
+  const msg = await getClient().messages.create({
+    model: DEEP,
+    max_tokens: 1024,
+    system:
+      "You are an elite DTC copywriter who writes high-converting ad copy. You understand direct-response psychology deeply — you match tone, urgency, and persuasion frameworks to the product and audience.",
+    messages: [
+      {
+        role: "user",
+        content: `Write new ad copy for "${params.productName}" based on this psychological analysis of a reference ad:
+
+${JSON.stringify(params.psychAnalysis, null, 2)}
+
+${params.angle ? `Creative angle: ${params.angle}` : ""}
+
+Generate new copy that:
+- Preserves the effective psychological structure identified in the analysis
+- Adapts the messaging for the product "${params.productName}"
+- Maintains the same emotional triggers and persuasion framework
+- Creates a compelling, conversion-optimized version
+
+Return JSON:
+{
+  "headline": "new headline text",
+  "body": "new body copy text",
+  "cta": "new CTA button text"
+}`,
+      },
+    ],
+  });
+
+  const text = msg.content[0].type === "text" ? msg.content[0].text : "";
+  const json = text.match(/\{[\s\S]*\}/)?.[0];
+  return json
+    ? (JSON.parse(json) as { headline: string; body: string; cta: string })
+    : { headline: "", body: "", cta: "" };
+}
+
 // ─── Prompt refinement layer ────────────────────────────────────────────────
 
 export type RefineTarget = "seed_image" | "kling_video";

@@ -56,6 +56,22 @@ export type SSEEvent =
       projectId: string;
       stage: string;
       substage?: string;
+    }
+  | {
+      type: "static-ad:progress";
+      jobId: string;
+      progress: number;
+      stage: "analyzing" | "generating";
+    }
+  | {
+      type: "static-ad:completed";
+      jobId: string;
+      outputImageUrl: string;
+    }
+  | {
+      type: "static-ad:failed";
+      jobId: string;
+      error: string;
     };
 
 export function emit(event: SSEEvent): void {

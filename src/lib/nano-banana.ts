@@ -206,6 +206,116 @@ export async function generateSeedImage(
   return generateViaHiggsfield(req);
 }
 
+// ─── Static Ad Generation ───────────────────────────────────────────────────
+
+export type StaticAdRequest = {
+  productImages: Array<{ url: string; label: string }>; // 1-3 hero images with labels
+  prompt: string; // full generation prompt including copy + layout instructions (layout from Claude analysis, not a reference image)
+};
+
+/**
+ * Generate a static ad image using Nano Banana Pro (Gemini).
+ * Takes a reference ad + product images + generation prompt, returns a new ad image.
+ *
+ * // TODO: Confirm Nano Banana Pro API input schema for static ad regeneration —
+ * // current implementation assumes same generateContent endpoint with multiple
+ * // image inputs + text prompt, identical to seed image generation.
+ */
+export async function generateStaticAd(
+  req: StaticAdRequest
+): Promise<NanoBananaResult> {
+  const key = nanoBananaKey();
+  if (!key) throw new Error("NANO_BANANA_API_KEY is not set");
+
+  const parts: Array<Record<string, unknown>> = [];
+
+  // ── PRODUCT IMAGES GO FIRST — model anchors on early images ──
+  // Putting product first ensures the model treats it as the primary subject
+  if (req.productImages.length > 0) {
+    parts.push({
+      text: "THE PRODUCT — This is the product you are creating an ad for. These photos show the REAL physical product. Study every detail — shape, color, material, features, construction. The final ad MUST feature THIS EXACT product:",
+    });
+    for (const img of req.productImages) {
+      try {
+        parts.push({ text: `PRODUCT PHOTO — ${img.label}:` });
+        const prodImg = await downloadImageBase64(img.url);
+        parts.push({
+          inlineData: { mimeType: prodImg.mimeType, data: prodImg.base64 },
+        });
+      } catch (err) {
+        console.warn(
+          `[nano-banana] Failed to download product image: ${img.url}`,
+          err
+        );
+      }
+    }
+  }
+
+  // ── GENERATION INSTRUCTIONS with strong product fidelity ──
+  // NOTE: No reference ad image is sent — layout is guided entirely by text
+  // from Claude's psychological analysis. This prevents product feature contamination.
+  let instruction = req.prompt;
+
+  if (req.productImages.length > 0) {
+    instruction += `\n\nCRITICAL: Create a NEW ad featuring the product from the PRODUCT PHOTOS above. The layout reference is ONLY for compositional inspiration — completely ignore its product.`;
+    instruction += `\n\nPRODUCT FIDELITY — CLOSED WORLD RULE: The product photos above are the ONLY source of truth. The product has ONLY the features visible in those photos.\n- Reproduce the product EXACTLY as photographed — same color, material, shape, silhouette\n- If a feature is visible in the photos, include it\n- If a feature is NOT visible in the photos, it DOES NOT EXIST — do NOT add it\n- Do NOT hallucinate features from the layout reference ad's product — that is a completely different product\n- Do NOT add text, logos, patterns, graphics, labels, or markings that are not in the product photos\n- Do NOT add pockets, zippers, straps, hoods, or construction details that are not in the product photos\n- When in doubt, leave it out — showing fewer details is better than inventing wrong ones`;
+  }
+
+  parts.push({ text: instruction });
+
+  const body = {
+    contents: [{ parts }],
+    generationConfig: {
+      responseModalities: ["IMAGE", "TEXT"],
+    },
+  };
+
+  console.log(
+    `[nano-banana] Static ad generation: ${parts.length} parts (${req.productImages.length} product images)`
+  );
+
+  const url = `${GEMINI_BASE}/models/${NB_MODEL}:generateContent?key=${key}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Nano Banana static ad ${res.status}: ${text.slice(0, 300)}`);
+  }
+
+  const data = (await res.json()) as {
+    candidates?: Array<{
+      content?: {
+        parts?: Array<{
+          inlineData?: { mimeType: string; data: string };
+          text?: string;
+        }>;
+      };
+    }>;
+    error?: { message: string };
+  };
+
+  if (data.error) {
+    throw new Error(`Nano Banana error: ${data.error.message}`);
+  }
+
+  for (const candidate of data.candidates ?? []) {
+    for (const part of candidate.content?.parts ?? []) {
+      if (part.inlineData?.data) {
+        return {
+          imageBase64: part.inlineData.data,
+          mimeType: part.inlineData.mimeType || "image/png",
+        };
+      }
+    }
+  }
+
+  throw new Error("Nano Banana returned no image for static ad generation");
+}
+
 // ─── Legacy stubs — kept so cron.ts compiles without changes ─────────────────
 
 /** @deprecated Use generateSeedImage instead */
