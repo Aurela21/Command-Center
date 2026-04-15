@@ -29,7 +29,12 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3001)",
       "Bash(curl -s \"http://localhost:3001/api/projects\")",
       "Bash(curl -s \"http://localhost:3001/api/projects/31462658-076b-40d8-8a68-0a2d2f16f48d/production-state\")",
-      "Bash(curl -s \"http://localhost:3001/api/projects/31462658-076a-4032-a104-083e06ff5553/production-state\")"
+      "Bash(curl -s \"http://localhost:3001/api/projects/31462658-076a-4032-a104-083e06ff5553/production-state\")",
+      "Bash(curl -s 'http://localhost:3001/api/projects/31462658-076a-4032-a104-083e06ff5553/production-state')",
+      "Bash(curl -s -X DELETE \"http://localhost:3001/api/projects/31462658-076a-4032-a104-083e06ff5553/scenes/4b1685cc-7a8b-4cc2-afe5-$\\(curl -s 'http://localhost:3001/api/projects/31462658-076a-4032-a104-083e06ff5553/production-state')",
+      "Bash(curl -s -w '\\\\nHTTP_CODE:%{http_code}' -X DELETE http://localhost:3001/api/projects/31462658-076a-4032-a104-083e06ff5553/scenes/4b1685cc-7a8d-4194-b5d2-ee63ce72e1d3)",
+      "Bash(curl -s -w '\\\\nHTTP:%{http_code}' -X DELETE http://localhost:3001/api/projects/31462658-076a-4032-a104-083e06ff5553/scenes/__TRACKED_VAR__)",
+      "Bash(curl -s -w \"\\\\nHTTP:%{http_code}\" -X DELETE \"http://localhost:3001/api/projects/31462658-076a-4032-a104-083e06ff5553/scenes/4b1685cc-7a8d-4194-b5d2-ee63ce72e1d3\")"
     ],
     "additionalDirectories": [
       "/Users/nicorobinson/Desktop/Command Center Higgs/src/app/api/projects/[id]/asset-versions",

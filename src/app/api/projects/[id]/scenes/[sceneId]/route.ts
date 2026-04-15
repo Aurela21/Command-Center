@@ -5,8 +5,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { scenes, assetVersions } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { scenes, assetVersions, jobs } from "@/db/schema";
+import { eq, and, inArray } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 
 type Params = { params: Promise<{ id: string; sceneId: string }> };
@@ -91,6 +91,20 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   if (!existing) {
     return NextResponse.json({ error: "Scene not found" }, { status: 404 });
   }
+
+  // Clear job references to asset_versions for this scene (prevents FK violation on cascade delete)
+  const sceneAssetIds = await db
+    .select({ id: assetVersions.id })
+    .from(assetVersions)
+    .where(eq(assetVersions.sceneId, sceneId));
+  if (sceneAssetIds.length > 0) {
+    await db
+      .update(jobs)
+      .set({ resultAssetVersionId: null })
+      .where(inArray(jobs.resultAssetVersionId, sceneAssetIds.map((a) => a.id)));
+  }
+  // Also delete jobs tied to this scene
+  await db.delete(jobs).where(eq(jobs.sceneId, sceneId));
 
   await db.delete(scenes).where(eq(scenes.id, sceneId));
 
