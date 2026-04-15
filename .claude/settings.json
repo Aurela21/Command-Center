@@ -35,7 +35,8 @@
       "/Users/nicorobinson/Desktop/Command Center Higgs/src/app/api/projects/[id]/asset-versions",
       "/Users/nicorobinson/.claude/plans",
       "/Users/nicorobinson/Desktop/Command Center Higgs/src/app/api/projects/[id]",
-      "/Users/nicorobinson/Desktop/Command Center Higgs/src/app/(app)/projects/[id]"
+      "/Users/nicorobinson/Desktop/Command Center Higgs/src/app/(app)/projects/[id]",
+      "/Users/nicorobinson/Desktop/Command Center Higgs/src/app/api/projects/[id]/chat"
     ]
   }
 }

@@ -5,3 +5,4 @@ export * from "./jobs";
 export * from "./quality-checks";
 export * from "./knowledge";
 export * from "./products";
+export * from "./chat";
