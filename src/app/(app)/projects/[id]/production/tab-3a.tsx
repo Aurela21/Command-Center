@@ -3,8 +3,11 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Check, ChevronDown, ChevronRight, Copy, Download, Loader2, Package, Pencil, Plus, Sparkles, Trash2, User, Wand2, X } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Copy, Download, GripVertical, Loader2, Package, Pencil, Plus, Sparkles, Trash2, Upload, User, Wand2, X } from "lucide-react";
 import type { SceneProductionState, SeedVersion, HeroImage } from "./types";
+import { DndContext, closestCenter, type DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 // ─── Scene list item (left panel) ────────────────────────────────────────────
 
@@ -88,6 +91,47 @@ function SceneListItem({
         </p>
       </div>
     </button>
+  );
+}
+
+// ─── Sortable scene list item (wraps SceneListItem with drag handle) ─────────
+
+function SortableSceneItem({
+  scene,
+  isSelected,
+  onSelect,
+  canRemove,
+  onRemove,
+}: {
+  scene: SceneProductionState;
+  isSelected: boolean;
+  onSelect: () => void;
+  canRemove: boolean;
+  onRemove: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: scene.sceneId });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1, zIndex: isDragging ? 10 : undefined };
+
+  return (
+    <div ref={setNodeRef} style={style} className="relative group/scene">
+      <div className="flex items-center">
+        <div {...attributes} {...listeners} className="shrink-0 px-1 cursor-grab active:cursor-grabbing text-neutral-300 hover:text-neutral-500">
+          <GripVertical className="h-3.5 w-3.5" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <SceneListItem scene={scene} isSelected={isSelected} onSelect={onSelect} />
+        </div>
+      </div>
+      {canRemove && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onRemove(); }}
+          className="absolute top-2 right-2 p-1 rounded bg-white/80 text-neutral-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover/scene:opacity-100 transition-all"
+          title="Remove scene"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -664,6 +708,77 @@ function ReferenceFramePicker({
   );
 }
 
+// ─── Seed upload button ──────────────────────────────────────────────────────
+
+function SeedUploadButton({
+  projectId,
+  sceneId,
+  color,
+  addSeedVersion,
+}: {
+  projectId: string;
+  sceneId: string;
+  color: string;
+  addSeedVersion: (sceneId: string, version: SeedVersion) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  async function handleFile(file: File) {
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("sceneId", sceneId);
+      const res = await fetch(`/api/projects/${projectId}/upload-seed`, {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      const data = (await res.json()) as { assetVersionId: string; imageUrl: string };
+      addSeedVersion(sceneId, {
+        id: data.assetVersionId,
+        createdAt: new Date().toISOString(),
+        qualityScore: 0,
+        color,
+        imageUrl: data.imageUrl,
+        prompt: "Uploaded image",
+      });
+    } catch (err) {
+      console.error("[upload-seed]", err);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleFile(file);
+          e.target.value = "";
+        }}
+      />
+      <button
+        onClick={() => inputRef.current?.click()}
+        disabled={uploading}
+        className="flex items-center gap-2 text-sm text-neutral-500 hover:text-neutral-700 disabled:opacity-40 transition-colors"
+      >
+        {uploading ? (
+          <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Uploading…</>
+        ) : (
+          <><Upload className="h-3.5 w-3.5" /> Upload seed image</>
+        )}
+      </button>
+    </>
+  );
+}
+
 // ─── Seed detail panel (right panel) ─────────────────────────────────────────
 
 function allFrameUrls(r2Base: string, projectId: string, count: number): string[] {
@@ -1138,6 +1253,13 @@ function SeedDetailPanel({
               )}
             </Button>
           )}
+          {/* Upload seed image button */}
+          <SeedUploadButton
+            projectId={projectId}
+            sceneId={scene.sceneId}
+            color={scene.color}
+            addSeedVersion={addSeedVersion}
+          />
         </div>
       </div>
 
@@ -1373,6 +1495,8 @@ type Props = {
   onApprovedHeroChange: (url: string | null) => void;
   onHeroGeneratingChange: (generating: boolean) => void;
   productTags: ProductTag[];
+  initialSelectedSceneId: string | null;
+  onReorderScenes: (sceneIds: string[]) => void;
 };
 
 // ─── Hero Model Setup Panel ──────────────────────────────────────────────────
@@ -1796,11 +1920,19 @@ export function Tab3A({
   scenes, updateScene, addSeedVersion, addScene, removeScene,
   projectId, extractedFrameCount, r2PublicUrl, projectType,
   heroImages, approvedHeroUrl, onHeroImagesChange, onApprovedHeroChange, onHeroGeneratingChange,
-  productTags,
+  productTags, initialSelectedSceneId, onReorderScenes,
 }: Props) {
   const [selectedId, setSelectedId] = useState<string>(
     scenes[0]?.sceneId ?? ""
   );
+
+  // Sync selection when navigating from another tab (e.g. Review Pairs "Edit seed")
+  useEffect(() => {
+    if (initialSelectedSceneId && scenes.some((s) => s.sceneId === initialSelectedSceneId)) {
+      setSelectedId(initialSelectedSceneId);
+    }
+  }, [initialSelectedSceneId, scenes]);
+
   const selected = scenes.find((s) => s.sceneId === selectedId) ?? scenes[0];
   const approvedCount = scenes.filter((s) => s.seedImageApproved).length;
 
@@ -1836,18 +1968,31 @@ export function Tab3A({
               <Plus className="h-3.5 w-3.5" />
             </button>
           </div>
-          <div className="flex-1 overflow-y-auto">
-            {scenes.map((scene) => (
-              <div key={scene.sceneId} className="relative group/scene">
-                <SceneListItem
-                  scene={scene}
-                  isSelected={scene.sceneId === selectedId}
-                  onSelect={() => setSelectedId(scene.sceneId)}
-                />
-                {scenes.length > 1 && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
+          <DndContext
+            collisionDetection={closestCenter}
+            onDragEnd={(event: DragEndEvent) => {
+              const { active, over } = event;
+              if (!over || active.id === over.id) return;
+              const oldIdx = scenes.findIndex((s) => s.sceneId === active.id);
+              const newIdx = scenes.findIndex((s) => s.sceneId === over.id);
+              if (oldIdx === -1 || newIdx === -1) return;
+              const reordered = [...scenes];
+              const [moved] = reordered.splice(oldIdx, 1);
+              reordered.splice(newIdx, 0, moved);
+              const newIds = reordered.map((s) => s.sceneId);
+              onReorderScenes(newIds);
+            }}
+          >
+            <SortableContext items={scenes.map((s) => s.sceneId)} strategy={verticalListSortingStrategy}>
+              <div className="flex-1 overflow-y-auto">
+                {scenes.map((scene) => (
+                  <SortableSceneItem
+                    key={scene.sceneId}
+                    scene={scene}
+                    isSelected={scene.sceneId === selectedId}
+                    onSelect={() => setSelectedId(scene.sceneId)}
+                    canRemove={scenes.length > 1}
+                    onRemove={() => {
                       if (scene.sceneId === selectedId && scenes.length > 1) {
                         const idx = scenes.findIndex((s) => s.sceneId === scene.sceneId);
                         const next = scenes[idx === 0 ? 1 : idx - 1];
@@ -1855,15 +2000,11 @@ export function Tab3A({
                       }
                       void removeScene(scene.sceneId);
                     }}
-                    className="absolute top-2 right-2 p-1 rounded bg-white/80 text-neutral-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover/scene:opacity-100 transition-all"
-                    title="Remove scene"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                )}
+                  />
+                ))}
               </div>
-            ))}
-          </div>
+            </SortableContext>
+          </DndContext>
         </div>
 
         {/* Detail panel (right, scrollable) */}

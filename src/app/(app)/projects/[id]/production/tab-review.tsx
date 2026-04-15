@@ -349,7 +349,7 @@ function ScenePairRow({
   allScenes: SceneProductionState[];
   projectId: string;
   updateScene: (sceneId: string, patch: Partial<SceneProductionState>) => void;
-  onEditSeed: () => void;
+  onEditSeed: (sceneId: string) => void;
   productTags: ProductTag[];
 }) {
   return (
@@ -406,7 +406,7 @@ function ScenePairRow({
           );
         })()}
         <button
-          onClick={onEditSeed}
+          onClick={() => onEditSeed(scene.sceneId)}
           className="mt-1.5 flex items-center gap-1 text-[11px] text-neutral-400 hover:text-neutral-700 transition-colors"
         >
           <ExternalLink className="h-2.5 w-2.5" />
@@ -434,7 +434,7 @@ type Props = {
   scenes: SceneProductionState[];
   updateScene: (sceneId: string, patch: Partial<SceneProductionState>) => void;
   projectId: string;
-  onGoTo3A: () => void;
+  onGoTo3A: (sceneId?: string) => void;
   onGoTo3B: () => void;
   productTags: ProductTag[];
 };
@@ -698,7 +698,7 @@ export function TabReview({ scenes, updateScene, projectId, onGoTo3A, onGoTo3B, 
               allScenes={scenes}
               projectId={projectId}
               updateScene={updateScene}
-              onEditSeed={onGoTo3A}
+              onEditSeed={(sceneId: string) => onGoTo3A(sceneId)}
               productTags={productTags}
             />
           ))}

@@ -220,6 +220,7 @@ export default function ProductionPage() {
   const [heroGenerating, setHeroGenerating] = useState(false);
   const [productTags, setProductTags] = useState<ProductTag[]>([]);
   const [chatOpen, setChatOpen] = useState(false);
+  const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
 
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
@@ -584,6 +585,21 @@ export default function ProductionPage() {
             onApprovedHeroChange={setApprovedHeroUrl}
             onHeroGeneratingChange={setHeroGenerating}
             productTags={productTags}
+            initialSelectedSceneId={selectedSceneId}
+            onReorderScenes={(sceneIds: string[]) => {
+              // Reorder local state
+              const reordered = sceneIds
+                .map((id) => scenes.find((s) => s.sceneId === id)!)
+                .filter(Boolean)
+                .map((s, i) => ({ ...s, sceneOrder: i + 1 }));
+              setScenes(reordered);
+              // Persist to DB
+              fetch(`/api/projects/${projectId}/reorder-scenes`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ sceneIds }),
+              }).catch(console.error);
+            }}
           />
         </div>
         <div className={activeTab === "review" ? "h-full" : "hidden"}>
@@ -591,7 +607,7 @@ export default function ProductionPage() {
             scenes={scenes}
             updateScene={updateScene}
             projectId={projectId}
-            onGoTo3A={() => setActiveTab("3a")}
+            onGoTo3A={(sceneId?: string) => { if (sceneId) setSelectedSceneId(sceneId); setActiveTab("3a"); }}
             onGoTo3B={() => setActiveTab("3b")}
             productTags={productTags}
           />
