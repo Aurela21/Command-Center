@@ -17,7 +17,8 @@ import { Tab3B } from "./tab-3b";
 import { TabReview } from "./tab-review";
 import { Tab3C } from "./tab-3c";
 import { QueueTracker } from "./queue-tracker";
-import { Loader2 } from "lucide-react";
+import { ChatPanel } from "./chat-panel";
+import { Brain, Loader2 } from "lucide-react";
 
 // ─── DB row types (mirrors what production-state returns) ────────────────────
 
@@ -218,6 +219,7 @@ export default function ProductionPage() {
   const [approvedHeroUrl, setApprovedHeroUrl] = useState<string | null>(null);
   const [heroGenerating, setHeroGenerating] = useState(false);
   const [productTags, setProductTags] = useState<ProductTag[]>([]);
+  const [chatOpen, setChatOpen] = useState(false);
 
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
@@ -520,6 +522,18 @@ export default function ProductionPage() {
               {videosComplete}/{scenes.length} videos
             </p>
           </div>
+          <button
+            onClick={() => setChatOpen(!chatOpen)}
+            className={cn(
+              "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
+              chatOpen
+                ? "bg-violet-100 text-violet-700"
+                : "bg-neutral-100 text-neutral-600 hover:bg-violet-50 hover:text-violet-600"
+            )}
+          >
+            <Brain className="h-4 w-4" />
+            AI Chat
+          </button>
         </div>
 
         {/* Tab bar */}
@@ -593,6 +607,14 @@ export default function ProductionPage() {
 
       {/* Global queue tracker */}
       <QueueTracker scenes={scenes} heroGenerating={heroGenerating} />
+
+      {/* AI Chat panel */}
+      <ChatPanel
+        open={chatOpen}
+        onClose={() => setChatOpen(false)}
+        projectId={projectId}
+        scenes={scenes}
+      />
     </div>
   );
 }
