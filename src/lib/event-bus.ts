@@ -67,6 +67,8 @@ export type SSEEvent =
       type: "static-ad:completed";
       jobId: string;
       outputImageUrl: string;
+      generationId: string;
+      versionNumber: number;
     }
   | {
       type: "static-ad:failed";

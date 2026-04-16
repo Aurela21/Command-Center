@@ -12,6 +12,9 @@ import {
   AlertTriangle,
   RefreshCw,
   Scan,
+  Plus,
+  X,
+  ImagePlus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { StaticAdUpload } from "@/components/static-ad-upload";
@@ -57,7 +60,6 @@ export default function StaticAdJobPage() {
     enabled: !!jobId,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
-      // Poll every 3s while analyzing or generating
       if (status === "analyzing" || status === "generating") return 3000;
       return false;
     },
@@ -79,17 +81,10 @@ export default function StaticAdJobPage() {
     imageCount: p.imageCount ?? 0,
   }));
 
-  // Track all generation output URLs (newest first)
-  const [allOutputUrls, setAllOutputUrls] = useState<string[]>([]);
-
-  // Sync from job data — add the current outputImageUrl if not already tracked
-  useEffect(() => {
-    if (job?.outputImageUrl) {
-      setAllOutputUrls((prev) =>
-        prev.includes(job.outputImageUrl!) ? prev : [job.outputImageUrl!, ...prev]
-      );
-    }
-  }, [job?.outputImageUrl]);
+  // "New round" — user wants to upload a different reference image
+  const [newRoundActive, setNewRoundActive] = useState(false);
+  // Track whether there are existing generations (to know if this is first run or new round)
+  const hasGenerations = !!job?.outputImageUrl;
 
   // SSE listener for real-time progress
   const [progress, setProgress] = useState(0);
@@ -106,13 +101,12 @@ export default function StaticAdJobPage() {
         if (data.type === "static-ad:progress") {
           setProgress(data.progress);
         } else if (data.type === "static-ad:completed") {
-          if (data.outputImageUrl) {
-            setAllOutputUrls((prev) =>
-              prev.includes(data.outputImageUrl) ? prev : [data.outputImageUrl, ...prev]
-            );
-          }
           qc.invalidateQueries({ queryKey: ["static-ad-job", jobId] });
+          qc.invalidateQueries({
+            queryKey: ["static-ad-generations", jobId],
+          });
           setProgress(0);
+          setNewRoundActive(false);
         } else if (data.type === "static-ad:failed") {
           qc.invalidateQueries({ queryKey: ["static-ad-job", jobId] });
           setProgress(0);
@@ -162,6 +156,9 @@ export default function StaticAdJobPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["static-ad-job", jobId] });
+      qc.invalidateQueries({
+        queryKey: ["static-ad-generations", jobId],
+      });
     },
     onError: (err) => toast.error(err.message),
   });
@@ -175,18 +172,46 @@ export default function StaticAdJobPage() {
 
   const handleConfirmAndGenerate = useCallback(
     async (finalCopy: AdCopy) => {
-      // Save final copy first
       await fetch(`/api/static-ads/${jobId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ finalCopy, status: "confirmed" }),
       });
       qc.invalidateQueries({ queryKey: ["static-ad-job", jobId] });
-      // Then trigger generation
       generateMutation.mutate(undefined);
     },
     [jobId, qc, generateMutation]
   );
+
+  const handleStartNewRound = useCallback(async () => {
+    // Reset job to uploading state with cleared image + analysis
+    await fetch(`/api/static-ads/${jobId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        status: "uploading",
+        inputImageUrl: null,
+        psychAnalysis: null,
+        extractedCopy: null,
+        finalCopy: null,
+      }),
+    });
+    qc.invalidateQueries({ queryKey: ["static-ad-job", jobId] });
+    setNewRoundActive(true);
+  }, [jobId, qc]);
+
+  const handleCancelNewRound = useCallback(async () => {
+    // If there are existing generations, restore to completed
+    if (hasGenerations) {
+      await fetch(`/api/static-ads/${jobId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "completed" }),
+      });
+      qc.invalidateQueries({ queryKey: ["static-ad-job", jobId] });
+    }
+    setNewRoundActive(false);
+  }, [jobId, qc, hasGenerations]);
 
   const handleCancel = useCallback(() => {
     router.push("/static-ads");
@@ -219,6 +244,15 @@ export default function StaticAdJobPage() {
     job.status === "confirmed" ||
     generateMutation.isPending;
 
+  // Determine if we should show the upload/analyze/generate flow
+  const showFlow =
+    !hasGenerations || // first time
+    newRoundActive || // user clicked "New Reference Ad"
+    job.status === "uploading" ||
+    job.status === "analyzing" ||
+    job.status === "analyzed" ||
+    (job.status === "generating" && !hasGenerations);
+
   return (
     <div className="max-w-4xl mx-auto px-8 py-10">
       {/* Header */}
@@ -229,7 +263,7 @@ export default function StaticAdJobPage() {
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
-        <div>
+        <div className="flex-1">
           <h1 className="text-lg font-semibold text-neutral-900">
             {job.productName ?? "Static Ad"}
           </h1>
@@ -238,142 +272,178 @@ export default function StaticAdJobPage() {
             {progress > 0 && ` — ${progress}%`}
           </p>
         </div>
+        {/* "New Reference Ad" button — show when completed and not already in a new round */}
+        {job.status === "completed" && !newRoundActive && (
+          <Button
+            onClick={handleStartNewRound}
+            variant="outline"
+            className="gap-2"
+          >
+            <ImagePlus className="h-4 w-4" />
+            New Reference Ad
+          </Button>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Left: Reference image */}
-        <div className="space-y-4">
-          <h3 className="text-sm font-semibold text-neutral-900">
-            Reference Ad
-          </h3>
-          {job.inputImageUrl ? (
-            <div className="rounded-xl border border-neutral-200 overflow-hidden bg-neutral-100">
-              <img
-                src={job.inputImageUrl}
-                alt="Reference ad"
-                className="w-full h-auto object-contain"
-              />
-            </div>
-          ) : (
-            <StaticAdUpload
-              jobId={jobId}
-              onUploaded={handleUploadComplete}
-            />
+      {/* New round flow panel */}
+      {showFlow && (
+        <div
+          className={cn(
+            "mb-8",
+            hasGenerations &&
+              "rounded-xl border border-neutral-200 bg-neutral-50 p-6"
           )}
-
-          {/* Analyze button — show after upload, before analysis */}
-          {job.inputImageUrl &&
-            job.status === "uploading" &&
-            !isAnalyzing && (
-              <Button
-                onClick={() => analyzeMutation.mutate()}
-                className="w-full bg-neutral-900 hover:bg-neutral-700 text-white gap-2"
+        >
+          {hasGenerations && (
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-neutral-900">
+                New Reference Ad
+              </h3>
+              <button
+                onClick={handleCancelNewRound}
+                className="text-neutral-400 hover:text-neutral-600 transition-colors"
               >
-                <Scan className="h-4 w-4" />
-                Analyze Ad
-              </Button>
-            )}
-
-          {/* Analyzing spinner */}
-          {isAnalyzing && (
-            <div className="flex items-center gap-2 text-sm text-blue-600">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Analyzing ad psychology...
-              {progress > 0 && <span className="text-xs">({progress}%)</span>}
+                <X className="h-4 w-4" />
+              </button>
             </div>
           )}
-        </div>
 
-        {/* Right: Stage-dependent content */}
-        <div>
-          {/* Analyzed — show analysis panel */}
-          {job.status === "analyzed" && job.psychAnalysis && (
-            <PsychAnalysisPanel
-              analysis={job.psychAnalysis}
-              extractedCopy={
-                (job.extractedCopy as AdCopy) ??
-                job.psychAnalysis.extractedCopy ?? {
-                  headline: "",
-                  body: "",
-                  cta: "",
-                }
-              }
-              onConfirm={handleConfirmAndGenerate}
-              onCancel={handleCancel}
-              isGenerating={isGenerating}
-            />
-          )}
-
-          {/* Generating — progress */}
-          {isGenerating && (
-            <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
-              <Loader2 className="h-10 w-10 text-neutral-400 animate-spin" />
-              <p className="text-sm font-medium text-neutral-600">
-                Generating your ad...
-              </p>
-              {progress > 0 && (
-                <div className="w-48 bg-neutral-200 rounded-full h-1.5">
-                  <div
-                    className="bg-neutral-900 h-1.5 rounded-full transition-all"
-                    style={{ width: `${progress}%` }}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Left: Reference image / upload */}
+            <div className="space-y-4">
+              {!hasGenerations && (
+                <h3 className="text-sm font-semibold text-neutral-900">
+                  Reference Ad
+                </h3>
+              )}
+              {job.inputImageUrl ? (
+                <div className="rounded-xl border border-neutral-200 overflow-hidden bg-neutral-100">
+                  <img
+                    src={job.inputImageUrl}
+                    alt="Reference ad"
+                    className="w-full h-auto object-contain"
                   />
                 </div>
+              ) : (
+                <StaticAdUpload
+                  jobId={jobId}
+                  onUploaded={handleUploadComplete}
+                />
               )}
-              <p className="text-xs text-neutral-400">
-                This may take up to a minute
-              </p>
+
+              {job.inputImageUrl &&
+                job.status === "uploading" &&
+                !isAnalyzing && (
+                  <Button
+                    onClick={() => analyzeMutation.mutate()}
+                    className="w-full bg-neutral-900 hover:bg-neutral-700 text-white gap-2"
+                  >
+                    <Scan className="h-4 w-4" />
+                    Analyze Ad
+                  </Button>
+                )}
+
+              {isAnalyzing && (
+                <div className="flex items-center gap-2 text-sm text-blue-600">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Analyzing ad psychology...
+                  {progress > 0 && (
+                    <span className="text-xs">({progress}%)</span>
+                  )}
+                </div>
+              )}
             </div>
-          )}
 
-          {/* Completed — show preview */}
-          {job.status === "completed" &&
-            job.outputImageUrl &&
-            job.inputImageUrl && (
-              <StaticAdPreview
-                inputImageUrl={job.inputImageUrl}
-                outputImageUrl={job.outputImageUrl}
-                allOutputUrls={allOutputUrls}
-                onRegenerate={(editPrompt) => generateMutation.mutate(editPrompt)}
-                isRegenerating={generateMutation.isPending}
-                products={productTags}
-              />
-            )}
-
-          {/* Failed — error + retry */}
-          {job.status === "failed" && (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-6 space-y-3">
-              <div className="flex items-center gap-2 text-red-600">
-                <AlertTriangle className="h-5 w-5" />
-                <span className="text-sm font-medium">Generation Failed</span>
-              </div>
-              <p className="text-sm text-red-500">{job.lastError}</p>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  if (job.psychAnalysis) {
-                    generateMutation.mutate(undefined);
-                  } else {
-                    analyzeMutation.mutate();
+            {/* Right: Stage-dependent content */}
+            <div>
+              {job.status === "analyzed" && job.psychAnalysis && (
+                <PsychAnalysisPanel
+                  analysis={job.psychAnalysis}
+                  extractedCopy={
+                    (job.extractedCopy as AdCopy) ??
+                    job.psychAnalysis.extractedCopy ?? {
+                      headline: "",
+                      body: "",
+                      cta: "",
+                    }
                   }
-                }}
-                className="gap-2"
-              >
-                <RefreshCw className="h-4 w-4" />
-                Retry
-              </Button>
-            </div>
-          )}
+                  onConfirm={handleConfirmAndGenerate}
+                  onCancel={
+                    hasGenerations ? handleCancelNewRound : handleCancel
+                  }
+                  isGenerating={isGenerating}
+                />
+              )}
 
-          {/* Uploading — waiting for image */}
-          {job.status === "uploading" && !job.inputImageUrl && (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <p className="text-sm text-neutral-400">
-                Upload a reference ad image to get started.
-              </p>
+              {isGenerating && (
+                <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
+                  <Loader2 className="h-10 w-10 text-neutral-400 animate-spin" />
+                  <p className="text-sm font-medium text-neutral-600">
+                    Generating your ad...
+                  </p>
+                  {progress > 0 && (
+                    <div className="w-48 bg-neutral-200 rounded-full h-1.5">
+                      <div
+                        className="bg-neutral-900 h-1.5 rounded-full transition-all"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                  )}
+                  <p className="text-xs text-neutral-400">
+                    This may take up to a minute
+                  </p>
+                </div>
+              )}
+
+              {job.status === "failed" && (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-6 space-y-3">
+                  <div className="flex items-center gap-2 text-red-600">
+                    <AlertTriangle className="h-5 w-5" />
+                    <span className="text-sm font-medium">
+                      Generation Failed
+                    </span>
+                  </div>
+                  <p className="text-sm text-red-500">{job.lastError}</p>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      if (job.psychAnalysis) {
+                        generateMutation.mutate(undefined);
+                      } else {
+                        analyzeMutation.mutate();
+                      }
+                    }}
+                    className="gap-2"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    Retry
+                  </Button>
+                </div>
+              )}
+
+              {job.status === "uploading" && !job.inputImageUrl && !hasGenerations && (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <p className="text-sm text-neutral-400">
+                    Upload a reference ad image to get started.
+                  </p>
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Generations preview — always visible when there are generations */}
+      {hasGenerations && (
+        <StaticAdPreview
+          jobId={jobId}
+          inputImageUrl={job.inputImageUrl ?? ""}
+          productSlug={job.productSlug ?? "static-ad"}
+          onRegenerate={(editPrompt) => generateMutation.mutate(editPrompt)}
+          isRegenerating={generateMutation.isPending}
+          products={productTags}
+        />
+      )}
     </div>
   );
 }

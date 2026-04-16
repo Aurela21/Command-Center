@@ -229,42 +229,50 @@ export async function generateStaticAd(
 
   const parts: Array<Record<string, unknown>> = [];
 
-  // ── PRODUCT IMAGES GO FIRST — model anchors on early images ──
-  // Putting product first ensures the model treats it as the primary subject
-  if (req.productImages.length > 0) {
+  // ── PRIMARY IMAGE — the first product photo is the BASE (same pattern as generateSeedImage) ──
+  // Gemini preserves the primary image much better than reference images.
+  // By making the product photo the base, the model edits around it instead of redrawing it.
+  const [primary, ...additional] = req.productImages;
+
+  if (primary) {
     parts.push({
-      text: "THE PRODUCT — This is the product you are creating an ad for. These photos show the REAL physical product. Study every detail — shape, color, material, features, construction. The final ad MUST feature THIS EXACT product:",
+      text: "IMAGE 1 — This is the BASE PRODUCT. Keep this product's appearance EXACTLY as shown — same shape, color, material, every detail. Do NOT redraw or modify this product in any way:",
     });
-    for (const img of req.productImages) {
-      try {
-        parts.push({ text: `PRODUCT PHOTO — ${img.label}:` });
-        const prodImg = await downloadImageBase64(img.url);
-        parts.push({
-          inlineData: { mimeType: prodImg.mimeType, data: prodImg.base64 },
-        });
-      } catch (err) {
-        console.warn(
-          `[nano-banana] Failed to download product image: ${img.url}`,
-          err
-        );
-      }
+    try {
+      const primaryImg = await downloadImageBase64(primary.url);
+      parts.push({ inlineData: { mimeType: primaryImg.mimeType, data: primaryImg.base64 } });
+    } catch (err) {
+      console.warn(`[nano-banana] Failed to download primary product image: ${primary.url}`, err);
     }
   }
 
-  // ── GENERATION INSTRUCTIONS with strong product fidelity ──
-  // NOTE: No reference ad image is sent — layout is guided entirely by text
-  // from Claude's psychological analysis. This prevents product feature contamination.
-  let instruction = req.prompt;
-
-  if (req.productImages.length > 0) {
-    instruction += `\n\nCRITICAL: Create a NEW ad featuring the product from the PRODUCT PHOTOS above. The layout reference is ONLY for compositional inspiration — completely ignore its product.`;
-    instruction += `\n\nPRODUCT FIDELITY — CLOSED WORLD RULE: The product photos above are the ONLY source of truth. The product has ONLY the features visible in those photos.\n- Reproduce the product EXACTLY as photographed — same color, material, shape, silhouette\n- If a feature is visible in the photos, include it\n- If a feature is NOT visible in the photos, it DOES NOT EXIST — do NOT add it\n- Do NOT hallucinate features from the layout reference ad's product — that is a completely different product\n- Do NOT add text, logos, patterns, graphics, labels, or markings that are not in the product photos\n- Do NOT add pockets, zippers, straps, hoods, or construction details that are not in the product photos\n- When in doubt, leave it out — showing fewer details is better than inventing wrong ones`;
+  // Additional product angles as references
+  for (const img of additional) {
+    try {
+      parts.push({ text: `ADDITIONAL PRODUCT ANGLE — ${img.label}:` });
+      const refImg = await downloadImageBase64(img.url);
+      parts.push({ inlineData: { mimeType: refImg.mimeType, data: refImg.base64 } });
+    } catch (err) {
+      console.warn(`[nano-banana] Failed to download product image: ${img.url}`, err);
+    }
   }
 
-  parts.push({ text: instruction });
+  // ── PROMPT — framed as "edit this product photo into an ad" ──
+  parts.push({
+    text: `Edit the product photo above into a square 1:1 static ad image. Keep the product EXACTLY as it appears — do not redraw it, do not add any features, do not change any details. Build the ad layout AROUND the product.
+
+${req.prompt}`,
+  });
 
   const body = {
     contents: [{ parts }],
+    system_instruction: {
+      parts: [
+        {
+          text: "You are editing a product photo into an ad. The product in IMAGE 1 is sacred — preserve it exactly. Do not redraw, reinterpret, add to, or modify the product. Build the ad background, text, and layout around the existing product. If a detail is not in the original photo, do not add it. Output square 1:1.",
+        },
+      ],
+    },
     generationConfig: {
       responseModalities: ["IMAGE", "TEXT"],
     },

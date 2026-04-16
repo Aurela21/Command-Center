@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { staticAdJobs, productProfiles } from "@/db/schema";
-import { desc, eq } from "drizzle-orm";
+import { staticAdJobs, staticAdGenerations, productProfiles } from "@/db/schema";
+import { desc, eq, sql, count } from "drizzle-orm";
 
 export async function GET() {
   const rows = await db
@@ -15,6 +15,10 @@ export async function GET() {
       updatedAt: staticAdJobs.updatedAt,
       productName: productProfiles.name,
       productSlug: productProfiles.slug,
+      generationCount: sql<number>`(
+        SELECT COUNT(*)::int FROM static_ad_generations
+        WHERE static_ad_generations.job_id = ${staticAdJobs.id}
+      )`.as("generation_count"),
     })
     .from(staticAdJobs)
     .leftJoin(productProfiles, eq(staticAdJobs.productId, productProfiles.id))

@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import {
   staticAdJobs,
+  staticAdGenerations,
   productProfiles,
   productImages,
 } from "@/db/schema";
-import { eq, sql, asc } from "drizzle-orm";
+import { eq, sql, asc, desc, max } from "drizzle-orm";
 import { generateStaticAd } from "@/lib/nano-banana";
 import { uploadBuffer } from "@/lib/r2";
 import { emit } from "@/lib/event-bus";
@@ -126,13 +127,39 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     emit({ type: "static-ad:progress", jobId: id, progress: 80, stage: "generating" });
 
-    // Upload to R2
-    const buffer = Buffer.from(result.imageBase64, "base64");
-    const ext = result.mimeType.includes("png") ? "png" : "jpg";
+    // Resize to 500x500 (1:1) and upload to R2
+    const rawBuffer = Buffer.from(result.imageBase64, "base64");
+    const sharp = (await import("sharp")).default;
+    const buffer = await sharp(rawBuffer)
+      .resize(500, 500, { fit: "cover", position: "centre" })
+      .jpeg({ quality: 90 })
+      .toBuffer();
+    const ext = "jpg";
     const key = `static-ads/${id}/output-${Date.now()}.${ext}`;
-    const outputImageUrl = await uploadBuffer(key, buffer, result.mimeType);
+    const outputImageUrl = await uploadBuffer(key, buffer, "image/jpeg");
 
-    // Update job
+    // Determine next version number
+    const [maxRow] = await db
+      .select({ maxVer: max(staticAdGenerations.versionNumber) })
+      .from(staticAdGenerations)
+      .where(eq(staticAdGenerations.jobId, id));
+    const versionNumber = (maxRow?.maxVer ?? 0) + 1;
+
+    // Insert generation row
+    const [generation] = await db
+      .insert(staticAdGenerations)
+      .values({
+        jobId: id,
+        versionNumber,
+        imageUrl: outputImageUrl,
+        referenceImageUrl: job.inputImageUrl,
+        fileSizeBytes: buffer.length,
+        generationPrompt: prompt,
+        editPrompt: editPrompt ?? null,
+      })
+      .returning();
+
+    // Update job (outputImageUrl used for list page thumbnails)
     const [updated] = await db
       .update(staticAdJobs)
       .set({
@@ -145,7 +172,13 @@ export async function POST(req: NextRequest, { params }: Params) {
       .where(eq(staticAdJobs.id, id))
       .returning();
 
-    emit({ type: "static-ad:completed", jobId: id, outputImageUrl });
+    emit({
+      type: "static-ad:completed",
+      jobId: id,
+      outputImageUrl,
+      generationId: generation.id,
+      versionNumber,
+    });
 
     return NextResponse.json(updated);
   } catch (err) {
@@ -171,39 +204,14 @@ function buildGenerationPrompt(
   analysis: StaticAdAnalysis | null,
   editPrompt?: string | null
 ): string {
-  let prompt = `Create a static ad for the product "${productName}".
+  let prompt = `Product: "${productName}"${productDescription ? ` — ${productDescription}` : ""}
 
-AD COPY TO USE:
-- Headline: ${copy.headline}
-- Body: ${copy.body}
-- CTA: ${copy.cta}`;
+Place the product from the photos into a clean, professional static ad.
 
-  // Product ground truth — this tells the model exactly what the product is
-  if (productDescription || productImageLabels.length > 0) {
-    prompt += `
-
-PRODUCT GROUND TRUTH — This is the ONLY source of truth about the product:`;
-    if (productDescription) {
-      prompt += `
-Description: ${productDescription}`;
-    }
-    if (productImageLabels.length > 0) {
-      prompt += `
-Product photos provided: ${productImageLabels.join(", ")}`;
-    }
-    prompt += `
-The product has ONLY the features visible in the product photos and described above. If a feature is NOT visible in the photos and NOT mentioned in the description, it DOES NOT EXIST on this product. Do NOT add any feature, text, logo, pattern, graphic, or detail that is not clearly visible in the product photos.`;
-  }
-
-  prompt += `
-
-LAYOUT INSTRUCTIONS:
-- Use the layout reference ad ONLY for compositional inspiration (text placement, visual hierarchy, spacing)
-- The product in the layout reference is a DIFFERENT product — ignore its features entirely
-- Show the product from the PRODUCT PHOTOS — match it exactly as photographed
-- Include all the ad copy text exactly as specified above
-- Maintain professional ad quality — crisp text, clean composition
-- Output a single static ad image`;
+Text to include in the ad:
+Headline: ${copy.headline}
+Body: ${copy.body}
+CTA: ${copy.cta}`;
 
   if (analysis) {
     prompt += `

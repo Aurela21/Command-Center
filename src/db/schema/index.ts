@@ -7,3 +7,4 @@ export * from "./knowledge";
 export * from "./products";
 export * from "./chat";
 export * from "./static-ad-jobs";
+export * from "./static-ad-generations";

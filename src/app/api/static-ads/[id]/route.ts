@@ -46,6 +46,11 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (body.inputImageUrl !== undefined)
     updates.inputImageUrl = body.inputImageUrl;
   if (body.finalCopy !== undefined) updates.finalCopy = body.finalCopy;
+  if (body.extractedCopy !== undefined)
+    updates.extractedCopy = body.extractedCopy;
+  if (body.psychAnalysis !== undefined)
+    updates.psychAnalysis = body.psychAnalysis;
+  if (body.productId !== undefined) updates.productId = body.productId;
   if (body.status !== undefined) updates.status = body.status;
   if (body.lastError !== undefined) updates.lastError = body.lastError;
 

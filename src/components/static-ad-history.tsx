@@ -11,6 +11,7 @@ type StaticAdJobSummary = {
   outputImageUrl: string | null;
   productName: string | null;
   createdAt: string;
+  generationCount?: number;
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -92,7 +93,13 @@ export function StaticAdHistory({
               {job.productName ?? "No product"}
             </p>
             <p className="text-xs text-neutral-400 mt-0.5">
-              {STATUS_LABELS[job.status] ?? job.status} ·{" "}
+              {STATUS_LABELS[job.status] ?? job.status}
+              {(job.generationCount ?? 0) > 0 && (
+                <span className="ml-1.5 text-neutral-500">
+                  · {job.generationCount} version{job.generationCount !== 1 ? "s" : ""}
+                </span>
+              )}
+              {" · "}
               {new Date(job.createdAt).toLocaleDateString()}
             </p>
           </div>
