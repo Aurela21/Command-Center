@@ -24,8 +24,8 @@ function SceneListItem({
     <button
       onClick={onSelect}
       className={cn(
-        "w-full text-left flex items-start gap-3 px-4 py-3 border-b border-neutral-100 transition-colors",
-        isSelected ? "bg-neutral-900" : "hover:bg-neutral-50"
+        "w-full text-left flex items-start gap-3 px-4 py-3 border-b border-[#1a1a1e] transition-colors",
+        isSelected ? "bg-[#6366f1]" : "hover:bg-[#27272a]"
       )}
     >
       <div
@@ -39,7 +39,7 @@ function SceneListItem({
           <span
             className={cn(
               "text-xs tabular-nums font-medium",
-              isSelected ? "text-white/60" : "text-neutral-400"
+              isSelected ? "text-white/60" : "text-[#71717a]"
             )}
           >
             {String(scene.sceneOrder).padStart(2, "0")}
@@ -47,7 +47,7 @@ function SceneListItem({
           <span
             className={cn(
               "text-xs tabular-nums",
-              isSelected ? "text-white/40" : "text-neutral-400"
+              isSelected ? "text-white/40" : "text-[#71717a]"
             )}
           >
             {scene.targetClipDurationS.toFixed(1)}s
@@ -64,7 +64,7 @@ function SceneListItem({
             <Loader2
               className={cn(
                 "h-3 w-3 animate-spin",
-                isSelected ? "text-white/60" : "text-neutral-400"
+                isSelected ? "text-white/60" : "text-[#71717a]"
               )}
             />
           )}
@@ -74,7 +74,7 @@ function SceneListItem({
                 "text-[10px] px-1.5 py-0.5 rounded-full font-medium",
                 isSelected
                   ? "bg-white/10 text-white/60"
-                  : "bg-neutral-100 text-neutral-500"
+                  : "bg-[#27272a] text-[#a1a1aa]"
               )}
             >
               {scene.seedVersions.length}v
@@ -84,7 +84,7 @@ function SceneListItem({
         <p
           className={cn(
             "text-xs leading-snug line-clamp-2",
-            isSelected ? "text-white/70" : "text-neutral-500"
+            isSelected ? "text-white/70" : "text-[#a1a1aa]"
           )}
         >
           {scene.description}
@@ -115,7 +115,7 @@ function SortableSceneItem({
   return (
     <div ref={setNodeRef} style={style} className="relative group/scene">
       <div className="flex items-center">
-        <div {...attributes} {...listeners} className="shrink-0 px-1 cursor-grab active:cursor-grabbing text-neutral-300 hover:text-neutral-500">
+        <div {...attributes} {...listeners} className="shrink-0 px-1 cursor-grab active:cursor-grabbing text-[#52525b] hover:text-[#a1a1aa]">
           <GripVertical className="h-3.5 w-3.5" />
         </div>
         <div className="flex-1 min-w-0">
@@ -125,7 +125,7 @@ function SortableSceneItem({
       {canRemove && (
         <button
           onClick={(e) => { e.stopPropagation(); onRemove(); }}
-          className="absolute top-2 right-2 p-1 rounded bg-white/80 text-neutral-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover/scene:opacity-100 transition-all"
+          className="absolute top-2 right-2 p-1 rounded bg-black/60 text-[#52525b] hover:text-red-500 hover:bg-red-500/10 opacity-0 group-hover/scene:opacity-100 transition-all"
           title="Remove scene"
         >
           <X className="h-3 w-3" />
@@ -241,12 +241,12 @@ export function PromptWithMentions({
         }}
         rows={rows}
         placeholder={placeholder}
-        className="w-full text-sm rounded-md border border-neutral-200 px-3 py-2.5 bg-white resize-none focus:outline-none focus:ring-2 focus:ring-neutral-200 focus:border-neutral-300 transition-all placeholder:text-neutral-400"
+        className="w-full text-sm rounded-md border border-[#27272a] px-3 py-2.5 bg-[#18181b] resize-none focus:outline-none focus:ring-2 focus:ring-[#27272a] focus:border-[#3f3f46] transition-all placeholder:text-[#71717a] text-[#fafafa]"
       />
 
       {/* Autocomplete dropdown */}
       {showMenu && filtered.length > 0 && (
-        <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-lg overflow-hidden max-h-48 overflow-y-auto">
+        <div className="absolute z-20 left-0 right-0 mt-1 bg-[#18181b] border border-[#27272a] rounded-lg shadow-lg overflow-hidden max-h-48 overflow-y-auto">
           {filtered.map((p, i) => (
             <button
               key={p.slug}
@@ -258,20 +258,20 @@ export function PromptWithMentions({
               className={cn(
                 "w-full text-left flex items-center gap-3 px-3 py-2.5 transition-colors",
                 i === menuIndex
-                  ? "bg-orange-50"
-                  : "hover:bg-neutral-50"
+                  ? "bg-orange-500/10"
+                  : "hover:bg-[#27272a]"
               )}
             >
-              <div className="shrink-0 w-7 h-7 rounded bg-orange-100 flex items-center justify-center">
+              <div className="shrink-0 w-7 h-7 rounded bg-orange-500/20 flex items-center justify-center">
                 <Package className="h-3.5 w-3.5 text-orange-500" />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-medium text-neutral-800 truncate">
+                <p className="text-sm font-medium text-[#fafafa] truncate">
                   {p.name}
                 </p>
                 <p className="text-[11px] text-orange-500 font-mono">
                   @{p.slug}
-                  <span className="text-neutral-300 ml-1.5">
+                  <span className="text-[#52525b] ml-1.5">
                     {p.imageCount} image{p.imageCount !== 1 ? "s" : ""}
                   </span>
                 </p>
@@ -371,7 +371,7 @@ function SeedCardFooter({
   const promptText = version.prompt;
 
   return (
-    <div className="bg-white">
+    <div className="bg-[#18181b]">
       {/* Score + Approve + Edit row */}
       <div className="px-2.5 py-2 flex items-center justify-between gap-1.5">
         <span
@@ -381,7 +381,7 @@ function SeedCardFooter({
               ? "text-emerald-600"
               : version.qualityScore >= 65
               ? "text-amber-600"
-              : "text-neutral-400"
+              : "text-[#71717a]"
           )}
         >
           {version.qualityScore > 0 ? version.qualityScore : `v${index + 1}`}
@@ -395,7 +395,7 @@ function SeedCardFooter({
                   setTimeout(() => editRef.current?.focus(), 50);
                 }
               }}
-              className="text-[11px] font-medium px-2 py-0.5 rounded transition-colors bg-neutral-100 text-neutral-500 hover:bg-amber-100 hover:text-amber-700"
+              className="text-[11px] font-medium px-2 py-0.5 rounded transition-colors bg-[#27272a] text-[#a1a1aa] hover:bg-amber-500/10 hover:text-amber-400"
               title="Edit this image"
             >
               <Pencil className="h-3 w-3" />
@@ -406,8 +406,8 @@ function SeedCardFooter({
             className={cn(
               "text-[11px] font-medium px-2 py-0.5 rounded transition-colors",
               isApproved
-                ? "bg-neutral-900 text-white"
-                : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
+                ? "bg-[#6366f1] text-white"
+                : "bg-[#27272a] text-[#a1a1aa] hover:bg-[#3f3f46]"
             )}
           >
             {isApproved ? "Approved" : "Approve"}
@@ -417,7 +417,7 @@ function SeedCardFooter({
 
       {/* Edit image field */}
       {showEditField && version.imageUrl && (
-        <div className="border-t border-neutral-100 px-2.5 py-2 space-y-1.5">
+        <div className="border-t border-[#1a1a1e] px-2.5 py-2 space-y-1.5">
           <p className="text-[10px] font-medium text-amber-600">
             Describe what to change
           </p>
@@ -451,7 +451,7 @@ function SeedCardFooter({
 
       {/* Apply to Scenes — only on approved seeds */}
       {isApproved && allScenes.length > 1 && (
-        <div className="border-t border-neutral-100">
+        <div className="border-t border-[#1a1a1e]">
           <button
             onClick={() => {
               setShowApplyPanel(!showApplyPanel);
@@ -460,10 +460,10 @@ function SeedCardFooter({
                 setApplyTargets(new Set());
               }
             }}
-            className="w-full flex items-center gap-1.5 px-2.5 py-1.5 text-left hover:bg-neutral-50 transition-colors"
+            className="w-full flex items-center gap-1.5 px-2.5 py-1.5 text-left hover:bg-[#27272a] transition-colors"
           >
-            <Copy className="h-3 w-3 text-neutral-400 shrink-0" />
-            <span className="text-[11px] text-neutral-500">Apply to other scenes</span>
+            <Copy className="h-3 w-3 text-[#71717a] shrink-0" />
+            <span className="text-[11px] text-[#a1a1aa]">Apply to other scenes</span>
           </button>
 
           {showApplyPanel && (
@@ -485,8 +485,8 @@ function SeedCardFooter({
                       className={cn(
                         "px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors",
                         applyTargets.has(s.sceneId)
-                          ? "bg-neutral-900 text-white"
-                          : "bg-neutral-100 text-neutral-500 hover:bg-neutral-200"
+                          ? "bg-[#6366f1] text-white"
+                          : "bg-[#27272a] text-[#a1a1aa] hover:bg-[#3f3f46]"
                       )}
                     >
                       Scene {String(s.sceneOrder).padStart(2, "0")}
@@ -503,7 +503,7 @@ function SeedCardFooter({
                       prev.size === otherIds.length ? new Set() : new Set(otherIds)
                     );
                   }}
-                  className="text-[10px] text-neutral-400 hover:text-neutral-600 transition-colors"
+                  className="text-[10px] text-[#71717a] hover:text-[#a1a1aa] transition-colors"
                 >
                   {applyTargets.size === allScenes.length - 1 ? "Deselect all" : "Select all"}
                 </button>
@@ -517,7 +517,7 @@ function SeedCardFooter({
                     setApplyTargets(new Set());
                   }}
                   disabled={applying || applyTargets.size === 0}
-                  className="text-[11px] font-medium text-white bg-neutral-900 hover:bg-neutral-700 px-2.5 py-1 rounded transition-colors disabled:opacity-40"
+                  className="text-[11px] font-medium text-white bg-[#6366f1] hover:bg-[#6366f1]/80 px-2.5 py-1 rounded transition-colors disabled:opacity-40"
                 >
                   {applying ? "Applying…" : `Apply to ${applyTargets.size} scene${applyTargets.size !== 1 ? "s" : ""}`}
                 </button>
@@ -529,18 +529,18 @@ function SeedCardFooter({
 
       {/* Expandable prompt section */}
       {promptText ? (
-        <div className="border-t border-neutral-100">
+        <div className="border-t border-[#1a1a1e]">
           <button
             onClick={() => { setExpanded(!expanded); setEditing(false); }}
-            className="w-full flex items-center gap-1.5 px-2.5 py-1.5 text-left hover:bg-neutral-50 transition-colors"
+            className="w-full flex items-center gap-1.5 px-2.5 py-1.5 text-left hover:bg-[#27272a] transition-colors"
           >
             <ChevronDown
               className={cn(
-                "h-3 w-3 text-neutral-400 transition-transform shrink-0",
+                "h-3 w-3 text-[#71717a] transition-transform shrink-0",
                 expanded && "rotate-180"
               )}
             />
-            <span className="text-[11px] text-neutral-500 truncate flex-1">
+            <span className="text-[11px] text-[#a1a1aa] truncate flex-1">
               {promptText}
             </span>
           </button>
@@ -554,7 +554,7 @@ function SeedCardFooter({
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
                     rows={4}
-                    className="w-full text-[11px] rounded border border-neutral-200 px-2 py-1.5 bg-white resize-none focus:outline-none focus:ring-2 focus:ring-neutral-200 transition-all leading-relaxed"
+                    className="w-full text-[11px] rounded border border-[#27272a] px-2 py-1.5 bg-[#18181b] resize-none focus:outline-none focus:ring-2 focus:ring-[#27272a] transition-all leading-relaxed text-[#fafafa]"
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                         e.preventDefault();
@@ -567,7 +567,7 @@ function SeedCardFooter({
                     }}
                   />
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-neutral-400">
+                    <span className="text-[10px] text-[#71717a]">
                       {"\u2318"}+Enter to save &middot; Esc to cancel
                     </span>
                     <div className="flex gap-1.5">
@@ -576,14 +576,14 @@ function SeedCardFooter({
                           setDraft(version.prompt ?? "");
                           setEditing(false);
                         }}
-                        className="text-[11px] text-neutral-400 hover:text-neutral-600 px-1.5 py-0.5 transition-colors"
+                        className="text-[11px] text-[#71717a] hover:text-[#a1a1aa] px-1.5 py-0.5 transition-colors"
                       >
                         Cancel
                       </button>
                       <button
                         onClick={handleSave}
                         disabled={saving}
-                        className="text-[11px] font-medium text-white bg-neutral-900 hover:bg-neutral-700 px-2 py-0.5 rounded transition-colors disabled:opacity-50"
+                        className="text-[11px] font-medium text-white bg-[#6366f1] hover:bg-[#6366f1]/80 px-2 py-0.5 rounded transition-colors disabled:opacity-50"
                       >
                         {saving ? "Saving…" : "Save"}
                       </button>
@@ -592,12 +592,12 @@ function SeedCardFooter({
                 </>
               ) : (
                 <>
-                  <p className="text-[11px] text-neutral-600 leading-relaxed whitespace-pre-wrap">
+                  <p className="text-[11px] text-[#a1a1aa] leading-relaxed whitespace-pre-wrap">
                     {promptText}
                   </p>
                   <button
                     onClick={() => setEditing(true)}
-                    className="flex items-center gap-1 text-[11px] text-neutral-400 hover:text-neutral-600 transition-colors"
+                    className="flex items-center gap-1 text-[11px] text-[#71717a] hover:text-[#a1a1aa] transition-colors"
                   >
                     <Pencil className="h-3 w-3" />
                     Edit prompt
@@ -608,8 +608,8 @@ function SeedCardFooter({
           )}
         </div>
       ) : (
-        <div className="border-t border-neutral-100 px-2.5 py-1.5">
-          <span className="text-[11px] text-neutral-300 italic">No prompt recorded</span>
+        <div className="border-t border-[#1a1a1e] px-2.5 py-1.5">
+          <span className="text-[11px] text-[#52525b] italic">No prompt recorded</span>
         </div>
       )}
     </div>
@@ -638,15 +638,15 @@ function ReferenceFramePicker({
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">
+        <p className="text-xs font-medium uppercase tracking-widest text-[#71717a]">
           Reference Frame
-          <span className="text-neutral-300 font-normal ml-2 normal-case tracking-normal">
+          <span className="text-[#52525b] font-normal ml-2 normal-case tracking-normal">
             {extractedFrameCount} available
           </span>
         </p>
         <button
           onClick={() => setOpen(!open)}
-          className="text-[11px] text-neutral-500 hover:text-neutral-700 transition-colors flex items-center gap-1"
+          className="text-[11px] text-[#a1a1aa] hover:text-[#fafafa] transition-colors flex items-center gap-1"
         >
           {open ? "Collapse" : "Change frame"}
           <ChevronDown className={cn("h-3 w-3 transition-transform", open && "rotate-180")} />
@@ -659,15 +659,15 @@ function ReferenceFramePicker({
           <img
             src={selectedUrl}
             alt={`Frame ${scene.referenceFrame}`}
-            className="w-14 h-24 rounded-lg object-cover border-2 border-neutral-900"
+            className="w-14 h-24 rounded-lg object-cover border-2 border-[#6366f1]"
           />
-          <span className="text-xs text-neutral-500">Frame {scene.referenceFrame}</span>
+          <span className="text-xs text-[#a1a1aa]">Frame {scene.referenceFrame}</span>
         </div>
       )}
 
       {/* Expanded: frame grid */}
       {open && (
-        <div className="grid grid-cols-5 gap-2 max-h-72 overflow-y-auto rounded-lg border border-neutral-200 p-2 bg-neutral-50/50">
+        <div className="grid grid-cols-5 gap-2 max-h-72 overflow-y-auto rounded-lg border border-[#27272a] p-2 bg-[#09090b]/50">
           {frames.map((url, i) => {
             const isSelected = scene.referenceFrameUrl === url || (!scene.referenceFrameUrl && i === scene.referenceFrame);
             return (
@@ -691,8 +691,8 @@ function ReferenceFramePicker({
                 className={cn(
                   "aspect-[9/16] rounded-lg border-2 overflow-hidden transition-all relative",
                   isSelected
-                    ? "border-neutral-900 ring-2 ring-neutral-900 ring-offset-1"
-                    : "border-neutral-100 hover:border-neutral-300"
+                    ? "border-[#6366f1] ring-2 ring-[#6366f1] ring-offset-1"
+                    : "border-[#1a1a1e] hover:border-[#3f3f46]"
                 )}
               >
                 <img src={url} alt={`Frame ${i}`} className="w-full h-full object-cover" />
@@ -767,7 +767,7 @@ function SeedUploadButton({
       <button
         onClick={() => inputRef.current?.click()}
         disabled={uploading}
-        className="flex items-center gap-2 text-sm text-neutral-500 hover:text-neutral-700 disabled:opacity-40 transition-colors"
+        className="flex items-center gap-2 text-sm text-[#a1a1aa] hover:text-[#fafafa] disabled:opacity-40 transition-colors"
       >
         {uploading ? (
           <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Uploading…</>
@@ -1106,14 +1106,14 @@ function SeedDetailPanel({
     <div className="p-7 space-y-7 max-w-2xl">
       {/* Scene header */}
       <div className="flex items-end gap-4">
-        <span className="text-7xl font-light leading-none text-neutral-100 tabular-nums select-none">
+        <span className="text-7xl font-light leading-none text-[#1a1a1e] tabular-nums select-none">
           {String(scene.sceneOrder).padStart(2, "0")}
         </span>
         <div className="mb-1 space-y-1">
-          <p className="text-sm font-medium text-neutral-700">
+          <p className="text-sm font-medium text-[#a1a1aa]">
             {scene.targetClipDurationS.toFixed(1)}s target clip
           </p>
-          <p className="text-xs text-neutral-400 leading-relaxed line-clamp-2 max-w-sm">
+          <p className="text-xs text-[#71717a] leading-relaxed line-clamp-2 max-w-sm">
             {scene.description}
           </p>
         </div>
@@ -1121,7 +1121,7 @@ function SeedDetailPanel({
 
       {/* Hero mode indicator */}
       {approvedHeroUrl && (
-        <div className="rounded-lg border border-violet-100 bg-violet-50/30 px-4 py-3 flex items-center gap-3">
+        <div className="rounded-lg border border-violet-500/20 bg-violet-500/10 px-4 py-3 flex items-center gap-3">
           <img
             src={approvedHeroUrl}
             alt="Hero model"
@@ -1131,7 +1131,7 @@ function SeedDetailPanel({
             <p className="text-[10px] font-medium uppercase tracking-widest text-violet-400">
               Hero Mode Active
             </p>
-            <p className="text-[11px] text-neutral-500">
+            <p className="text-[11px] text-[#a1a1aa]">
               Seeds will use the approved hero model as base — prompts should describe pose & framing only
             </p>
           </div>
@@ -1140,11 +1140,11 @@ function SeedDetailPanel({
 
       {/* Script & Motion from 3A */}
       {scene.klingPrompt && (
-        <div className="rounded-lg border border-blue-100 bg-blue-50/30 px-4 py-3 space-y-1">
+        <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 px-4 py-3 space-y-1">
           <p className="text-[10px] font-medium uppercase tracking-widest text-blue-400">
             Script & Motion (from 3A)
           </p>
-          <p className="text-xs text-neutral-600 leading-relaxed">
+          <p className="text-xs text-[#a1a1aa] leading-relaxed">
             {scene.klingPrompt}
           </p>
         </div>
@@ -1161,14 +1161,14 @@ function SeedDetailPanel({
 
       {/* Suggested seed prompt */}
       {(suggesting || suggestedPrompt) && (
-        <div className="rounded-lg border border-emerald-100 bg-emerald-50/30 px-4 py-3 space-y-2">
+        <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 space-y-2">
           <p className="text-[10px] font-medium uppercase tracking-widest text-emerald-500">
             Suggested Seed Prompt
           </p>
           {suggesting ? (
             <div className="flex items-center gap-2 py-1">
               <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-400" />
-              <span className="text-xs text-neutral-400">Generating suggestion…</span>
+              <span className="text-xs text-[#71717a]">Generating suggestion…</span>
             </div>
           ) : suggestedPrompt ? (
             <>
@@ -1176,7 +1176,7 @@ function SeedDetailPanel({
                 value={suggestedPrompt}
                 onChange={(e) => setSuggestedPrompt(e.target.value)}
                 rows={4}
-                className="w-full text-xs rounded-md border border-emerald-200 bg-white px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-300 transition-all text-neutral-600 leading-relaxed"
+                className="w-full text-xs rounded-md border border-emerald-200 bg-[#18181b] px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-300 transition-all text-[#a1a1aa] leading-relaxed"
               />
               <Button
                 onClick={() => {
@@ -1195,7 +1195,7 @@ function SeedDetailPanel({
 
       {/* Brief prompt with @mention autocomplete */}
       <div>
-        <p className="text-xs font-medium uppercase tracking-widest text-neutral-400 mb-3">
+        <p className="text-xs font-medium uppercase tracking-widest text-[#71717a] mb-3">
           Seed Image Prompt
         </p>
         <PromptWithMentions
@@ -1238,7 +1238,7 @@ function SeedDetailPanel({
             <Button
               onClick={handleGenerate}
               disabled={generating || !scene.nanoBananaPrompt.trim()}
-              className="gap-2 bg-neutral-900 hover:bg-neutral-700 text-white h-9 text-sm disabled:opacity-40"
+              className="gap-2 bg-[#6366f1] hover:bg-[#6366f1]/80 text-white h-9 text-sm disabled:opacity-40"
             >
               {generating ? (
                 <>
@@ -1267,12 +1267,12 @@ function SeedDetailPanel({
       {refinedPrompt !== null && (
         <div>
           <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">
+            <p className="text-xs font-medium uppercase tracking-widest text-[#71717a]">
               Enhanced Prompt
             </p>
             <button
               onClick={() => setRefinedPrompt(null)}
-              className="text-[11px] text-neutral-400 hover:text-neutral-600 transition-colors"
+              className="text-[11px] text-[#71717a] hover:text-[#a1a1aa] transition-colors"
             >
               Discard
             </button>
@@ -1281,12 +1281,12 @@ function SeedDetailPanel({
             value={refinedPrompt}
             onChange={(e) => setRefinedPrompt(e.target.value)}
             rows={5}
-            className="w-full text-sm rounded-md border border-blue-200 bg-blue-50/30 px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300 transition-all text-neutral-700 leading-relaxed"
+            className="w-full text-sm rounded-md border border-blue-500/20 bg-blue-500/10 px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300 transition-all text-[#a1a1aa] leading-relaxed"
           />
           <Button
             onClick={handleGenerate}
             disabled={generating}
-            className="mt-2.5 gap-2 bg-neutral-900 hover:bg-neutral-700 text-white h-9 text-sm disabled:opacity-40"
+            className="mt-2.5 gap-2 bg-[#6366f1] hover:bg-[#6366f1]/80 text-white h-9 text-sm disabled:opacity-40"
           >
             {generating ? (
               <>
@@ -1311,10 +1311,10 @@ function SeedDetailPanel({
             const rejected = scene.seedVersions.filter((v) => v.isRejected);
             return (
               <>
-                <p className="text-xs font-medium uppercase tracking-widest text-neutral-400 mb-3">
+                <p className="text-xs font-medium uppercase tracking-widest text-[#71717a] mb-3">
                   Generated Versions
                   {rejected.length > 0 && (
-                    <span className="text-neutral-300 font-normal ml-1">
+                    <span className="text-[#52525b] font-normal ml-1">
                       ({rejected.length} rejected)
                     </span>
                   )}
@@ -1328,8 +1328,8 @@ function SeedDetailPanel({
                         className={cn(
                           "rounded-lg border-2 overflow-hidden transition-all group/card",
                           isApproved
-                            ? "border-neutral-900 ring-2 ring-neutral-900 ring-offset-1"
-                            : "border-neutral-100 hover:border-neutral-300"
+                            ? "border-[#6366f1] ring-2 ring-[#6366f1] ring-offset-1"
+                            : "border-[#1a1a1e] hover:border-[#3f3f46]"
                         )}
                       >
                         <div
@@ -1348,7 +1348,7 @@ function SeedDetailPanel({
                           {isApproved && (
                             <div className="absolute inset-0 flex items-center justify-center bg-black/20">
                               <div className="bg-white rounded-full p-1">
-                                <Check className="h-3.5 w-3.5 text-neutral-900" />
+                                <Check className="h-3.5 w-3.5 text-[#6366f1]" />
                               </div>
                             </div>
                           )}
@@ -1360,7 +1360,7 @@ function SeedDetailPanel({
                                 download={`seed-scene${String(scene.sceneOrder).padStart(2, "0")}-v${i + 1}.jpg`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="p-1.5 rounded-lg bg-black/40 text-white hover:bg-neutral-700/80 transition-colors"
+                                className="p-1.5 rounded-lg bg-black/40 text-white hover:bg-[#27272a]/80 transition-colors"
                                 title="Download"
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1420,12 +1420,12 @@ function SeedDetailPanel({
                 {/* Rejected versions (collapsed) */}
                 {rejected.length > 0 && (
                   <details className="mt-4">
-                    <summary className="text-xs text-neutral-400 cursor-pointer hover:text-neutral-600 transition-colors">
+                    <summary className="text-xs text-[#71717a] cursor-pointer hover:text-[#a1a1aa] transition-colors">
                       {rejected.length} rejected version{rejected.length !== 1 ? "s" : ""} — click to view
                     </summary>
                     <div className="mt-2 space-y-2">
                       {rejected.map((v, i) => (
-                        <div key={v.id} className="flex gap-3 p-2 rounded-lg bg-red-50/50 border border-red-100">
+                        <div key={v.id} className="flex gap-3 p-2 rounded-lg bg-red-500/5 border border-red-500/20">
                           {v.imageUrl && (
                             <img
                               src={v.imageUrl}
@@ -1436,7 +1436,7 @@ function SeedDetailPanel({
                           <div className="min-w-0">
                             <p className="text-[11px] font-medium text-red-600">Rejected</p>
                             {v.rejectionReason && (
-                              <p className="text-[11px] text-neutral-500 leading-relaxed mt-0.5 whitespace-pre-line">
+                              <p className="text-[11px] text-[#a1a1aa] leading-relaxed mt-0.5 whitespace-pre-line">
                                 {v.rejectionReason}
                               </p>
                             )}
@@ -1451,24 +1451,24 @@ function SeedDetailPanel({
           })()}
         </div>
       ) : generating ? (
-        <div className="flex flex-col items-center justify-center py-12 text-center border border-dashed border-neutral-200 rounded-xl">
-          <Loader2 className="h-8 w-8 text-neutral-300 mb-3 animate-spin" />
-          <p className="text-sm text-neutral-400 mb-3">Generating seed image…</p>
-          <div className="w-48 h-2 bg-neutral-100 rounded-full overflow-hidden">
+        <div className="flex flex-col items-center justify-center py-12 text-center border border-dashed border-[#27272a] rounded-xl">
+          <Loader2 className="h-8 w-8 text-[#52525b] mb-3 animate-spin" />
+          <p className="text-sm text-[#71717a] mb-3">Generating seed image…</p>
+          <div className="w-48 h-2 bg-[#27272a] rounded-full overflow-hidden">
             <div
-              className="h-full bg-neutral-900 rounded-full transition-all duration-500 ease-out"
+              className="h-full bg-[#6366f1] rounded-full transition-all duration-500 ease-out"
               style={{ width: `${genProgress}%` }}
             />
           </div>
-          <p className="text-xs text-neutral-300 mt-2 tabular-nums">
+          <p className="text-xs text-[#52525b] mt-2 tabular-nums">
             {genProgress}%
           </p>
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center py-12 text-center border border-dashed border-neutral-200 rounded-xl">
-          <Wand2 className="h-8 w-8 text-neutral-200 mb-3" />
-          <p className="text-sm text-neutral-400">No seed images yet</p>
-          <p className="text-xs text-neutral-400 mt-1">
+        <div className="flex flex-col items-center justify-center py-12 text-center border border-dashed border-[#27272a] rounded-xl">
+          <Wand2 className="h-8 w-8 text-[#27272a] mb-3" />
+          <p className="text-sm text-[#71717a]">No seed images yet</p>
+          <p className="text-xs text-[#71717a] mt-1">
             Add a prompt above and click Generate
           </p>
         </div>
@@ -1637,18 +1637,18 @@ function HeroModelPanel({
   const approvedHero = heroImages.find((h) => h.url === approvedHeroUrl);
 
   return (
-    <div className="border-b border-neutral-200 bg-neutral-50/50">
+    <div className="border-b border-[#27272a] bg-[#09090b]/50">
       {/* Header — always visible */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-3 px-6 py-3 text-left hover:bg-neutral-100/50 transition-colors"
+        className="w-full flex items-center gap-3 px-6 py-3 text-left hover:bg-[#27272a]/50 transition-colors"
       >
         <div className="w-7 h-7 rounded-lg bg-violet-100 flex items-center justify-center shrink-0">
           <User className="h-4 w-4 text-violet-600" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-neutral-800">Model & Setting</p>
-          <p className="text-[11px] text-neutral-400">
+          <p className="text-sm font-medium text-[#fafafa]">Model & Setting</p>
+          <p className="text-[11px] text-[#71717a]">
             {approvedHeroUrl
               ? "Hero model approved — used as base for all scene seeds"
               : "Generate a base model image to use across all scenes"}
@@ -1658,12 +1658,12 @@ function HeroModelPanel({
           <img
             src={approvedHero.url}
             alt="Hero"
-            className="w-10 h-14 rounded object-cover border border-neutral-200 shrink-0"
+            className="w-10 h-14 rounded object-cover border border-[#27272a] shrink-0"
           />
         )}
         <ChevronDown
           className={cn(
-            "h-4 w-4 text-neutral-400 transition-transform shrink-0",
+            "h-4 w-4 text-[#71717a] transition-transform shrink-0",
             expanded && "rotate-180"
           )}
         />
@@ -1673,15 +1673,15 @@ function HeroModelPanel({
       {expanded && (
         <div className="px-6 pb-5 space-y-4">
           {/* Mode toggle */}
-          <div className="flex gap-1 bg-neutral-100 rounded-lg p-0.5 w-fit">
+          <div className="flex gap-1 bg-[#27272a] rounded-lg p-0.5 w-fit">
             {extractedFrameCount > 0 && (
               <button
                 onClick={() => setMode("frame")}
                 className={cn(
                   "px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
                   mode === "frame"
-                    ? "bg-white text-neutral-800 shadow-sm"
-                    : "text-neutral-500 hover:text-neutral-700"
+                    ? "bg-[#18181b] text-[#fafafa] shadow-sm"
+                    : "text-[#a1a1aa] hover:text-[#fafafa]"
                 )}
               >
                 From Frame
@@ -1692,8 +1692,8 @@ function HeroModelPanel({
               className={cn(
                 "px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
                 mode === "scratch"
-                  ? "bg-white text-neutral-800 shadow-sm"
-                  : "text-neutral-500 hover:text-neutral-700"
+                  ? "bg-[#18181b] text-[#fafafa] shadow-sm"
+                  : "text-[#a1a1aa] hover:text-[#fafafa]"
               )}
             >
               From Scratch
@@ -1703,8 +1703,8 @@ function HeroModelPanel({
               className={cn(
                 "px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
                 mode === "upload"
-                  ? "bg-white text-neutral-800 shadow-sm"
-                  : "text-neutral-500 hover:text-neutral-700"
+                  ? "bg-[#18181b] text-[#fafafa] shadow-sm"
+                  : "text-[#a1a1aa] hover:text-[#fafafa]"
               )}
             >
               Upload
@@ -1715,7 +1715,7 @@ function HeroModelPanel({
           {mode === "frame" && (
             <div>
               <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-medium text-neutral-500">Source Frame</p>
+                <p className="text-xs font-medium text-[#a1a1aa]">Source Frame</p>
                 <button
                   onClick={() => setShowFramePicker(!showFramePicker)}
                   className="text-[11px] text-violet-500 hover:text-violet-700 transition-colors flex items-center gap-1"
@@ -1730,14 +1730,14 @@ function HeroModelPanel({
                   <img
                     src={frames[selectedFrame]}
                     alt={`Frame ${selectedFrame}`}
-                    className="w-16 h-28 rounded-lg object-cover border border-neutral-200"
+                    className="w-16 h-28 rounded-lg object-cover border border-[#27272a]"
                   />
-                  <span className="text-xs text-neutral-500">Frame {selectedFrame}</span>
+                  <span className="text-xs text-[#a1a1aa]">Frame {selectedFrame}</span>
                 </div>
               )}
 
               {showFramePicker && (
-                <div className="grid grid-cols-8 gap-1.5 max-h-48 overflow-y-auto rounded-lg border border-neutral-200 p-2 bg-white">
+                <div className="grid grid-cols-8 gap-1.5 max-h-48 overflow-y-auto rounded-lg border border-[#27272a] p-2 bg-[#18181b]">
                   {frames.map((url, i) => (
                     <button
                       key={i}
@@ -1746,7 +1746,7 @@ function HeroModelPanel({
                         "aspect-[9/16] rounded overflow-hidden border-2 transition-all",
                         i === selectedFrame
                           ? "border-violet-500 ring-1 ring-violet-500"
-                          : "border-transparent hover:border-neutral-300"
+                          : "border-transparent hover:border-[#3f3f46]"
                       )}
                     >
                       <img src={url} alt={`Frame ${i}`} className="w-full h-full object-cover" />
@@ -1785,7 +1785,7 @@ function HeroModelPanel({
                   <>
                     <Plus className="h-6 w-6 text-violet-400" />
                     <span className="text-sm text-violet-600 font-medium">Click to upload an image</span>
-                    <span className="text-[11px] text-neutral-400">Will be resized to 720x1280 (9:16)</span>
+                    <span className="text-[11px] text-[#71717a]">Will be resized to 720x1280 (9:16)</span>
                   </>
                 )}
               </button>
@@ -1794,7 +1794,7 @@ function HeroModelPanel({
             /* Generate mode (frame or scratch) */
             <>
               <div>
-                <p className="text-xs font-medium text-neutral-500 mb-1.5">
+                <p className="text-xs font-medium text-[#a1a1aa] mb-1.5">
                   {mode === "scratch" ? "Describe your character from scratch" : "Describe your model + setting"}
                 </p>
                 <PromptWithMentions
@@ -1831,7 +1831,7 @@ function HeroModelPanel({
           {/* Generated hero images */}
           {heroImages.length > 0 && (
             <div>
-              <p className="text-xs font-medium uppercase tracking-widest text-neutral-400 mb-2">
+              <p className="text-xs font-medium uppercase tracking-widest text-[#71717a] mb-2">
                 Click an image to use as your hero model
               </p>
               <div className="grid grid-cols-4 gap-3">
@@ -1846,7 +1846,7 @@ function HeroModelPanel({
                         "rounded-lg border-2 overflow-hidden transition-all text-left group/hero cursor-pointer",
                         isApproved
                           ? "border-violet-600 ring-2 ring-violet-600 ring-offset-1"
-                          : "border-neutral-200 hover:border-violet-400 hover:shadow-md"
+                          : "border-[#27272a] hover:border-violet-400 hover:shadow-md"
                       )}
                     >
                       <div className="aspect-[9/16] relative overflow-hidden">
@@ -1882,12 +1882,12 @@ function HeroModelPanel({
                           </div>
                         )}
                       </div>
-                      <div className="bg-white px-2.5 py-2">
-                        <p className="text-[11px] text-neutral-500 line-clamp-2 leading-relaxed">
+                      <div className="bg-[#18181b] px-2.5 py-2">
+                        <p className="text-[11px] text-[#a1a1aa] line-clamp-2 leading-relaxed">
                           {h.prompt}
                         </p>
                         <div className="flex items-center justify-between mt-1">
-                          <span className="text-[10px] text-neutral-300">
+                          <span className="text-[10px] text-[#52525b]">
                             Frame {h.sourceFrame}
                           </span>
                           <span
@@ -1895,7 +1895,7 @@ function HeroModelPanel({
                               "text-[11px] font-medium px-2 py-0.5 rounded",
                               isApproved
                                 ? "bg-violet-600 text-white"
-                                : "bg-neutral-100 text-neutral-500"
+                                : "bg-[#27272a] text-[#a1a1aa]"
                             )}
                           >
                             {isApproved ? "Selected" : "Click to select"}
@@ -1955,14 +1955,14 @@ export function Tab3A({
       {/* Scene split: list + detail */}
       <div className="flex flex-1 overflow-hidden">
         {/* Scene list (left, fixed width) */}
-        <div className="w-72 shrink-0 border-r border-neutral-200 overflow-y-auto bg-white flex flex-col">
-          <div className="px-4 py-2.5 border-b border-neutral-100 sticky top-0 bg-white/95 backdrop-blur-sm z-10 flex items-center justify-between">
-            <p className="text-xs text-neutral-400">
+        <div className="w-72 shrink-0 border-r border-[#27272a] overflow-y-auto bg-[#18181b] flex flex-col">
+          <div className="px-4 py-2.5 border-b border-[#1a1a1e] sticky top-0 bg-[#18181b]/95 backdrop-blur-sm z-10 flex items-center justify-between">
+            <p className="text-xs text-[#71717a]">
               {approvedCount}/{scenes.length} seeds approved
             </p>
             <button
               onClick={addScene}
-              className="p-1 rounded hover:bg-neutral-100 text-neutral-400 hover:text-neutral-600 transition-colors"
+              className="p-1 rounded hover:bg-[#27272a] text-[#71717a] hover:text-[#a1a1aa] transition-colors"
               title="Add scene"
             >
               <Plus className="h-3.5 w-3.5" />

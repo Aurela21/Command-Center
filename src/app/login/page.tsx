@@ -44,17 +44,17 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-neutral-50">
-      <Card className="w-full max-w-sm shadow-none border-neutral-200">
+    <div className="min-h-screen flex items-center justify-center bg-[#09090b]">
+      <Card className="w-full max-w-sm shadow-none bg-[#18181b] border-[#27272a]">
         <CardHeader className="pb-4">
-          <CardTitle className="text-base font-medium text-neutral-900">
+          <CardTitle className="text-base font-medium text-[#fafafa]">
             Command Center
           </CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="password" className="text-neutral-600">
+              <Label htmlFor="password" className="text-[#a1a1aa]">
                 Password
               </Label>
               <Input
@@ -64,7 +64,7 @@ export default function LoginPage() {
                 autoFocus
                 autoComplete="current-password"
                 placeholder=""
-                className="bg-white"
+                className="bg-[#09090b] border-[#27272a] text-[#fafafa] placeholder:text-[#71717a]"
               />
             </div>
             {error && (
@@ -73,7 +73,7 @@ export default function LoginPage() {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full bg-neutral-900 hover:bg-neutral-700 text-white"
+              className="w-full bg-[#6366f1] hover:bg-[#6366f1]/80 text-white"
             >
               {loading ? "Checking…" : "Enter"}
             </Button>

@@ -128,7 +128,7 @@ export default function UploadPage() {
   if (!project) {
     return (
       <div className="max-w-2xl mx-auto px-8 py-10">
-        <p className="text-sm text-neutral-500">Project not found.</p>
+        <p className="text-sm text-[#a1a1aa]">Project not found.</p>
         <Button variant="link" className="px-0 mt-2" onClick={() => router.push("/projects")}>
           Back to projects
         </Button>
@@ -142,7 +142,7 @@ export default function UploadPage() {
     <div className="max-w-2xl mx-auto px-8 py-10">
       {/* ── Header ── */}
       <div className="mb-8">
-        <p className="text-xs font-medium uppercase tracking-widest text-neutral-400 mb-2">
+        <p className="text-xs font-medium uppercase tracking-widest text-[#71717a] mb-2">
           Step 1 — Upload
         </p>
         {nameEditing ? (
@@ -155,11 +155,11 @@ export default function UploadPage() {
               if (e.key === "Enter") commitName();
               if (e.key === "Escape") setNameEditing(false);
             }}
-            className="text-2xl font-semibold text-neutral-900 bg-transparent border-b-2 border-neutral-300 outline-none w-full pb-0.5"
+            className="text-2xl font-semibold text-[#fafafa] bg-transparent border-b-2 border-[#3f3f46] outline-none w-full pb-0.5"
           />
         ) : (
           <h1
-            className="text-2xl font-semibold text-neutral-900 cursor-text hover:text-neutral-600 transition-colors"
+            className="text-2xl font-semibold text-[#fafafa] cursor-text hover:text-[#a1a1aa] transition-colors"
             onClick={() => {
               setNameValue(project.name);
               setNameEditing(true);
@@ -169,31 +169,31 @@ export default function UploadPage() {
             {project.name}
           </h1>
         )}
-        <p className="text-sm text-neutral-400 mt-1">
+        <p className="text-sm text-[#71717a] mt-1">
           Click the title to rename &middot; Upload a 15–60 second reference video
         </p>
       </div>
 
       {/* ── Kling element tags ── */}
       <section className="mb-8">
-        <h2 className="text-sm font-medium text-neutral-700 mb-1">
+        <h2 className="text-sm font-medium text-[#a1a1aa] mb-1">
           Kling Element Tags
         </h2>
-        <p className="text-xs text-neutral-400 mb-3">
+        <p className="text-xs text-[#71717a] mb-3">
           Tags registered in Kling (e.g.{" "}
           <span className="font-mono">airplane_hoodie</span>,{" "}
           <span className="font-mono">sarah</span>). Auto-injected into every
           scene prompt.
         </p>
         <div
-          className="flex flex-wrap gap-2 p-3 rounded-lg border border-neutral-200 bg-white min-h-[48px] cursor-text focus-within:ring-2 focus-within:ring-neutral-200 focus-within:border-neutral-300 transition-all"
+          className="flex flex-wrap gap-2 p-3 rounded-lg border border-[#27272a] bg-[#18181b] min-h-[48px] cursor-text focus-within:ring-2 focus-within:ring-[#27272a] focus-within:border-[#3f3f46] transition-all"
           onClick={() => document.getElementById("tag-input")?.focus()}
         >
           {currentTags.map((tag) => (
             <Badge
               key={tag}
               variant="secondary"
-              className="gap-1.5 pl-2.5 pr-1.5 py-0.5 text-xs font-mono bg-neutral-100 text-neutral-700 hover:bg-neutral-200"
+              className="gap-1.5 pl-2.5 pr-1.5 py-0.5 text-xs font-mono bg-[#27272a] text-[#a1a1aa] hover:bg-[#3f3f46]"
             >
               {tag}
               <button
@@ -202,7 +202,7 @@ export default function UploadPage() {
                   e.stopPropagation();
                   removeTag(tag);
                 }}
-                className="text-neutral-400 hover:text-neutral-700"
+                className="text-[#71717a] hover:text-[#a1a1aa]"
               >
                 <X className="h-2.5 w-2.5" />
               </button>
@@ -228,29 +228,29 @@ export default function UploadPage() {
             <button
               type="button"
               onClick={() => addTag(tagInput)}
-              className="shrink-0 text-neutral-400 hover:text-neutral-700"
+              className="shrink-0 text-[#71717a] hover:text-[#a1a1aa]"
             >
               <Plus className="h-4 w-4" />
             </button>
           )}
         </div>
-        <p className="text-xs text-neutral-400 mt-1.5">
+        <p className="text-xs text-[#71717a] mt-1.5">
           Enter or comma to add &middot; Backspace to remove last
         </p>
       </section>
 
       {/* ── Video upload / already-uploaded ── */}
       <section className="mb-8">
-        <h2 className="text-sm font-medium text-neutral-700 mb-3">
+        <h2 className="text-sm font-medium text-[#a1a1aa] mb-3">
           Reference Video
         </h2>
 
         {alreadyUploaded ? (
           // Show processed metadata summary if available
-          <div className="rounded-xl border border-green-100 bg-green-50 p-5 space-y-4">
+          <div className="rounded-xl border border-green-500/20 bg-green-500/10 p-5 space-y-4">
             <div className="flex items-center gap-3">
               <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
-              <p className="text-sm font-medium text-green-800">
+              <p className="text-sm font-medium text-green-400">
                 Video uploaded and processed
               </p>
             </div>
@@ -263,12 +263,12 @@ export default function UploadPage() {
                 ].map(({ label, value }) => (
                   <div
                     key={label}
-                    className="rounded-lg bg-white border border-green-100 px-3 py-2.5"
+                    className="rounded-lg bg-[#18181b] border border-green-500/20 px-3 py-2.5"
                   >
-                    <p className="text-[10px] uppercase tracking-widest text-green-700 font-medium">
+                    <p className="text-[10px] uppercase tracking-widest text-green-400 font-medium">
                       {label}
                     </p>
-                    <p className="text-sm font-semibold text-neutral-900 mt-0.5 tabular-nums">
+                    <p className="text-sm font-semibold text-[#fafafa] mt-0.5 tabular-nums">
                       {value}
                     </p>
                   </div>
@@ -277,7 +277,7 @@ export default function UploadPage() {
             )}
             <Button
               onClick={() => router.push(`/projects/${id}/manifest`)}
-              className="w-full bg-neutral-900 hover:bg-neutral-700 text-white gap-2"
+              className="w-full bg-[#6366f1] hover:bg-[#6366f1]/80 text-white gap-2"
             >
               Go to Scene Manifest
               <ArrowRight className="h-4 w-4" />
@@ -289,17 +289,17 @@ export default function UploadPage() {
       </section>
 
       {/* ── Debug info ── */}
-      <div className="rounded-lg bg-neutral-50 border border-neutral-100 px-4 py-3 text-xs text-neutral-500 space-y-0.5">
+      <div className="rounded-lg bg-[#09090b] border border-[#1a1a1e] px-4 py-3 text-xs text-[#a1a1aa] space-y-0.5">
         <p>
-          <span className="font-medium text-neutral-700">Status:</span>{" "}
+          <span className="font-medium text-[#a1a1aa]">Status:</span>{" "}
           <span className="capitalize">{project.status.replace(/_/g, " ")}</span>
         </p>
         <p>
-          <span className="font-medium text-neutral-700">Project ID:</span>{" "}
+          <span className="font-medium text-[#a1a1aa]">Project ID:</span>{" "}
           <span className="font-mono">{project.id}</span>
         </p>
         <p>
-          <span className="font-medium text-neutral-700">Created:</span>{" "}
+          <span className="font-medium text-[#a1a1aa]">Created:</span>{" "}
           {new Date(project.createdAt!).toLocaleString()}
         </p>
       </div>

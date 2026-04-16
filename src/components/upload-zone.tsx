@@ -204,16 +204,16 @@ export function UploadZone({ projectId }: { projectId: string }) {
   // ── Error state
   if (phase.kind === "error") {
     return (
-      <div className="rounded-xl border border-red-100 bg-red-50 p-5 flex items-start gap-4">
+      <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-5 flex items-start gap-4">
         <AlertCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-red-700">{phase.message}</p>
+          <p className="text-sm font-medium text-red-400">{phase.message}</p>
         </div>
         <Button
           variant="ghost"
           size="sm"
           onClick={() => setPhase({ kind: "idle" })}
-          className="shrink-0 text-red-500 hover:text-red-700 hover:bg-red-100 h-7 px-2"
+          className="shrink-0 text-red-500 hover:text-red-400 hover:bg-red-500/10 h-7 px-2"
         >
           Try again
         </Button>
@@ -225,10 +225,10 @@ export function UploadZone({ projectId }: { projectId: string }) {
   if (phase.kind === "done") {
     const { durationMs, fps, totalFrames } = phase;
     return (
-      <div className="rounded-xl border border-green-100 bg-green-50 p-5 space-y-4">
+      <div className="rounded-xl border border-green-500/20 bg-green-500/10 p-5 space-y-4">
         <div className="flex items-center gap-3">
           <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
-          <p className="text-sm font-medium text-green-800">
+          <p className="text-sm font-medium text-green-400">
             Video processed successfully
           </p>
         </div>
@@ -240,12 +240,12 @@ export function UploadZone({ projectId }: { projectId: string }) {
           ].map(({ label, value }) => (
             <div
               key={label}
-              className="rounded-lg bg-white border border-green-100 px-3 py-2.5"
+              className="rounded-lg bg-[#18181b] border border-green-500/20 px-3 py-2.5"
             >
-              <p className="text-[10px] uppercase tracking-widest text-green-700 font-medium">
+              <p className="text-[10px] uppercase tracking-widest text-green-400 font-medium">
                 {label}
               </p>
-              <p className="text-sm font-semibold text-neutral-900 mt-0.5 tabular-nums">
+              <p className="text-sm font-semibold text-[#fafafa] mt-0.5 tabular-nums">
                 {value}
               </p>
             </div>
@@ -253,7 +253,7 @@ export function UploadZone({ projectId }: { projectId: string }) {
         </div>
         <Button
           onClick={() => router.push(`/projects/${projectId}/manifest`)}
-          className="w-full bg-neutral-900 hover:bg-neutral-700 text-white gap-2"
+          className="w-full bg-[#6366f1] hover:bg-[#6366f1]/80 text-white gap-2"
         >
           Continue to Scene Manifest
           <ArrowRight className="h-4 w-4" />
@@ -265,11 +265,11 @@ export function UploadZone({ projectId }: { projectId: string }) {
   // ── Processing state
   if (phase.kind === "processing") {
     return (
-      <div className="rounded-xl border border-neutral-200 bg-white p-6 flex flex-col items-center gap-3">
-        <Loader2 className="h-8 w-8 text-neutral-400 animate-spin" />
+      <div className="rounded-xl border border-[#27272a] bg-[#18181b] p-6 flex flex-col items-center gap-3">
+        <Loader2 className="h-8 w-8 text-[#71717a] animate-spin" />
         <div className="text-center">
-          <p className="text-sm font-medium text-neutral-700">Analyzing video…</p>
-          <p className="text-xs text-neutral-400 mt-0.5">
+          <p className="text-sm font-medium text-[#a1a1aa]">Analyzing video…</p>
+          <p className="text-xs text-[#71717a] mt-0.5">
             Extracting metadata with ffmpeg. This takes a few seconds.
           </p>
         </div>
@@ -281,27 +281,27 @@ export function UploadZone({ projectId }: { projectId: string }) {
   if (phase.kind === "uploading") {
     const { file, progress } = phase;
     return (
-      <div className="rounded-xl border border-neutral-200 bg-white p-5 space-y-4">
+      <div className="rounded-xl border border-[#27272a] bg-[#18181b] p-5 space-y-4">
         <div className="flex items-center gap-4">
-          <div className="shrink-0 rounded-lg bg-neutral-100 p-3">
-            <Film className="h-5 w-5 text-neutral-500" />
+          <div className="shrink-0 rounded-lg bg-[#27272a] p-3">
+            <Film className="h-5 w-5 text-[#a1a1aa]" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-neutral-900 truncate">{file.name}</p>
-            <p className="text-xs text-neutral-400 mt-0.5">{fmtSize(file.size)}</p>
+            <p className="text-sm font-medium text-[#fafafa] truncate">{file.name}</p>
+            <p className="text-xs text-[#71717a] mt-0.5">{fmtSize(file.size)}</p>
           </div>
-          <span className="shrink-0 text-sm font-semibold tabular-nums text-neutral-900">
+          <span className="shrink-0 text-sm font-semibold tabular-nums text-[#fafafa]">
             {progress}%
           </span>
         </div>
         {/* Progress bar */}
-        <div className="h-1.5 w-full rounded-full bg-neutral-100 overflow-hidden">
+        <div className="h-1.5 w-full rounded-full bg-[#27272a] overflow-hidden">
           <div
-            className="h-full bg-neutral-900 rounded-full transition-all duration-150"
+            className="h-full bg-[#6366f1] rounded-full transition-all duration-150"
             style={{ width: `${progress}%` }}
           />
         </div>
-        <p className="text-xs text-neutral-400">
+        <p className="text-xs text-[#71717a]">
           Uploading directly to Cloudflare R2…
         </p>
       </div>
@@ -312,14 +312,14 @@ export function UploadZone({ projectId }: { projectId: string }) {
   if (phase.kind === "selected") {
     const { file, clientDurationS } = phase;
     return (
-      <div className="rounded-xl border border-neutral-200 bg-white p-5 space-y-4">
+      <div className="rounded-xl border border-[#27272a] bg-[#18181b] p-5 space-y-4">
         <div className="flex items-start gap-4">
-          <div className="shrink-0 rounded-lg bg-neutral-100 p-3">
-            <Film className="h-5 w-5 text-neutral-500" />
+          <div className="shrink-0 rounded-lg bg-[#27272a] p-3">
+            <Film className="h-5 w-5 text-[#a1a1aa]" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-neutral-900 truncate">{file.name}</p>
-            <p className="text-xs text-neutral-400 mt-0.5">
+            <p className="text-sm font-medium text-[#fafafa] truncate">{file.name}</p>
+            <p className="text-xs text-[#71717a] mt-0.5">
               {fmtSize(file.size)}
               {clientDurationS != null && ` · ${fmtDur(clientDurationS)}`}
             </p>
@@ -327,7 +327,7 @@ export function UploadZone({ projectId }: { projectId: string }) {
           <Button
             variant="ghost"
             size="icon"
-            className="shrink-0 h-7 w-7 text-neutral-400 hover:text-neutral-700"
+            className="shrink-0 h-7 w-7 text-[#71717a] hover:text-[#a1a1aa]"
             onClick={() => setPhase({ kind: "idle" })}
           >
             <X className="h-4 w-4" />
@@ -335,7 +335,7 @@ export function UploadZone({ projectId }: { projectId: string }) {
         </div>
         <Button
           onClick={startUpload}
-          className="w-full bg-neutral-900 hover:bg-neutral-700 text-white gap-2"
+          className="w-full bg-[#6366f1] hover:bg-[#6366f1]/80 text-white gap-2"
         >
           <Upload className="h-4 w-4" />
           Upload video
@@ -350,8 +350,8 @@ export function UploadZone({ projectId }: { projectId: string }) {
       className={cn(
         "flex flex-col items-center justify-center rounded-xl border-2 border-dashed cursor-pointer transition-colors p-10 select-none",
         dragOver
-          ? "border-neutral-400 bg-neutral-50"
-          : "border-neutral-200 bg-white hover:border-neutral-300 hover:bg-neutral-50"
+          ? "border-[#6366f1] bg-[#6366f1]/5"
+          : "border-[#3f3f46] bg-[#18181b] hover:border-[#6366f1] hover:bg-[#18181b]"
       )}
       onDragOver={(e) => {
         e.preventDefault();
@@ -360,9 +360,9 @@ export function UploadZone({ projectId }: { projectId: string }) {
       onDragLeave={() => setDragOver(false)}
       onDrop={handleDrop}
     >
-      <Upload className="h-8 w-8 text-neutral-300 mb-3" />
-      <p className="text-sm font-medium text-neutral-700">Drop your video here</p>
-      <p className="text-xs text-neutral-400 mt-1">
+      <Upload className="h-8 w-8 text-[#52525b] mb-3" />
+      <p className="text-sm font-medium text-[#a1a1aa]">Drop your video here</p>
+      <p className="text-xs text-[#71717a] mt-1">
         MP4, MOV, or WebM · up to 500 MB · 15–60 seconds
       </p>
       <input

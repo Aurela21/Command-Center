@@ -232,7 +232,7 @@ export default function StaticAdJobPage() {
   if (!job) {
     return (
       <div className="max-w-4xl mx-auto px-8 py-10">
-        <p className="text-neutral-500">Job not found.</p>
+        <p className="text-[#a1a1aa]">Job not found.</p>
       </div>
     );
   }
@@ -259,15 +259,15 @@ export default function StaticAdJobPage() {
       <div className="flex items-center gap-3 mb-8">
         <button
           onClick={() => router.push("/static-ads")}
-          className="text-neutral-400 hover:text-neutral-600 transition-colors"
+          className="text-[#71717a] hover:text-[#a1a1aa] transition-colors"
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
         <div className="flex-1">
-          <h1 className="text-lg font-semibold text-neutral-900">
+          <h1 className="text-lg font-semibold text-[#fafafa]">
             {job.productName ?? "Static Ad"}
           </h1>
-          <p className="text-xs text-neutral-400">
+          <p className="text-xs text-[#71717a]">
             {STATUS_LABEL[job.status] ?? job.status}
             {progress > 0 && ` — ${progress}%`}
           </p>
@@ -291,17 +291,17 @@ export default function StaticAdJobPage() {
           className={cn(
             "mb-8",
             hasGenerations &&
-              "rounded-xl border border-neutral-200 bg-neutral-50 p-6"
+              "rounded-xl border border-[#27272a] bg-[#09090b] p-6"
           )}
         >
           {hasGenerations && (
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-neutral-900">
+              <h3 className="text-sm font-semibold text-[#fafafa]">
                 New Reference Ad
               </h3>
               <button
                 onClick={handleCancelNewRound}
-                className="text-neutral-400 hover:text-neutral-600 transition-colors"
+                className="text-[#71717a] hover:text-[#a1a1aa] transition-colors"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -312,12 +312,12 @@ export default function StaticAdJobPage() {
             {/* Left: Reference image / upload */}
             <div className="space-y-4">
               {!hasGenerations && (
-                <h3 className="text-sm font-semibold text-neutral-900">
+                <h3 className="text-sm font-semibold text-[#fafafa]">
                   Reference Ad
                 </h3>
               )}
               {job.inputImageUrl ? (
-                <div className="rounded-xl border border-neutral-200 overflow-hidden bg-neutral-100">
+                <div className="rounded-xl border border-[#27272a] overflow-hidden bg-[#18181b]">
                   <img
                     src={job.inputImageUrl}
                     alt="Reference ad"
@@ -336,7 +336,7 @@ export default function StaticAdJobPage() {
                 !isAnalyzing && (
                   <Button
                     onClick={() => analyzeMutation.mutate()}
-                    className="w-full bg-neutral-900 hover:bg-neutral-700 text-white gap-2"
+                    className="w-full bg-[#6366f1] hover:bg-[#6366f1]/80 text-white gap-2"
                   >
                     <Scan className="h-4 w-4" />
                     Analyze Ad
@@ -377,26 +377,26 @@ export default function StaticAdJobPage() {
 
               {isGenerating && (
                 <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
-                  <Loader2 className="h-10 w-10 text-neutral-400 animate-spin" />
-                  <p className="text-sm font-medium text-neutral-600">
+                  <Loader2 className="h-10 w-10 text-[#71717a] animate-spin" />
+                  <p className="text-sm font-medium text-[#a1a1aa]">
                     Generating your ad...
                   </p>
                   {progress > 0 && (
-                    <div className="w-48 bg-neutral-200 rounded-full h-1.5">
+                    <div className="w-48 bg-[#27272a] rounded-full h-1.5">
                       <div
-                        className="bg-neutral-900 h-1.5 rounded-full transition-all"
+                        className="bg-[#6366f1] h-1.5 rounded-full transition-all"
                         style={{ width: `${progress}%` }}
                       />
                     </div>
                   )}
-                  <p className="text-xs text-neutral-400">
+                  <p className="text-xs text-[#71717a]">
                     This may take up to a minute
                   </p>
                 </div>
               )}
 
               {job.status === "failed" && (
-                <div className="rounded-xl border border-red-200 bg-red-50 p-6 space-y-3">
+                <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-6 space-y-3">
                   <div className="flex items-center gap-2 text-red-600">
                     <AlertTriangle className="h-5 w-5" />
                     <span className="text-sm font-medium">
@@ -423,7 +423,7 @@ export default function StaticAdJobPage() {
 
               {job.status === "uploading" && !job.inputImageUrl && !hasGenerations && (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
-                  <p className="text-sm text-neutral-400">
+                  <p className="text-sm text-[#71717a]">
                     Upload a reference ad image to get started.
                   </p>
                 </div>

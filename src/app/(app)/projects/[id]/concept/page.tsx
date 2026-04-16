@@ -107,7 +107,7 @@ export default function ConceptPage() {
   return (
     <div className="max-w-3xl mx-auto px-8 py-10">
       <div className="mb-8">
-        <h1 className="text-xl font-semibold text-neutral-900">New Concept</h1>
+        <h1 className="text-xl font-semibold text-[#fafafa]">New Concept</h1>
         <p className="text-sm text-neutral-400 mt-0.5">
           Describe your video concept and AI will generate a scene breakdown
         </p>
@@ -146,12 +146,12 @@ export default function ConceptPage() {
       {scenes.length > 0 && (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-medium text-neutral-700">
+            <h2 className="text-sm font-medium text-[#a1a1aa]">
               {scenes.length} Scenes · {scenes.reduce((t, s) => t + s.targetClipDurationS, 0).toFixed(0)}s total
             </h2>
             <button
               onClick={addScene}
-              className="flex items-center gap-1.5 text-xs text-neutral-500 hover:text-neutral-700 transition-colors"
+              className="flex items-center gap-1.5 text-xs text-[#a1a1aa] hover:text-[#a1a1aa] transition-colors"
             >
               <Plus className="h-3.5 w-3.5" />
               Add scene
@@ -162,28 +162,28 @@ export default function ConceptPage() {
             {scenes.map((scene, idx) => (
               <div
                 key={idx}
-                className="rounded-xl border border-neutral-200 bg-white p-5 space-y-3"
+                className="rounded-xl border border-[#27272a] bg-[#18181b] p-5 space-y-3"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-2.5">
                     <span className="text-xs font-medium text-neutral-400 tabular-nums">
                       Scene {String(scene.sceneOrder).padStart(2, "0")}
                     </span>
-                    <span className="text-xs text-neutral-300">
+                    <span className="text-xs text-[#52525b]">
                       · {scene.targetClipDurationS.toFixed(1)}s
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <button
                       onClick={() => setEditingIdx(editingIdx === idx ? null : idx)}
-                      className="p-1 rounded hover:bg-neutral-100 text-neutral-400 hover:text-neutral-600 transition-colors"
+                      className="p-1 rounded hover:bg-[#27272a] text-neutral-400 hover:text-[#fafafa] transition-colors"
                     >
                       <Pencil className="h-3.5 w-3.5" />
                     </button>
                     {scenes.length > 1 && (
                       <button
                         onClick={() => removeScene(idx)}
-                        className="p-1 rounded hover:bg-red-50 text-neutral-400 hover:text-red-500 transition-colors"
+                        className="p-1 rounded hover:bg-red-500/10 text-neutral-400 hover:text-red-500 transition-colors"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -201,7 +201,7 @@ export default function ConceptPage() {
                         value={scene.description}
                         onChange={(e) => updateScene(idx, { description: e.target.value })}
                         rows={2}
-                        className="w-full text-sm rounded-md border border-neutral-200 px-3 py-2 bg-neutral-50 resize-none focus:outline-none focus:ring-2 focus:ring-neutral-200 transition-all"
+                        className="w-full text-sm rounded-md border border-[#27272a] px-3 py-2 bg-[#09090b] text-[#fafafa] resize-none focus:outline-none focus:ring-2 focus:ring-[#6366f1]/50 transition-all"
                       />
                     </div>
                     <div className="grid grid-cols-[1fr_80px] gap-3">
@@ -213,7 +213,7 @@ export default function ConceptPage() {
                           value={scene.klingPrompt}
                           onChange={(e) => updateScene(idx, { klingPrompt: e.target.value })}
                           rows={2}
-                          className="w-full text-sm rounded-md border border-neutral-200 px-3 py-2 bg-neutral-50 resize-none focus:outline-none focus:ring-2 focus:ring-neutral-200 transition-all"
+                          className="w-full text-sm rounded-md border border-[#27272a] px-3 py-2 bg-[#09090b] text-[#fafafa] resize-none focus:outline-none focus:ring-2 focus:ring-[#6366f1]/50 transition-all"
                         />
                       </div>
                       <div>
@@ -223,7 +223,7 @@ export default function ConceptPage() {
                         <select
                           value={scene.targetClipDurationS}
                           onChange={(e) => updateScene(idx, { targetClipDurationS: parseFloat(e.target.value) })}
-                          className="w-full text-sm rounded-md border border-neutral-200 px-2 py-2 bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-neutral-200"
+                          className="w-full text-sm rounded-md border border-[#27272a] px-2 py-2 bg-[#09090b] text-[#fafafa] focus:outline-none focus:ring-2 focus:ring-[#6366f1]/50"
                         >
                           {[3, 4, 5, 6, 7].map((d) => (
                             <option key={d} value={d}>{d}s</option>
@@ -239,7 +239,7 @@ export default function ConceptPage() {
                         value={scene.seedPrompt}
                         onChange={(e) => updateScene(idx, { seedPrompt: e.target.value })}
                         rows={2}
-                        className="w-full text-sm rounded-md border border-neutral-200 px-3 py-2 bg-neutral-50 resize-none focus:outline-none focus:ring-2 focus:ring-neutral-200 transition-all"
+                        className="w-full text-sm rounded-md border border-[#27272a] px-3 py-2 bg-[#09090b] text-[#fafafa] resize-none focus:outline-none focus:ring-2 focus:ring-[#6366f1]/50 transition-all"
                       />
                     </div>
                     <button
@@ -251,17 +251,17 @@ export default function ConceptPage() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    <p className="text-sm text-neutral-600 leading-relaxed">
-                      {scene.description || <span className="text-neutral-300 italic">No description</span>}
+                    <p className="text-sm text-[#a1a1aa] leading-relaxed">
+                      {scene.description || <span className="text-[#52525b] italic">No description</span>}
                     </p>
                     {scene.klingPrompt && (
-                      <div className="rounded-lg bg-neutral-50 px-3 py-2">
+                      <div className="rounded-lg bg-[#18181b] px-3 py-2">
                         <p className="text-[10px] font-medium uppercase tracking-widest text-neutral-400 mb-0.5">Kling Prompt</p>
-                        <p className="text-xs text-neutral-500 leading-relaxed">{scene.klingPrompt}</p>
+                        <p className="text-xs text-[#a1a1aa] leading-relaxed">{scene.klingPrompt}</p>
                       </div>
                     )}
                     {scene.seedPrompt && (
-                      <div className="rounded-lg bg-violet-50/50 px-3 py-2">
+                      <div className="rounded-lg bg-violet-500/10 px-3 py-2">
                         <p className="text-[10px] font-medium uppercase tracking-widest text-violet-400 mb-0.5">Seed Prompt</p>
                         <p className="text-xs text-violet-600/70 leading-relaxed">{scene.seedPrompt}</p>
                       </div>
@@ -276,7 +276,7 @@ export default function ConceptPage() {
           <Button
             onClick={handleProceed}
             disabled={proceeding || scenes.length === 0}
-            className="w-full gap-2 bg-neutral-900 hover:bg-neutral-700 text-white h-11 text-sm"
+            className="w-full gap-2 bg-[#6366f1] hover:bg-[#6366f1]/80 text-white h-11 text-sm"
           >
             {proceeding ? (
               <>

@@ -129,26 +129,26 @@ export default function ProductDetailPage() {
 
   if (isLoading || !product) {
     return (
-      <div className="h-full flex items-center justify-center bg-white">
-        <Loader2 className="h-6 w-6 animate-spin text-neutral-300" />
+      <div className="h-full flex items-center justify-center bg-[#18181b]">
+        <Loader2 className="h-6 w-6 animate-spin text-[#52525b]" />
       </div>
     );
   }
 
   return (
-    <div className="h-full flex flex-col overflow-hidden bg-white">
+    <div className="h-full flex flex-col overflow-hidden bg-[#18181b]">
       {/* Header */}
-      <div className="shrink-0 px-8 py-5 border-b border-neutral-200">
+      <div className="shrink-0 px-8 py-5 border-b border-[#27272a]">
         <div className="flex items-start justify-between">
           <div>
             <button
               onClick={() => router.push("/knowledge/product_assets")}
-              className="inline-flex items-center gap-1.5 text-xs text-neutral-400 hover:text-neutral-600 transition-colors mb-2"
+              className="inline-flex items-center gap-1.5 text-xs text-[#71717a] hover:text-[#a1a1aa] transition-colors mb-2"
             >
               <ArrowLeft className="h-3 w-3" />
               Product Assets
             </button>
-            <h1 className="text-base font-semibold text-neutral-900">
+            <h1 className="text-base font-semibold text-[#fafafa]">
               {product.name}
             </h1>
             <p className="text-[11px] font-mono text-orange-500 mt-0.5">
@@ -167,7 +167,7 @@ export default function ProductDetailPage() {
             <Button
               onClick={() => inputRef.current?.click()}
               disabled={!!uploading}
-              className="gap-2 bg-neutral-900 hover:bg-neutral-700 text-white h-9 text-sm"
+              className="gap-2 bg-[#6366f1] hover:bg-[#6366f1]/80 text-white h-9 text-sm"
             >
               {uploading ? (
                 <>
@@ -190,13 +190,13 @@ export default function ProductDetailPage() {
           {/* Description */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">
+              <p className="text-xs font-medium uppercase tracking-widest text-[#71717a]">
                 Product Description
               </p>
               {descInput === null && (
                 <button
                   onClick={() => setDescInput(product.description ?? "")}
-                  className="text-xs text-neutral-400 hover:text-neutral-600 transition-colors"
+                  className="text-xs text-[#71717a] hover:text-[#a1a1aa] transition-colors"
                 >
                   Edit
                 </button>
@@ -208,7 +208,7 @@ export default function ProductDetailPage() {
                   value={descInput}
                   onChange={(e) => setDescInput(e.target.value)}
                   rows={3}
-                  className="w-full text-sm rounded-md border border-neutral-200 px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-neutral-200 focus:border-neutral-300 transition-all placeholder:text-neutral-400"
+                  className="w-full text-sm rounded-md border border-[#27272a] bg-[#09090b] text-[#fafafa] px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-[#27272a] focus:border-[#3f3f46] transition-all placeholder:text-[#71717a]"
                   placeholder="Describe the product, its features, materials, colors..."
                 />
                 <div className="flex gap-2">
@@ -216,7 +216,7 @@ export default function ProductDetailPage() {
                     size="sm"
                     onClick={() => descMutation.mutate(descInput)}
                     disabled={descMutation.isPending}
-                    className="h-7 text-xs bg-neutral-900 hover:bg-neutral-700 text-white"
+                    className="h-7 text-xs bg-[#6366f1] hover:bg-[#6366f1]/80 text-white"
                   >
                     Save
                   </Button>
@@ -231,9 +231,9 @@ export default function ProductDetailPage() {
                 </div>
               </div>
             ) : (
-              <p className="text-sm text-neutral-600 leading-relaxed">
+              <p className="text-sm text-[#a1a1aa] leading-relaxed">
                 {product.description || (
-                  <span className="text-neutral-300 italic">
+                  <span className="text-[#52525b] italic">
                     No description yet — add one to help Gemini understand the product
                   </span>
                 )}
@@ -243,17 +243,17 @@ export default function ProductDetailPage() {
 
           {/* Images */}
           <div>
-            <p className="text-xs font-medium uppercase tracking-widest text-neutral-400 mb-3">
+            <p className="text-xs font-medium uppercase tracking-widest text-[#71717a] mb-3">
               Product Images ({product.images.length})
             </p>
 
             {product.images.length === 0 ? (
-              <div className="border border-dashed border-neutral-200 rounded-xl p-10 text-center">
-                <Upload className="h-8 w-8 text-neutral-200 mx-auto mb-3" />
-                <p className="text-sm text-neutral-400">
+              <div className="border border-dashed border-[#27272a] rounded-xl p-10 text-center">
+                <Upload className="h-8 w-8 text-[#52525b] mx-auto mb-3" />
+                <p className="text-sm text-[#71717a]">
                   Upload product photos from multiple angles
                 </p>
-                <p className="text-xs text-neutral-300 mt-1">
+                <p className="text-xs text-[#52525b] mt-1">
                   Claude will auto-label each image. You can edit labels after.
                 </p>
               </div>
@@ -264,9 +264,9 @@ export default function ProductDetailPage() {
                   return (
                     <div
                       key={img.id}
-                      className="rounded-xl border border-neutral-100 overflow-hidden group"
+                      className="rounded-xl border border-[#1a1a1e] overflow-hidden group"
                     >
-                      <div className="aspect-square relative bg-neutral-50">
+                      <div className="aspect-square relative bg-[#09090b]">
                         <img
                           src={img.fileUrl}
                           alt={img.label}
@@ -295,7 +295,7 @@ export default function ProductDetailPage() {
                                 if (e.key === "Escape") setEditingLabel(null);
                               }}
                               autoFocus
-                              className="flex-1 text-xs border border-neutral-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-neutral-300"
+                              className="flex-1 text-xs border border-[#27272a] bg-[#09090b] text-[#fafafa] rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#3f3f46]"
                             />
                             <button
                               onClick={() => {
@@ -306,20 +306,20 @@ export default function ProductDetailPage() {
                                   });
                                 }
                               }}
-                              className="p-1 text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
+                              className="p-1 text-emerald-400 hover:bg-emerald-500/10 rounded transition-colors"
                             >
                               <Check className="h-3.5 w-3.5" />
                             </button>
                             <button
                               onClick={() => setEditingLabel(null)}
-                              className="p-1 text-neutral-400 hover:bg-neutral-100 rounded transition-colors"
+                              className="p-1 text-[#71717a] hover:bg-[#27272a] rounded transition-colors"
                             >
                               <X className="h-3.5 w-3.5" />
                             </button>
                           </div>
                         ) : (
                           <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-neutral-700">
+                            <span className="text-xs font-medium text-[#a1a1aa]">
                               {img.label}
                             </span>
                             <button
@@ -327,14 +327,14 @@ export default function ProductDetailPage() {
                                 setEditingLabel(img.id);
                                 setLabelInput(img.label);
                               }}
-                              className="p-1 text-neutral-300 hover:text-neutral-600 transition-colors"
+                              className="p-1 text-[#52525b] hover:text-[#a1a1aa] transition-colors"
                             >
                               <Pencil className="h-3 w-3" />
                             </button>
                           </div>
                         )}
                         {img.autoLabeled && img.label !== img.autoLabeled && (
-                          <p className="text-[10px] text-neutral-300 mt-0.5">
+                          <p className="text-[10px] text-[#52525b] mt-0.5">
                             Auto: {img.autoLabeled}
                           </p>
                         )}

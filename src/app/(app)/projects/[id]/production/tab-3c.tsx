@@ -51,26 +51,26 @@ function statusColor(
   switch (status) {
     case "idle":
       return {
-        text: "text-neutral-400",
-        bg: "bg-neutral-50",
-        dot: "bg-neutral-300",
+        text: "text-[#71717a]",
+        bg: "bg-[#09090b]",
+        dot: "bg-[#52525b]",
       };
     case "queued":
       return {
-        text: "text-amber-600",
-        bg: "bg-amber-50",
+        text: "text-amber-400",
+        bg: "bg-amber-500/10",
         dot: "bg-amber-400",
       };
     case "processing":
-      return { text: "text-blue-600", bg: "bg-blue-50", dot: "bg-blue-400" };
+      return { text: "text-blue-400", bg: "bg-blue-500/10", dot: "bg-blue-400" };
     case "completed":
       return {
-        text: "text-emerald-600",
-        bg: "bg-emerald-50",
+        text: "text-emerald-400",
+        bg: "bg-emerald-500/10",
         dot: "bg-emerald-500",
       };
     case "failed":
-      return { text: "text-red-600", bg: "bg-red-50", dot: "bg-red-500" };
+      return { text: "text-red-400", bg: "bg-red-500/10", dot: "bg-red-500" };
   }
 }
 
@@ -104,7 +104,7 @@ function QualityWarningDialog({
             </span>
             , which is below the 60-point threshold.
             {qs?.notes && (
-              <span className="block mt-1.5 text-neutral-600 italic">
+              <span className="block mt-1.5 text-[#a1a1aa] italic">
                 &ldquo;{qs.notes}&rdquo;
               </span>
             )}
@@ -125,7 +125,7 @@ function QualityWarningDialog({
               onRetry();
               onClose();
             }}
-            className="bg-neutral-900 hover:bg-neutral-700 text-white gap-1.5"
+            className="bg-[#6366f1] hover:bg-[#6366f1]/80 text-white gap-1.5"
           >
             <RefreshCw className="h-3.5 w-3.5" />
             Retry generation
@@ -251,17 +251,17 @@ function SceneGenerationCard({
   return (
     <div
       className={cn(
-        "rounded-xl border bg-white overflow-hidden transition-all",
+        "rounded-xl border bg-[#18181b] overflow-hidden transition-all",
         expanded && "col-span-full",
         scene.videoJobStatus === "completed"
           ? hasLowQuality
-            ? "border-amber-300"
-            : "border-emerald-200"
+            ? "border-amber-500/30"
+            : "border-emerald-500/20"
           : scene.videoJobStatus === "failed"
-          ? "border-red-200"
+          ? "border-red-500/20"
           : scene.videoJobStatus === "processing"
-          ? "border-blue-200"
-          : "border-neutral-100"
+          ? "border-blue-500/20"
+          : "border-[#1a1a1e]"
       )}
     >
       {/* Seed image or video thumbnail — click to expand */}
@@ -333,7 +333,7 @@ function SceneGenerationCard({
         )}
         {!scene.seedImageApproved && (
           <div className="absolute inset-0 flex items-center justify-center">
-            <Clapperboard className="h-8 w-8 text-neutral-200" />
+            <Clapperboard className="h-8 w-8 text-[#27272a]" />
           </div>
         )}
 
@@ -364,9 +364,9 @@ function SceneGenerationCard({
       {/* Card body */}
       <div className="p-3 space-y-2.5">
         {/* Prompt snippet */}
-        <p className="text-xs text-neutral-500 leading-snug line-clamp-2 min-h-[2.5rem]">
+        <p className="text-xs text-[#a1a1aa] leading-snug line-clamp-2 min-h-[2.5rem]">
           {scene.klingPrompt || (
-            <span className="text-neutral-300 italic">No prompt set</span>
+            <span className="text-[#52525b] italic">No prompt set</span>
           )}
         </p>
 
@@ -379,7 +379,7 @@ function SceneGenerationCard({
             {statusLabel(scene.videoJobStatus)}
           </span>
           {scene.videoJobStatus === "processing" && (
-            <span className="text-xs text-neutral-400 tabular-nums ml-auto">
+            <span className="text-xs text-[#71717a] tabular-nums ml-auto">
               {scene.videoJobProgress}%
             </span>
           )}
@@ -387,7 +387,7 @@ function SceneGenerationCard({
 
         {/* Progress bar (only when processing) */}
         {scene.videoJobStatus === "processing" && (
-          <div className="h-1 bg-neutral-100 rounded-full overflow-hidden">
+          <div className="h-1 bg-[#27272a] rounded-full overflow-hidden">
             <div
               className="h-full bg-blue-500 rounded-full transition-all duration-500"
               style={{ width: `${scene.videoJobProgress}%` }}
@@ -404,10 +404,10 @@ function SceneGenerationCard({
 
         {/* Missing prerequisites */}
         {!scene.seedImageApproved && (
-          <p className="text-[11px] text-neutral-400">Seed image needed</p>
+          <p className="text-[11px] text-[#71717a]">Seed image needed</p>
         )}
         {scene.seedImageApproved && !scene.klingPromptApproved && (
-          <p className="text-[11px] text-neutral-400">
+          <p className="text-[11px] text-[#71717a]">
             Prompt approval needed
           </p>
         )}
@@ -443,7 +443,7 @@ function SceneGenerationCard({
                 )}
                 <button
                   onClick={handleGenerate}
-                  className="flex items-center gap-1.5 text-xs font-medium text-neutral-400 hover:text-neutral-700 transition-colors"
+                  className="flex items-center gap-1.5 text-xs font-medium text-[#71717a] hover:text-[#a1a1aa] transition-colors"
                 >
                   <RefreshCw className="h-3 w-3" />
                   Rerun
@@ -455,10 +455,10 @@ function SceneGenerationCard({
                   className={cn(
                     "text-xs font-semibold tabular-nums px-2 py-0.5 rounded-full transition-colors",
                     scene.qualityScore.overall < 60
-                      ? "bg-red-50 text-red-600 hover:bg-red-100"
+                      ? "bg-red-500/10 text-red-400 hover:bg-red-500/20"
                       : scene.qualityScore.overall < 80
-                      ? "bg-amber-50 text-amber-600 hover:bg-amber-100"
-                      : "bg-emerald-50 text-emerald-600"
+                      ? "bg-amber-500/10 text-amber-400 hover:bg-amber-500/20"
+                      : "bg-emerald-500/10 text-emerald-400"
                   )}
                 >
                   {scene.qualityScore.overall}
@@ -472,8 +472,8 @@ function SceneGenerationCard({
               className={cn(
                 "flex items-center gap-1.5 text-xs font-medium transition-colors",
                 canGenerate && scene.videoJobStatus === "idle"
-                  ? "text-neutral-700 hover:text-neutral-900"
-                  : "text-neutral-300 cursor-not-allowed"
+                  ? "text-[#a1a1aa] hover:text-[#fafafa]"
+                  : "text-[#52525b] cursor-not-allowed"
               )}
             >
               {scene.videoJobStatus === "queued" ? (
@@ -497,11 +497,11 @@ function SceneGenerationCard({
         const active = scene.videoVersions.filter((v) => !v.isRejected);
         const rejected = scene.videoVersions.filter((v) => v.isRejected);
         return (
-        <div className="border-t border-neutral-100 px-3 py-3">
-          <p className="text-[11px] font-medium text-neutral-400 uppercase tracking-widest mb-2">
+        <div className="border-t border-[#1a1a1e] px-3 py-3">
+          <p className="text-[11px] font-medium text-[#71717a] uppercase tracking-widest mb-2">
             Generations ({active.length})
             {rejected.length > 0 && (
-              <span className="text-neutral-300 font-normal ml-1">
+              <span className="text-[#52525b] font-normal ml-1">
                 ({rejected.length} rejected)
               </span>
             )}
@@ -512,7 +512,7 @@ function SceneGenerationCard({
                 key={v.id}
                 className={cn(
                   "flex items-start gap-2.5 p-2 rounded-lg border transition-colors group/version",
-                  i === 0 ? "border-emerald-200 bg-emerald-50/30" : "border-neutral-100 bg-neutral-50/50"
+                  i === 0 ? "border-emerald-500/20 bg-emerald-500/5" : "border-[#1a1a1e] bg-[#09090b]/50"
                 )}
               >
                 <video
@@ -532,20 +532,20 @@ function SceneGenerationCard({
                           Latest
                         </span>
                       )}
-                      <span className="text-[10px] text-neutral-400">
+                      <span className="text-[10px] text-[#71717a]">
                         v{active.length - i}
                       </span>
                     </div>
                     <button
                       onClick={() => handleRejectVideo(v.id)}
-                      className="p-1 rounded text-neutral-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover/version:opacity-100 transition-all"
+                      className="p-1 rounded text-[#52525b] hover:text-red-500 hover:bg-red-500/10 opacity-0 group-hover/version:opacity-100 transition-all"
                       title="Reject — Claude will analyze why it's bad"
                     >
                       <Trash2 className="h-3 w-3" />
                     </button>
                   </div>
                   {v.prompt && (
-                    <p className="text-[11px] text-neutral-500 leading-snug line-clamp-2">
+                    <p className="text-[11px] text-[#a1a1aa] leading-snug line-clamp-2">
                       {v.prompt}
                     </p>
                   )}
@@ -566,12 +566,12 @@ function SceneGenerationCard({
           {/* Rejected versions */}
           {rejected.length > 0 && (
             <details className="mt-3">
-              <summary className="text-[11px] text-neutral-400 cursor-pointer hover:text-neutral-600 transition-colors">
+              <summary className="text-[11px] text-[#71717a] cursor-pointer hover:text-[#a1a1aa] transition-colors">
                 {rejected.length} rejected — click to view
               </summary>
               <div className="mt-2 space-y-2">
                 {rejected.map((v) => (
-                  <div key={v.id} className="flex gap-2.5 p-2 rounded-lg bg-red-50/50 border border-red-100">
+                  <div key={v.id} className="flex gap-2.5 p-2 rounded-lg bg-red-500/5 border border-red-500/20">
                     <video
                       src={v.fileUrl}
                       className="w-12 aspect-[9/16] rounded object-cover shrink-0 opacity-60"
@@ -581,12 +581,12 @@ function SceneGenerationCard({
                     <div className="min-w-0">
                       <p className="text-[10px] font-medium text-red-500">Rejected</p>
                       {v.rejectionReason && (
-                        <p className="text-[10px] text-neutral-500 leading-relaxed mt-0.5 whitespace-pre-line">
+                        <p className="text-[10px] text-[#a1a1aa] leading-relaxed mt-0.5 whitespace-pre-line">
                           {v.rejectionReason}
                         </p>
                       )}
                       {!v.rejectionReason && (
-                        <p className="text-[10px] text-neutral-300 italic mt-0.5">Analyzing...</p>
+                        <p className="text-[10px] text-[#52525b] italic mt-0.5">Analyzing...</p>
                       )}
                     </div>
                   </div>
@@ -636,15 +636,15 @@ function SceneGenerationCard({
               ) : null;
             })()}
             <div>
-              <p className="text-xs font-medium text-neutral-500 mb-1.5">
+              <p className="text-xs font-medium text-[#a1a1aa] mb-1.5">
                 Base scene prompt
               </p>
-              <p className="text-xs text-neutral-400 bg-neutral-50 rounded px-3 py-2 leading-relaxed">
+              <p className="text-xs text-[#71717a] bg-[#09090b] rounded px-3 py-2 leading-relaxed">
                 {scene.klingPrompt}
               </p>
             </div>
             <div>
-              <p className="text-xs font-medium text-neutral-500 mb-1.5">
+              <p className="text-xs font-medium text-[#a1a1aa] mb-1.5">
                 AI direction (optional)
               </p>
               <div className="flex gap-2">
@@ -676,12 +676,12 @@ function SceneGenerationCard({
                   )}
                 </Button>
               </div>
-              <p className="text-[10px] text-neutral-300 mt-1">
+              <p className="text-[10px] text-[#52525b] mt-1">
                 Tell Claude how to adjust the prompt, or leave blank for auto-enhance
               </p>
             </div>
             <div>
-              <p className="text-xs font-medium text-neutral-500 mb-1.5">
+              <p className="text-xs font-medium text-[#a1a1aa] mb-1.5">
                 {refinedPrompt !== scene.klingPrompt ? "Enhanced prompt (editable)" : "Prompt to send (editable)"}
               </p>
               <textarea
@@ -692,10 +692,10 @@ function SceneGenerationCard({
                   "w-full text-sm rounded-md border px-3 py-2.5 resize-none focus:outline-none focus:ring-2 transition-all leading-relaxed",
                   refinedPrompt !== scene.klingPrompt
                     ? "border-blue-200 bg-blue-50/30 focus:ring-blue-200 focus:border-blue-300"
-                    : "border-neutral-200 bg-white focus:ring-neutral-200 focus:border-neutral-300"
+                    : "border-[#27272a] bg-[#18181b] focus:ring-[#27272a] focus:border-[#3f3f46]"
                 )}
               />
-              <p className="text-[11px] text-neutral-400 mt-1">
+              <p className="text-[11px] text-[#71717a] mt-1">
                 {refinedPrompt.trim().split(/\s+/).length} words
                 {refinedPrompt.trim().split(/\s+/).length > 40 && (
                   <span className="text-amber-500 ml-1">— Kling works best under 40 words</span>
@@ -705,18 +705,18 @@ function SceneGenerationCard({
           </div>
           <DialogFooter className="flex items-center !justify-between">
             <div className="flex items-center gap-2">
-              <p className="text-xs text-neutral-500">Clip length:</p>
-              <div className="flex rounded-md border border-neutral-200 overflow-hidden">
+              <p className="text-xs text-[#a1a1aa]">Clip length:</p>
+              <div className="flex rounded-md border border-[#27272a] overflow-hidden">
                 {[3, 4, 5, 6, 7].map((d, i) => (
                   <button
                     key={d}
                     onClick={() => setClipDuration(d)}
                     className={cn(
                       "px-3 py-1 text-xs font-medium transition-colors",
-                      i > 0 && "border-l border-neutral-200",
+                      i > 0 && "border-l border-[#27272a]",
                       clipDuration === d
-                        ? "bg-neutral-900 text-white"
-                        : "bg-white text-neutral-500 hover:bg-neutral-50"
+                        ? "bg-[#6366f1] text-white"
+                        : "bg-[#18181b] text-[#a1a1aa] hover:bg-[#27272a]"
                     )}
                   >
                     {d}s
@@ -731,7 +731,7 @@ function SceneGenerationCard({
               <Button
                 onClick={handleSubmit}
                 disabled={!refinedPrompt.trim()}
-                className="bg-neutral-900 hover:bg-neutral-700 text-white text-xs gap-2"
+                className="bg-[#6366f1] hover:bg-[#6366f1]/80 text-white text-xs gap-2"
               >
                 <Clapperboard className="h-3.5 w-3.5" />
                 Generate {clipDuration}s
@@ -805,10 +805,10 @@ export function Tab3C({ scenes, updateScene, projectId }: Props) {
   return (
     <div className="h-full flex flex-col overflow-hidden">
       {/* Toolbar */}
-      <div className="shrink-0 px-8 py-4 border-b border-neutral-100 bg-neutral-50/50 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4 text-xs text-neutral-500">
+      <div className="shrink-0 px-8 py-4 border-b border-[#1a1a1e] bg-[#09090b]/50 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4 text-xs text-[#a1a1aa]">
           <span>
-            <span className="font-medium text-neutral-700">
+            <span className="font-medium text-[#a1a1aa]">
               {readyScenes.length}
             </span>
             /{scenes.length} ready
@@ -832,7 +832,7 @@ export function Tab3C({ scenes, updateScene, projectId }: Props) {
         <Button
           onClick={handleGenerateAll}
           disabled={readyScenes.length === 0}
-          className="gap-2 bg-neutral-900 hover:bg-neutral-700 text-white h-9 text-sm disabled:opacity-40"
+          className="gap-2 bg-[#6366f1] hover:bg-[#6366f1]/80 text-white h-9 text-sm disabled:opacity-40"
         >
           <Play className="h-3.5 w-3.5" />
           Generate All

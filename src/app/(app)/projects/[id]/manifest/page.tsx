@@ -101,7 +101,7 @@ function dbSceneToMock(
 function BoundaryBadge({ source }: { source: MockScene["boundarySource"] }) {
   if (source === "ai") {
     return (
-      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
         <Sparkles className="h-3 w-3" />
         AI
       </span>
@@ -109,7 +109,7 @@ function BoundaryBadge({ source }: { source: MockScene["boundarySource"] }) {
   }
   if (source === "user_adjusted") {
     return (
-      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-100">
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
         <Pencil className="h-3 w-3" />
         Adjusted
       </span>
@@ -139,7 +139,7 @@ function ManifestTimeline({
   totalDurationMs: number;
 }) {
   return (
-    <div className="flex h-10 rounded-lg overflow-hidden gap-px bg-neutral-200">
+    <div className="flex h-10 rounded-lg overflow-hidden gap-px bg-[#27272a]">
       {scenes.map((scene, i) => {
         const pct =
           ((scene.endTimeMs - scene.startTimeMs) / totalDurationMs) * 100;
@@ -156,13 +156,13 @@ function ManifestTimeline({
               backgroundColor: isSelected ? "#171717" : sceneColor(i),
               minWidth: "4px",
             }}
-            className="relative flex items-center justify-center transition-colors hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900"
+            className="relative flex items-center justify-center transition-colors hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6366f1]"
           >
             {showLabel && (
               <span
                 className={cn(
                   "text-[11px] font-semibold tabular-nums select-none",
-                  isSelected ? "text-white" : "text-neutral-600"
+                  isSelected ? "text-white" : "text-[#a1a1aa]"
                 )}
               >
                 {scene.sceneOrder}
@@ -204,8 +204,8 @@ function ReferenceFramePicker({
             className={cn(
               "aspect-[9/16] rounded overflow-hidden border-2 transition-all focus-visible:outline-none",
               isSelected
-                ? "border-neutral-900 ring-2 ring-neutral-900 ring-offset-1"
-                : "border-neutral-100 hover:border-neutral-300"
+                ? "border-[#6366f1] ring-2 ring-[#6366f1] ring-offset-1"
+                : "border-[#1a1a1e] hover:border-[#3f3f46]"
             )}
           >
             <div
@@ -225,7 +225,7 @@ function ReferenceFramePicker({
               {isSelected && (
                 <div className="absolute inset-0 bg-black/10" />
               )}
-              <span className="relative text-[9px] font-mono font-semibold text-neutral-600 bg-white/80 px-1 py-0.5 rounded leading-none">
+              <span className="relative text-[9px] font-mono font-semibold text-[#a1a1aa] bg-black/60 px-1 py-0.5 rounded leading-none">
                 f{frame}
               </span>
             </div>
@@ -302,10 +302,10 @@ function SceneDetailPanel({
     <div className="p-6 space-y-7">
       <div className="flex items-start justify-between">
         <div className="flex items-end gap-3">
-          <span className="text-8xl font-light leading-none text-neutral-200 tabular-nums select-none">
+          <span className="text-8xl font-light leading-none text-[#27272a] tabular-nums select-none">
             {String(scene.sceneOrder).padStart(2, "0")}
           </span>
-          <span className="text-sm text-neutral-400 mb-2">
+          <span className="text-sm text-[#71717a] mb-2">
             {(durationMs / 1000).toFixed(1)}s &middot; f{scene.startFrame}–f{scene.endFrame}
           </span>
         </div>
@@ -315,7 +315,7 @@ function SceneDetailPanel({
       </div>
 
       <div>
-        <p className="text-xs font-medium uppercase tracking-widest text-neutral-400 mb-3">
+        <p className="text-xs font-medium uppercase tracking-widest text-[#71717a] mb-3">
           Reference Frame
         </p>
         {scene.referenceFrameUrl && (
@@ -323,7 +323,7 @@ function SceneDetailPanel({
             <img
               src={scene.referenceFrameUrl}
               alt="Reference frame"
-              className="w-full max-w-xs rounded-lg border border-neutral-100 object-cover aspect-[9/16]"
+              className="w-full max-w-xs rounded-lg border border-[#1a1a1e] object-cover aspect-[9/16]"
             />
           </div>
         )}
@@ -336,9 +336,9 @@ function SceneDetailPanel({
             onUpdate({ referenceFrame: frame, referenceFrameSource: "user_selected" })
           }
         />
-        <p className="text-xs text-neutral-400 mt-2">
+        <p className="text-xs text-[#71717a] mt-2">
           Selected:{" "}
-          <span className="font-mono font-medium text-neutral-600">
+          <span className="font-mono font-medium text-[#a1a1aa]">
             f{scene.referenceFrame}
           </span>
           {scene.referenceFrameSource === "user_selected" && (
@@ -348,12 +348,12 @@ function SceneDetailPanel({
       </div>
 
       <div>
-        <p className="text-xs font-medium uppercase tracking-widest text-neutral-400 mb-3">
+        <p className="text-xs font-medium uppercase tracking-widest text-[#71717a] mb-3">
           Boundaries
         </p>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <Label className="text-xs text-neutral-500">Start Frame</Label>
+            <Label className="text-xs text-[#a1a1aa]">Start Frame</Label>
             <Input
               value={startInput}
               onChange={(e) => setStartInput(e.target.value)}
@@ -366,7 +366,7 @@ function SceneDetailPanel({
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs text-neutral-500">End Frame</Label>
+            <Label className="text-xs text-[#a1a1aa]">End Frame</Label>
             <Input
               value={endInput}
               onChange={(e) => setEndInput(e.target.value)}
@@ -387,19 +387,19 @@ function SceneDetailPanel({
       </div>
 
       <div>
-        <p className="text-xs font-medium uppercase tracking-widest text-neutral-400 mb-3">
+        <p className="text-xs font-medium uppercase tracking-widest text-[#71717a] mb-3">
           Description
         </p>
         <textarea
           value={scene.description}
           onChange={(e) => onUpdate({ description: e.target.value })}
           rows={4}
-          className="w-full text-sm rounded-md border border-neutral-200 px-3 py-2.5 bg-white resize-none focus:outline-none focus:ring-2 focus:ring-neutral-200 focus:border-neutral-300 transition-all placeholder:text-neutral-400"
+          className="w-full text-sm rounded-md border border-[#27272a] px-3 py-2.5 bg-[#18181b] resize-none focus:outline-none focus:ring-2 focus:ring-[#27272a] focus:border-[#3f3f46] transition-all placeholder:text-[#71717a] text-[#fafafa]"
           placeholder="Describe what happens in this scene…"
         />
       </div>
 
-      <div className="flex items-center gap-2 pt-1 border-t border-neutral-100">
+      <div className="flex items-center gap-2 pt-1 border-t border-[#1a1a1e]">
         <Button variant="outline" size="sm" onClick={onSplit} className="gap-1.5 text-xs h-8">
           <Scissors className="h-3.5 w-3.5" />
           Split
@@ -415,7 +415,7 @@ function SceneDetailPanel({
             variant="outline"
             size="sm"
             onClick={onRemove}
-            className="gap-1.5 text-xs h-8 text-red-500 hover:text-red-600 hover:bg-red-50 hover:border-red-200 ml-auto"
+            className="gap-1.5 text-xs h-8 text-red-500 hover:text-red-400 hover:bg-red-500/10 hover:border-red-500/20 ml-auto"
           >
             <Trash2 className="h-3.5 w-3.5" />
             Remove
@@ -451,8 +451,8 @@ function SceneListItem({
       ref={ref}
       onClick={onSelect}
       className={cn(
-        "w-full text-left flex items-start gap-3 px-5 py-4 border-b border-neutral-100 transition-colors",
-        isSelected ? "bg-neutral-900" : "hover:bg-neutral-50"
+        "w-full text-left flex items-start gap-3 px-5 py-4 border-b border-[#1a1a1e] transition-colors",
+        isSelected ? "bg-[#6366f1]" : "hover:bg-[#27272a]"
       )}
     >
       <div className="shrink-0 flex flex-col items-center gap-1.5 pt-0.5">
@@ -463,10 +463,10 @@ function SceneListItem({
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-2 mb-1">
-          <span className={cn("text-xl font-light tabular-nums leading-none", isSelected ? "text-white/30" : "text-neutral-200")}>
+          <span className={cn("text-xl font-light tabular-nums leading-none", isSelected ? "text-white/30" : "text-[#27272a]")}>
             {String(scene.sceneOrder).padStart(2, "0")}
           </span>
-          <span className={cn("text-xs tabular-nums", isSelected ? "text-white/40" : "text-neutral-400")}>
+          <span className={cn("text-xs tabular-nums", isSelected ? "text-white/40" : "text-[#71717a]")}>
             {(durationMs / 1000).toFixed(1)}s
           </span>
           {scene.boundarySource !== "ai" && (
@@ -475,7 +475,7 @@ function SceneListItem({
             </span>
           )}
         </div>
-        <p className={cn("text-xs leading-relaxed line-clamp-2", isSelected ? "text-white/80" : "text-neutral-600")}>
+        <p className={cn("text-xs leading-relaxed line-clamp-2", isSelected ? "text-white/80" : "text-[#a1a1aa]")}>
           {scene.description}
         </p>
       </div>
@@ -681,11 +681,11 @@ export default function ManifestPage() {
 
   if (isAnalyzing || (scenesLoading && scenes.length === 0)) {
     return (
-      <div className="h-full flex flex-col items-center justify-center bg-white gap-4">
-        <Loader2 className="h-8 w-8 text-neutral-300 animate-spin" />
+      <div className="h-full flex flex-col items-center justify-center bg-[#18181b] gap-4">
+        <Loader2 className="h-8 w-8 text-[#52525b] animate-spin" />
         <div className="text-center">
-          <p className="text-sm font-medium text-neutral-700">Analyzing video…</p>
-          <p className="text-xs text-neutral-400 mt-1">
+          <p className="text-sm font-medium text-[#a1a1aa]">Analyzing video…</p>
+          <p className="text-xs text-[#71717a] mt-1">
             Claude is detecting scenes. This takes 30–60 seconds.
           </p>
         </div>
@@ -695,25 +695,25 @@ export default function ManifestPage() {
 
   if (scenes.length === 0) {
     return (
-      <div className="h-full flex items-center justify-center bg-white">
-        <p className="text-sm text-neutral-400">No scenes found. Try re-uploading the video.</p>
+      <div className="h-full flex items-center justify-center bg-[#18181b]">
+        <p className="text-sm text-[#71717a]">No scenes found. Try re-uploading the video.</p>
       </div>
     );
   }
 
   return (
-    <div className="h-full flex flex-col overflow-hidden bg-white">
+    <div className="h-full flex flex-col overflow-hidden bg-[#18181b]">
       {/* ── Header ── */}
-      <div className="shrink-0 flex items-center justify-between px-8 py-4 border-b border-neutral-200">
+      <div className="shrink-0 flex items-center justify-between px-8 py-4 border-b border-[#27272a]">
         <div>
-          <h1 className="text-base font-semibold text-neutral-900">Scene Manifest</h1>
-          <p className="text-xs text-neutral-400 mt-0.5">
+          <h1 className="text-base font-semibold text-[#fafafa]">Scene Manifest</h1>
+          <p className="text-xs text-[#71717a] mt-0.5">
             {scenes.length} scenes &middot; {msToTimecode(totalDurationMs)} total
           </p>
         </div>
         <Button
           onClick={() => setApproveOpen(true)}
-          className="bg-neutral-900 hover:bg-neutral-700 text-white gap-2"
+          className="bg-[#6366f1] hover:bg-[#6366f1]/80 text-white gap-2"
         >
           <Check className="h-4 w-4" />
           Approve Manifest
@@ -721,14 +721,14 @@ export default function ManifestPage() {
       </div>
 
       {/* ── Timeline ── */}
-      <div className="shrink-0 px-8 py-4 border-b border-neutral-100 bg-neutral-50/50">
+      <div className="shrink-0 px-8 py-4 border-b border-[#1a1a1e] bg-[#09090b]/50">
         <ManifestTimeline
           scenes={scenes}
           selectedId={selectedId}
           onSelect={selectScene}
           totalDurationMs={totalDurationMs}
         />
-        <div className="flex items-center justify-between mt-1.5 text-[11px] text-neutral-400 font-mono">
+        <div className="flex items-center justify-between mt-1.5 text-[11px] text-[#71717a] font-mono">
           <span>0:00</span>
           <span>{msToTimecode(totalDurationMs * 0.25)}</span>
           <span>{msToTimecode(totalDurationMs * 0.5)}</span>
@@ -739,7 +739,7 @@ export default function ManifestPage() {
 
       {/* ── Content row ── */}
       <div className="flex-1 flex overflow-hidden">
-        <div ref={listRef} className="w-[38%] shrink-0 border-r border-neutral-200 overflow-y-auto">
+        <div ref={listRef} className="w-[38%] shrink-0 border-r border-[#27272a] overflow-y-auto">
           {scenes.map((scene, i) => (
             <SceneListItem
               key={scene.id}
@@ -751,7 +751,7 @@ export default function ManifestPage() {
             />
           ))}
         </div>
-        <div className="flex-1 overflow-y-auto bg-white">
+        <div className="flex-1 overflow-y-auto bg-[#18181b]">
           {selectedScene && (
             <SceneDetailPanel
               key={selectedScene.id}
@@ -790,7 +790,7 @@ export default function ManifestPage() {
             <Button
               onClick={() => approveMutation.mutate()}
               disabled={approveMutation.isPending}
-              className="bg-neutral-900 hover:bg-neutral-700 text-white"
+              className="bg-[#6366f1] hover:bg-[#6366f1]/80 text-white"
             >
               {approveMutation.isPending ? "Approving…" : "Approve & continue"}
             </Button>

@@ -20,13 +20,13 @@ function ProgressBar({
   const pct = max === 0 ? 0 : Math.round((value / max) * 100);
   return (
     <div className="flex items-center gap-2">
-      <div className="flex-1 h-1.5 bg-neutral-100 rounded-full overflow-hidden">
+      <div className="flex-1 h-1.5 bg-[#27272a] rounded-full overflow-hidden">
         <div
           className="h-full rounded-full transition-all"
           style={{ width: `${pct}%`, backgroundColor: color }}
         />
       </div>
-      <span className="text-xs tabular-nums text-neutral-500 shrink-0 w-10 text-right">
+      <span className="text-xs tabular-nums text-[#a1a1aa] shrink-0 w-10 text-right">
         {value}/{max}
       </span>
     </div>
@@ -68,8 +68,8 @@ function EditablePrompt({
         className={cn(
           "rounded-lg border px-3.5 py-3 min-h-[72px] flex flex-col justify-between",
           scene.klingPromptApproved
-            ? "border-emerald-200 bg-emerald-50/30"
-            : "border-neutral-100 bg-neutral-50"
+            ? "border-emerald-500/20 bg-emerald-500/5"
+            : "border-[#1a1a1e] bg-[#09090b]"
         )}
       >
         {editing ? (
@@ -82,7 +82,7 @@ function EditablePrompt({
               rows={4}
             />
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-neutral-400">
+              <span className="text-[10px] text-[#71717a]">
                 {draft.trim().split(/\s+/).length}w &middot; {"\u2318"}+Enter to save
               </span>
               <div className="flex gap-1.5">
@@ -91,13 +91,13 @@ function EditablePrompt({
                     setDraft(scene.klingPrompt);
                     setEditing(false);
                   }}
-                  className="text-[11px] text-neutral-400 hover:text-neutral-600 px-2 py-0.5 transition-colors"
+                  className="text-[11px] text-[#71717a] hover:text-[#a1a1aa] px-2 py-0.5 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSave}
-                  className="text-[11px] font-medium text-white bg-neutral-900 hover:bg-neutral-700 px-2.5 py-0.5 rounded transition-colors"
+                  className="text-[11px] font-medium text-white bg-[#6366f1] hover:bg-[#6366f1]/80 px-2.5 py-0.5 rounded transition-colors"
                 >
                   Save
                 </button>
@@ -106,11 +106,11 @@ function EditablePrompt({
           </div>
         ) : scene.klingPrompt ? (
           <>
-            <p className="text-sm text-neutral-600 leading-relaxed">
+            <p className="text-sm text-[#a1a1aa] leading-relaxed">
               {scene.klingPrompt}
             </p>
             <div className="flex items-center justify-between mt-2">
-              <span className="text-xs text-neutral-400">{wc}w</span>
+              <span className="text-xs text-[#71717a]">{wc}w</span>
               <div className="flex items-center gap-2">
                 {scene.klingPromptApproved && (
                   <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 font-medium">
@@ -120,7 +120,7 @@ function EditablePrompt({
                 )}
                 <button
                   onClick={() => setEditing(true)}
-                  className="inline-flex items-center gap-1 text-[11px] text-neutral-400 hover:text-neutral-700 transition-colors"
+                  className="inline-flex items-center gap-1 text-[11px] text-[#71717a] hover:text-[#a1a1aa] transition-colors"
                 >
                   <Pencil className="h-3 w-3" />
                   Edit
@@ -129,7 +129,7 @@ function EditablePrompt({
             </div>
           </>
         ) : (
-          <div className="flex items-center gap-2 text-neutral-300">
+          <div className="flex items-center gap-2 text-[#52525b]">
             <FileText className="h-4 w-4" />
             <span className="text-xs">No prompt yet</span>
           </div>
@@ -242,7 +242,7 @@ function EndFrameSlot({
   return (
     <div className="shrink-0 w-24">
       <div className="flex items-center justify-between mb-1">
-        <p className="text-[10px] text-neutral-400">End Frame</p>
+        <p className="text-[10px] text-[#71717a]">End Frame</p>
         {picked && (
           <button
             onClick={handleRemove}
@@ -273,7 +273,7 @@ function EndFrameSlot({
           </button>
           <button
             onClick={() => setShowPrompt(!showPrompt)}
-            className="w-full text-center text-[10px] text-neutral-400 hover:text-amber-600 transition-colors"
+            className="w-full text-center text-[10px] text-[#71717a] hover:text-amber-600 transition-colors"
           >
             Change
           </button>
@@ -281,23 +281,23 @@ function EndFrameSlot({
       ) : optionsLen > 0 ? (
         <div className="space-y-1.5">
           <div className="relative">
-            <div className="w-20 aspect-[9/16] rounded-lg border-2 border-neutral-200 overflow-hidden relative mx-auto">
+            <div className="w-20 aspect-[9/16] rounded-lg border-2 border-[#27272a] overflow-hidden relative mx-auto">
               {current && (
                 <img src={current.url} alt={`Option ${safeIdx + 1}`} className="absolute inset-0 w-full h-full object-cover" />
               )}
             </div>
             {optionsLen > 1 && (
               <>
-                <button onClick={goPrev} className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 p-0.5 rounded-full bg-white border border-neutral-200 shadow-sm hover:bg-neutral-50">
-                  <ChevronLeft className="h-3 w-3 text-neutral-500" />
+                <button onClick={goPrev} className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 p-0.5 rounded-full bg-[#18181b] border border-[#27272a] shadow-sm hover:bg-[#27272a]">
+                  <ChevronLeft className="h-3 w-3 text-[#a1a1aa]" />
                 </button>
-                <button onClick={goNext} className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1 p-0.5 rounded-full bg-white border border-neutral-200 shadow-sm hover:bg-neutral-50">
-                  <ChevronRight className="h-3 w-3 text-neutral-500" />
+                <button onClick={goNext} className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1 p-0.5 rounded-full bg-[#18181b] border border-[#27272a] shadow-sm hover:bg-[#27272a]">
+                  <ChevronRight className="h-3 w-3 text-[#a1a1aa]" />
                 </button>
               </>
             )}
           </div>
-          <p className="text-center text-[10px] text-neutral-400 tabular-nums">{safeIdx + 1} / {optionsLen}</p>
+          <p className="text-center text-[10px] text-[#71717a] tabular-nums">{safeIdx + 1} / {optionsLen}</p>
           {current?.label && <p className="text-center text-[10px] text-amber-500 truncate">{current.label}</p>}
           <button onClick={handleSelect} className="w-full text-center text-[10px] font-medium text-amber-600 hover:text-amber-700">
             Use as end frame
@@ -306,10 +306,10 @@ function EndFrameSlot({
       ) : (
         <button
           onClick={() => setShowPrompt(true)}
-          className="w-20 aspect-[9/16] rounded-lg border border-dashed border-neutral-200 hover:border-amber-300 flex flex-col items-center justify-center gap-1 transition-colors group/add"
+          className="w-20 aspect-[9/16] rounded-lg border border-dashed border-[#27272a] hover:border-amber-300 flex flex-col items-center justify-center gap-1 transition-colors group/add"
         >
-          <Plus className="h-4 w-4 text-neutral-300 group-hover/add:text-amber-500" />
-          <span className="text-[9px] text-neutral-300 group-hover/add:text-amber-500">Add</span>
+          <Plus className="h-4 w-4 text-[#52525b] group-hover/add:text-amber-500" />
+          <span className="text-[9px] text-[#52525b] group-hover/add:text-amber-500">Add</span>
         </button>
       )}
 
@@ -324,7 +324,7 @@ function EndFrameSlot({
               if (e.key === "Escape") setShowPrompt(false);
             }}
             placeholder="Describe end frame..."
-            className="w-full text-[11px] border border-amber-200 rounded px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-amber-200 transition-all placeholder:text-neutral-300"
+            className="w-full text-[11px] border border-amber-200 rounded px-2 py-1 bg-[#18181b] focus:outline-none focus:ring-2 focus:ring-amber-200 transition-all placeholder:text-[#52525b] text-[#fafafa]"
             disabled={generating}
           />
           <button onClick={handleGenerate} disabled={generating || !prompt.trim()}
@@ -409,7 +409,7 @@ function GenerateVideoButton({
         "w-full flex items-center justify-center gap-1 text-[10px] font-medium px-2 py-1.5 rounded transition-colors disabled:opacity-30",
         isReady
           ? "bg-blue-50 text-blue-600 hover:bg-blue-100"
-          : "bg-neutral-50 text-neutral-300"
+          : "bg-[#09090b] text-[#52525b]"
       )}
       title={isReady ? "Generate video" : "Approve seed + prompt first"}
     >
@@ -434,24 +434,24 @@ function ScenePairRow({
   productTags: ProductTag[];
 }) {
   return (
-    <div className="flex gap-5 py-5 border-b border-neutral-100 last:border-0">
+    <div className="flex gap-5 py-5 border-b border-[#1a1a1e] last:border-0">
       {/* Scene label */}
       <div className="w-10 shrink-0 pt-1 text-center">
         <div
           className="w-2.5 h-2.5 rounded-full mx-auto mb-1"
           style={{ backgroundColor: scene.color }}
         />
-        <span className="text-xs tabular-nums font-medium text-neutral-400">
+        <span className="text-xs tabular-nums font-medium text-[#71717a]">
           {String(scene.sceneOrder).padStart(2, "0")}
         </span>
-        <p className="text-[10px] text-neutral-300 tabular-nums mt-0.5">
+        <p className="text-[10px] text-[#52525b] tabular-nums mt-0.5">
           {scene.targetClipDurationS.toFixed(1)}s
         </p>
       </div>
 
       {/* Seed image (start frame) */}
       <div className="shrink-0">
-        <p className="text-[10px] text-neutral-400 mb-1">Start Frame</p>
+        <p className="text-[10px] text-[#71717a] mb-1">Start Frame</p>
         {(() => {
           const approvedVersion = scene.seedVersions.find(
             (v) => v.id === scene.approvedSeedVersionId
@@ -462,8 +462,8 @@ function ScenePairRow({
               className={cn(
                 "w-20 aspect-[9/16] rounded-lg border relative overflow-hidden flex items-center justify-center",
                 scene.seedImageApproved
-                  ? "border-emerald-200"
-                  : "border-neutral-100 border-dashed"
+                  ? "border-emerald-500/20"
+                  : "border-[#1a1a1e] border-dashed"
               )}
               style={{ backgroundColor: imgUrl ? undefined : scene.color }}
             >
@@ -474,7 +474,7 @@ function ScenePairRow({
                   className="absolute inset-0 w-full h-full object-cover"
                 />
               ) : (
-                <ImageOff className="h-4 w-4 text-neutral-200" />
+                <ImageOff className="h-4 w-4 text-[#27272a]" />
               )}
               {scene.seedImageApproved && (
                 <div className="absolute top-1 left-1">
@@ -488,7 +488,7 @@ function ScenePairRow({
         })()}
         <button
           onClick={() => onEditSeed(scene.sceneId)}
-          className="mt-1.5 flex items-center gap-1 text-[11px] text-neutral-400 hover:text-neutral-700 transition-colors"
+          className="mt-1.5 flex items-center gap-1 text-[11px] text-[#71717a] hover:text-[#a1a1aa] transition-colors"
         >
           <ExternalLink className="h-2.5 w-2.5" />
           Edit seed
@@ -515,8 +515,8 @@ function ScenePairRow({
             className={cn(
               "w-full text-[10px] font-medium px-2 py-1 rounded transition-colors",
               scene.seedImageApproved
-                ? "bg-emerald-100 text-emerald-700"
-                : "bg-neutral-100 text-neutral-500 hover:bg-emerald-50"
+                ? "bg-emerald-500/20 text-emerald-400"
+                : "bg-[#27272a] text-[#a1a1aa] hover:bg-emerald-500/10"
             )}
           >
             {scene.seedImageApproved ? "Seed ✓" : "Approve Seed"}
@@ -534,8 +534,8 @@ function ScenePairRow({
             className={cn(
               "w-full text-[10px] font-medium px-2 py-1 rounded transition-colors",
               scene.klingPromptApproved
-                ? "bg-emerald-100 text-emerald-700"
-                : "bg-neutral-100 text-neutral-500 hover:bg-emerald-50"
+                ? "bg-emerald-500/20 text-emerald-400"
+                : "bg-[#27272a] text-[#a1a1aa] hover:bg-emerald-500/10"
             )}
           >
             {scene.klingPromptApproved ? "Prompt ✓" : "Approve Prompt"}
@@ -561,7 +561,7 @@ function ScenePairRow({
                   URL.revokeObjectURL(url);
                 });
               }}
-              className="flex items-center gap-1 text-[10px] text-neutral-400 hover:text-neutral-600 transition-colors"
+              className="flex items-center gap-1 text-[10px] text-[#71717a] hover:text-[#a1a1aa] transition-colors"
               title="Download latest video"
             >
               <Download className="h-3 w-3" />
@@ -697,14 +697,14 @@ export function TabReview({ scenes, updateScene, projectId, onGoTo3A, onGoTo3B, 
     <div className="h-full overflow-y-auto">
       <div className="max-w-3xl mx-auto px-8 py-6">
         {/* Progress summary */}
-        <div className="mb-7 p-5 rounded-xl border border-neutral-100 bg-neutral-50/50 space-y-3">
+        <div className="mb-7 p-5 rounded-xl border border-[#1a1a1e] bg-[#09090b]/50 space-y-3">
           <div className="flex items-center justify-between mb-1">
-            <p className="text-sm font-medium text-neutral-700">
+            <p className="text-sm font-medium text-[#a1a1aa]">
               Production readiness
             </p>
             <div className="flex items-center gap-2">
               {ready && (
-                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full">
+                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full">
                   <Check className="h-3.5 w-3.5" />
                   Ready
                 </span>
@@ -725,7 +725,7 @@ export function TabReview({ scenes, updateScene, projectId, onGoTo3A, onGoTo3B, 
                       }
                       setFeedback({ type: "success", msg: `Queued ${readyScenes.length} video generation(s)` });
                     }}
-                    className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 px-2.5 py-1 rounded-full transition-colors"
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-400 bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500/20 px-2.5 py-1 rounded-full transition-colors"
                   >
                     <Play className="h-3 w-3" />
                     Generate All ({readyScenes.length})
@@ -736,15 +736,15 @@ export function TabReview({ scenes, updateScene, projectId, onGoTo3A, onGoTo3B, 
           </div>
           <div className="space-y-2.5">
             <div>
-              <p className="text-xs text-neutral-500 mb-1.5">Seed images</p>
+              <p className="text-xs text-[#a1a1aa] mb-1.5">Seed images</p>
               <ProgressBar value={seedsApproved} max={scenes.length} color="#10b981" />
             </div>
             <div>
-              <p className="text-xs text-neutral-500 mb-1.5">Kling prompts</p>
+              <p className="text-xs text-[#a1a1aa] mb-1.5">Kling prompts</p>
               <ProgressBar value={promptsApproved} max={scenes.length} color="#6366f1" />
             </div>
             <div>
-              <p className="text-xs text-neutral-500 mb-1.5">Pairs complete</p>
+              <p className="text-xs text-[#a1a1aa] mb-1.5">Pairs complete</p>
               <ProgressBar value={bothApproved} max={scenes.length} color="#f59e0b" />
             </div>
           </div>
@@ -785,7 +785,7 @@ export function TabReview({ scenes, updateScene, projectId, onGoTo3A, onGoTo3B, 
                   "px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
                   bulkSelected.has(s.sceneId)
                     ? "bg-violet-600 text-white"
-                    : "bg-white border border-violet-200 text-neutral-400 hover:border-violet-300"
+                    : "bg-[#18181b] border border-violet-200 text-[#71717a] hover:border-violet-300"
                 )}
               >
                 Scene {String(s.sceneOrder).padStart(2, "0")}
@@ -805,7 +805,7 @@ export function TabReview({ scenes, updateScene, projectId, onGoTo3A, onGoTo3B, 
                 }
               }}
               placeholder="e.g. remove background descriptions, shorten to under 35 words..."
-              className="flex-1 text-sm border border-violet-200 rounded-md px-3 py-1.5 h-9 bg-white focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-300 transition-all placeholder:text-neutral-300"
+              className="flex-1 text-sm border border-violet-200 rounded-md px-3 py-1.5 h-9 bg-[#18181b] focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-300 transition-all placeholder:text-[#52525b] text-[#fafafa]"
             />
             <button
               onClick={handleBulkEdit}

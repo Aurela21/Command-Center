@@ -497,7 +497,7 @@ export default function ProductionPage() {
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-neutral-400" />
+        <Loader2 className="h-6 w-6 animate-spin text-[#71717a]" />
       </div>
     );
   }
@@ -509,15 +509,15 @@ export default function ProductionPage() {
   ).length;
 
   return (
-    <div className="h-full flex flex-col overflow-hidden bg-white">
+    <div className="h-full flex flex-col overflow-hidden bg-[#18181b]">
       {/* ── Header ── */}
-      <div className="shrink-0 px-8 py-4 border-b border-neutral-200">
+      <div className="shrink-0 px-8 py-4 border-b border-[#27272a]">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <h1 className="text-base font-semibold text-neutral-900">
+            <h1 className="text-base font-semibold text-[#fafafa]">
               Production
             </h1>
-            <p className="text-xs text-neutral-400 mt-0.5">
+            <p className="text-xs text-[#71717a] mt-0.5">
               {scenes.length} scenes &middot; {seedsApproved}/{scenes.length}{" "}
               seeds &middot; {promptsApproved}/{scenes.length} prompts &middot;{" "}
               {videosComplete}/{scenes.length} videos
@@ -528,8 +528,8 @@ export default function ProductionPage() {
             className={cn(
               "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
               chatOpen
-                ? "bg-violet-100 text-violet-700"
-                : "bg-neutral-100 text-neutral-600 hover:bg-violet-50 hover:text-violet-600"
+                ? "bg-violet-500/20 text-violet-400"
+                : "bg-[#27272a] text-[#a1a1aa] hover:bg-violet-500/10 hover:text-violet-400"
             )}
           >
             <Brain className="h-4 w-4" />
@@ -546,8 +546,8 @@ export default function ProductionPage() {
               className={cn(
                 "px-4 py-1.5 rounded-md text-sm font-medium transition-colors",
                 activeTab === tab.id
-                  ? "bg-neutral-900 text-white"
-                  : "text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100"
+                  ? "bg-[#6366f1] text-white"
+                  : "text-[#a1a1aa] hover:text-[#fafafa] hover:bg-[#27272a]"
               )}
             >
               {tab.label}

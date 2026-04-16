@@ -95,9 +95,9 @@ export function StaticAdUpload({
 
   if (state.kind === "done") {
     return (
-      <div className="relative rounded-xl border-2 border-dashed border-green-300 bg-green-50 p-6 text-center">
+      <div className="relative rounded-xl border-2 border-dashed border-green-500/20 bg-green-500/10 p-6 text-center">
         <Image className="h-8 w-8 text-green-500 mx-auto mb-2" />
-        <p className="text-sm font-medium text-green-700">Image uploaded</p>
+        <p className="text-sm font-medium text-green-400">Image uploaded</p>
       </div>
     );
   }
@@ -110,8 +110,8 @@ export function StaticAdUpload({
       className={cn(
         "relative rounded-xl border-2 border-dashed p-8 text-center cursor-pointer transition-colors",
         state.kind === "error"
-          ? "border-red-300 bg-red-50"
-          : "border-neutral-300 bg-neutral-50 hover:border-neutral-400 hover:bg-neutral-100"
+          ? "border-red-500/20 bg-red-500/10"
+          : "border-[#3f3f46] bg-[#09090b] hover:border-[#3f3f46] hover:bg-[#27272a]"
       )}
     >
       <input
@@ -127,23 +127,23 @@ export function StaticAdUpload({
 
       {state.kind === "uploading" ? (
         <div className="space-y-3">
-          <Loader2 className="h-8 w-8 text-neutral-400 mx-auto animate-spin" />
-          <p className="text-sm text-neutral-600">{state.filename}</p>
-          <div className="w-48 mx-auto bg-neutral-200 rounded-full h-1.5">
+          <Loader2 className="h-8 w-8 text-[#71717a] mx-auto animate-spin" />
+          <p className="text-sm text-[#a1a1aa]">{state.filename}</p>
+          <div className="w-48 mx-auto bg-[#27272a] rounded-full h-1.5">
             <div
-              className="bg-neutral-900 h-1.5 rounded-full transition-all"
+              className="bg-[#6366f1] h-1.5 rounded-full transition-all"
               style={{ width: `${state.progress}%` }}
             />
           </div>
-          <p className="text-xs text-neutral-400">{state.progress}%</p>
+          <p className="text-xs text-[#71717a]">{state.progress}%</p>
         </div>
       ) : (
         <div className="space-y-2">
-          <Upload className="h-8 w-8 text-neutral-400 mx-auto" />
-          <p className="text-sm font-medium text-neutral-600">
+          <Upload className="h-8 w-8 text-[#71717a] mx-auto" />
+          <p className="text-sm font-medium text-[#a1a1aa]">
             Drop a reference ad image here
           </p>
-          <p className="text-xs text-neutral-400">
+          <p className="text-xs text-[#71717a]">
             JPG, PNG, or WEBP up to 50 MB
           </p>
           {state.kind === "error" && (

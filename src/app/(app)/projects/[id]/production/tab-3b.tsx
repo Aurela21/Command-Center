@@ -37,15 +37,15 @@ function ScenePromptCard({
 
   const cardBorder =
     wc > 50
-      ? "border-red-200"
+      ? "border-red-500/20"
       : wc > 40
-      ? "border-amber-200"
-      : "border-neutral-100";
+      ? "border-amber-500/20"
+      : "border-[#1a1a1e]";
 
   return (
     <div
       className={cn(
-        "rounded-xl border bg-white p-5 space-y-4 transition-colors",
+        "rounded-xl border bg-[#18181b] p-5 space-y-4 transition-colors",
         cardBorder
       )}
     >
@@ -56,10 +56,10 @@ function ScenePromptCard({
             className="w-2.5 h-2.5 rounded-full shrink-0"
             style={{ backgroundColor: scene.color }}
           />
-          <span className="text-xs font-medium text-neutral-500 tabular-nums">
+          <span className="text-xs font-medium text-[#a1a1aa] tabular-nums">
             Scene {String(scene.sceneOrder).padStart(2, "0")}
           </span>
-          <span className="text-xs text-neutral-400">
+          <span className="text-xs text-[#71717a]">
             &middot; {scene.targetClipDurationS.toFixed(1)}s
           </span>
         </div>
@@ -69,19 +69,19 @@ function ScenePromptCard({
             className={cn(
               "text-xs tabular-nums px-2 py-0.5 rounded-full",
               wc > 50
-                ? "bg-red-50 text-red-600"
+                ? "bg-red-500/10 text-red-400"
                 : wc > 40
-                ? "bg-amber-50 text-amber-600"
+                ? "bg-amber-500/10 text-amber-400"
                 : wc > 0
-                ? "bg-emerald-50 text-emerald-600"
-                : "bg-neutral-100 text-neutral-400"
+                ? "bg-emerald-500/10 text-emerald-400"
+                : "bg-[#27272a] text-[#71717a]"
             )}
           >
             {wc}w
           </span>
           {/* Approval state */}
           {scene.klingPromptApproved ? (
-            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
               <Check className="h-3 w-3" />
               Approved
             </span>
@@ -90,7 +90,7 @@ function ScenePromptCard({
       </div>
 
       {/* Description snippet */}
-      <p className="text-xs text-neutral-400 leading-relaxed line-clamp-1">
+      <p className="text-xs text-[#71717a] leading-relaxed line-clamp-1">
         {scene.description}
       </p>
 
@@ -138,7 +138,7 @@ function ScenePromptCard({
             onClick={() =>
               updateScene(scene.sceneId, { klingPromptApproved: false })
             }
-            className="text-xs font-medium text-neutral-400 hover:text-neutral-600 transition-colors"
+            className="text-xs font-medium text-[#71717a] hover:text-[#a1a1aa] transition-colors"
           >
             Unapprove
           </button>
@@ -341,15 +341,15 @@ export function Tab3B({
   }
 
   const selectClass =
-    "text-sm border border-neutral-200 rounded-md px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-neutral-200 transition-all text-neutral-700";
+    "text-sm border border-[#27272a] rounded-md px-3 py-1.5 bg-[#18181b] focus:outline-none focus:ring-2 focus:ring-[#27272a] transition-all text-[#a1a1aa]";
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
       {/* Script generator (top, fixed) */}
-      <div className="shrink-0 px-8 py-5 border-b border-neutral-200 bg-neutral-50/50">
+      <div className="shrink-0 px-8 py-5 border-b border-[#27272a] bg-[#09090b]/50">
         <div className="flex items-end gap-4 flex-wrap">
           <div className="space-y-1.5">
-            <p className="text-xs font-medium text-neutral-500">Camera Angle</p>
+            <p className="text-xs font-medium text-[#a1a1aa]">Camera Angle</p>
             <select
               value={angle}
               onChange={(e) => setAngle(e.target.value)}
@@ -361,7 +361,7 @@ export function Tab3B({
             </select>
           </div>
           <div className="space-y-1.5">
-            <p className="text-xs font-medium text-neutral-500">Tonality</p>
+            <p className="text-xs font-medium text-[#a1a1aa]">Tonality</p>
             <select
               value={tonality}
               onChange={(e) => setTonality(e.target.value)}
@@ -373,7 +373,7 @@ export function Tab3B({
             </select>
           </div>
           <div className="space-y-1.5">
-            <p className="text-xs font-medium text-neutral-500">Format</p>
+            <p className="text-xs font-medium text-[#a1a1aa]">Format</p>
             <select
               value={format}
               onChange={(e) => setFormat(e.target.value)}
@@ -387,7 +387,7 @@ export function Tab3B({
           <Button
             onClick={handleGenerateScript}
             disabled={generating || reoptimizing}
-            className="gap-2 bg-neutral-900 hover:bg-neutral-700 text-white h-9 text-sm disabled:opacity-40"
+            className="gap-2 bg-[#6366f1] hover:bg-[#6366f1]/80 text-white h-9 text-sm disabled:opacity-40"
           >
             {generating ? (
               <>
@@ -433,14 +433,14 @@ export function Tab3B({
         {/* Script output */}
         {script && (
           <div className="mt-4">
-            <p className="text-xs font-medium uppercase tracking-widest text-neutral-400 mb-2">
+            <p className="text-xs font-medium uppercase tracking-widest text-[#71717a] mb-2">
               Generated Script
             </p>
             <textarea
               value={script}
               onChange={(e) => onScriptChange(e.target.value)}
               rows={8}
-              className="w-full text-xs font-mono rounded-md border border-neutral-200 px-3 py-2.5 bg-white resize-none focus:outline-none focus:ring-2 focus:ring-neutral-200 transition-all text-neutral-600 leading-relaxed"
+              className="w-full text-xs font-mono rounded-md border border-[#27272a] px-3 py-2.5 bg-[#18181b] resize-none focus:outline-none focus:ring-2 focus:ring-[#27272a] transition-all text-[#a1a1aa] leading-relaxed"
             />
           </div>
         )}
@@ -449,11 +449,11 @@ export function Tab3B({
       {/* Scene prompts (scrollable) */}
       <div className="flex-1 overflow-y-auto px-8 py-5">
         <div className="flex items-center justify-between mb-4">
-          <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">
+          <p className="text-xs font-medium uppercase tracking-widest text-[#71717a]">
             Scene Prompts
           </p>
           <div className="flex items-center gap-3">
-            <p className="text-xs text-neutral-400">
+            <p className="text-xs text-[#71717a]">
               {approvedCount}/{scenes.length} approved
             </p>
             {approvedCount < scenes.length ? (
@@ -479,7 +479,7 @@ export function Tab3B({
                     updateScene(s.sceneId, { klingPromptApproved: false });
                   });
                 }}
-                className="text-[11px] text-neutral-400 hover:text-neutral-600 transition-colors"
+                className="text-[11px] text-[#71717a] hover:text-[#a1a1aa] transition-colors"
               >
                 Unapprove all
               </button>
@@ -489,11 +489,11 @@ export function Tab3B({
 
         {/* Full script (read-only reference) */}
         {script && (
-          <div className="mb-4 rounded-xl border border-neutral-100 bg-neutral-50/50 p-4 space-y-2">
-            <p className="text-[10px] font-medium uppercase tracking-widest text-neutral-400">
+          <div className="mb-4 rounded-xl border border-[#1a1a1e] bg-[#09090b]/50 p-4 space-y-2">
+            <p className="text-[10px] font-medium uppercase tracking-widest text-[#71717a]">
               Full Script
             </p>
-            <p className="text-xs text-neutral-600 leading-relaxed whitespace-pre-line">
+            <p className="text-xs text-[#a1a1aa] leading-relaxed whitespace-pre-line">
               {script}
             </p>
           </div>
@@ -521,7 +521,7 @@ export function Tab3B({
                   "px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
                   bulkSelected.has(s.sceneId)
                     ? "bg-violet-600 text-white"
-                    : "bg-white border border-violet-200 text-neutral-400 hover:border-violet-300"
+                    : "bg-[#18181b] border border-violet-200 text-[#71717a] hover:border-violet-300"
                 )}
               >
                 Scene {String(s.sceneOrder).padStart(2, "0")}
@@ -539,7 +539,7 @@ export function Tab3B({
                 }
               }}
               placeholder="e.g. remove background descriptions, backgrounds come from seed images..."
-              className="flex-1 text-sm border border-violet-200 rounded-md px-3 py-1.5 h-9 bg-white focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-300 transition-all placeholder:text-neutral-300"
+              className="flex-1 text-sm border border-violet-200 rounded-md px-3 py-1.5 h-9 bg-[#18181b] focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-300 transition-all placeholder:text-[#52525b] text-[#fafafa]"
             />
             <Button
               onClick={handleBulkEdit}

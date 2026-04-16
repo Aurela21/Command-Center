@@ -82,8 +82,8 @@ export default function StaticAdsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-xl font-semibold text-neutral-900">Static Ads</h1>
-          <p className="text-sm text-neutral-400 mt-0.5">
+          <h1 className="text-xl font-semibold text-[#fafafa]">Static Ads</h1>
+          <p className="text-sm text-[#71717a] mt-0.5">
             {isLoading
               ? ""
               : `${jobs?.length ?? 0} ad${jobs?.length !== 1 ? "s" : ""}`}
@@ -94,7 +94,7 @@ export default function StaticAdsPage() {
             setSelectedProductId("");
             setDialogOpen(true);
           }}
-          className="bg-neutral-900 hover:bg-neutral-700 text-white gap-2"
+          className="bg-[#6366f1] hover:bg-[#6366f1]/80 text-white gap-2"
         >
           <ImagePlus className="h-4 w-4" />
           New Ad
@@ -126,7 +126,7 @@ export default function StaticAdsPage() {
                   id="product-select"
                   value={selectedProductId}
                   onChange={(e) => setSelectedProductId(e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  className="flex h-10 w-full rounded-md border border-[#27272a] bg-[#18181b] px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
                   <option value="">Select a product...</option>
                   {products.map((p) => (
@@ -136,7 +136,7 @@ export default function StaticAdsPage() {
                   ))}
                 </select>
                 {products.length === 0 && (
-                  <p className="text-xs text-neutral-400">
+                  <p className="text-xs text-[#71717a]">
                     No products found. Add products in the Knowledge Base first.
                   </p>
                 )}
@@ -153,7 +153,7 @@ export default function StaticAdsPage() {
               <Button
                 type="submit"
                 disabled={!selectedProductId || createMutation.isPending}
-                className="bg-neutral-900 hover:bg-neutral-700 text-white"
+                className="bg-[#6366f1] hover:bg-[#6366f1]/80 text-white"
               >
                 {createMutation.isPending ? "Creating..." : "Create"}
               </Button>

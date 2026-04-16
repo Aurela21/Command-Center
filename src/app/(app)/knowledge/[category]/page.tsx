@@ -188,7 +188,7 @@ function UploadZone({
         />
         <Button
           onClick={() => inputRef.current?.click()}
-          className="gap-2 bg-neutral-900 hover:bg-neutral-700 text-white h-9 text-sm"
+          className="gap-2 bg-[#6366f1] hover:bg-[#6366f1]/80 text-white h-9 text-sm"
         >
           <Upload className="h-3.5 w-3.5" />
           Upload
@@ -199,18 +199,18 @@ function UploadZone({
 
   if (state.kind === "uploading") {
     return (
-      <div className="flex items-center gap-3 text-sm text-neutral-600">
+      <div className="flex items-center gap-3 text-sm text-[#a1a1aa]">
         <Loader2 className="h-4 w-4 animate-spin shrink-0 text-blue-500" />
         <div className="flex-1 min-w-0">
           <p className="truncate text-xs font-medium">{state.filename}</p>
-          <div className="mt-1 h-1 bg-neutral-100 rounded-full overflow-hidden w-48">
+          <div className="mt-1 h-1 bg-[#27272a] rounded-full overflow-hidden w-48">
             <div
               className="h-full bg-blue-500 rounded-full transition-all"
               style={{ width: `${state.progress}%` }}
             />
           </div>
         </div>
-        <span className="text-xs tabular-nums text-neutral-400 shrink-0">
+        <span className="text-xs tabular-nums text-[#71717a] shrink-0">
           {state.progress}%
         </span>
       </div>
@@ -219,7 +219,7 @@ function UploadZone({
 
   if (state.kind === "processing") {
     return (
-      <div className="flex items-center gap-2 text-sm text-neutral-600">
+      <div className="flex items-center gap-2 text-sm text-[#a1a1aa]">
         <Loader2 className="h-4 w-4 animate-spin shrink-0 text-blue-500" />
         <span className="text-xs">Processing...</span>
       </div>
@@ -266,25 +266,25 @@ function DocumentItem({
 }) {
   const Icon = isImage ? ImageIcon : FileText;
   return (
-    <div className="flex items-center gap-4 px-4 py-3 border-b border-neutral-100 last:border-0 hover:bg-neutral-50/50 group transition-colors">
+    <div className="flex items-center gap-4 px-4 py-3 border-b border-[#1a1a1e] last:border-0 hover:bg-[#27272a] group transition-colors">
       <div className="shrink-0">
-        <div className="w-9 h-9 rounded-lg bg-neutral-100 flex items-center justify-center">
-          <Icon className="h-4 w-4 text-neutral-400" />
+        <div className="w-9 h-9 rounded-lg bg-[#27272a] flex items-center justify-center">
+          <Icon className="h-4 w-4 text-[#71717a]" />
         </div>
       </div>
 
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-neutral-800 truncate">
+        <p className="text-sm font-medium text-[#fafafa] truncate">
           {doc.name}
         </p>
         <div className="flex items-center gap-3 mt-0.5">
           <StatusBadge status={doc.status} />
           {doc.status === "ready" && doc.totalChunks != null && (
-            <span className="text-[11px] text-neutral-400">
+            <span className="text-[11px] text-[#71717a]">
               {doc.totalChunks} chunk{doc.totalChunks !== 1 ? "s" : ""}
             </span>
           )}
-          <span className="text-[11px] text-neutral-300">
+          <span className="text-[11px] text-[#52525b]">
             {doc.fileType?.toUpperCase()}
           </span>
         </div>
@@ -295,7 +295,7 @@ function DocumentItem({
           <button
             onClick={() => onReprocess(doc.id)}
             title="Retry processing"
-            className="p-1.5 rounded text-neutral-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+            className="p-1.5 rounded text-[#71717a] hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
           >
             <RefreshCw className="h-3.5 w-3.5" />
           </button>
@@ -303,7 +303,7 @@ function DocumentItem({
         <button
           onClick={() => onDelete(doc.id)}
           title="Delete document"
-          className="p-1.5 rounded text-neutral-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+          className="p-1.5 rounded text-[#71717a] hover:text-red-400 hover:bg-red-500/10 transition-colors"
         >
           <Trash2 className="h-3.5 w-3.5" />
         </button>
@@ -342,12 +342,12 @@ function SearchPanel({ category }: { category: string }) {
     <div className="flex flex-col h-full">
       <form onSubmit={handleSearch} className="flex gap-2 mb-5">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#71717a]" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search this category..."
-            className="w-full pl-9 pr-4 py-2 text-sm border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-neutral-200 focus:border-neutral-300 transition-all placeholder:text-neutral-400"
+            className="w-full pl-9 pr-4 py-2 text-sm border border-[#27272a] rounded-lg bg-[#09090b] text-[#fafafa] focus:outline-none focus:ring-2 focus:ring-[#27272a] focus:border-[#3f3f46] transition-all placeholder:text-[#71717a]"
           />
         </div>
         <Button
@@ -368,28 +368,28 @@ function SearchPanel({ category }: { category: string }) {
       <div className="flex-1 overflow-y-auto space-y-3">
         {results === null ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <Search className="h-8 w-8 text-neutral-200 mb-3" />
-            <p className="text-sm text-neutral-400">
+            <Search className="h-8 w-8 text-[#52525b] mb-3" />
+            <p className="text-sm text-[#71717a]">
               Search documents in this category
             </p>
           </div>
         ) : results.length === 0 ? (
-          <p className="text-sm text-neutral-400 text-center py-10">
+          <p className="text-sm text-[#71717a] text-center py-10">
             No results found
           </p>
         ) : (
           results.map((r) => (
             <div
               key={r.id}
-              className="rounded-xl border border-neutral-100 bg-white p-4 space-y-2"
+              className="rounded-xl border border-[#1a1a1e] bg-[#18181b] p-4 space-y-2"
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="text-xs font-medium text-neutral-700 truncate">
+                  <p className="text-xs font-medium text-[#a1a1aa] truncate">
                     {r.documentName}
                   </p>
                   {r.sectionTitle && (
-                    <p className="text-[11px] text-neutral-400 truncate">
+                    <p className="text-[11px] text-[#71717a] truncate">
                       {r.sectionTitle}
                     </p>
                   )}
@@ -398,16 +398,16 @@ function SearchPanel({ category }: { category: string }) {
                   className={cn(
                     "text-xs font-semibold tabular-nums shrink-0 px-2 py-0.5 rounded-full",
                     r.similarity >= 0.8
-                      ? "bg-emerald-50 text-emerald-600"
+                      ? "bg-emerald-500/10 text-emerald-400"
                       : r.similarity >= 0.6
-                      ? "bg-blue-50 text-blue-600"
-                      : "bg-neutral-100 text-neutral-500"
+                      ? "bg-blue-500/10 text-blue-400"
+                      : "bg-[#27272a] text-[#a1a1aa]"
                   )}
                 >
                   {Math.round(r.similarity * 100)}%
                 </span>
               </div>
-              <p className="text-xs text-neutral-600 leading-relaxed line-clamp-4">
+              <p className="text-xs text-[#a1a1aa] leading-relaxed line-clamp-4">
                 {r.content}
               </p>
             </div>
@@ -482,22 +482,22 @@ export default function CategoryPage() {
   });
 
   return (
-    <div className="h-full flex flex-col overflow-hidden bg-white">
+    <div className="h-full flex flex-col overflow-hidden bg-[#18181b]">
       {/* Header */}
-      <div className="shrink-0 px-8 py-5 border-b border-neutral-200">
+      <div className="shrink-0 px-8 py-5 border-b border-[#27272a]">
         <div className="flex items-start justify-between">
           <div>
             <button
               onClick={() => router.push("/knowledge")}
-              className="inline-flex items-center gap-1.5 text-xs text-neutral-400 hover:text-neutral-600 transition-colors mb-2"
+              className="inline-flex items-center gap-1.5 text-xs text-[#71717a] hover:text-[#a1a1aa] transition-colors mb-2"
             >
               <ArrowLeft className="h-3 w-3" />
               Knowledge Base
             </button>
-            <h1 className="text-base font-semibold text-neutral-900">
+            <h1 className="text-base font-semibold text-[#fafafa]">
               {meta.label}
             </h1>
-            <p className="text-xs text-neutral-400 mt-0.5">
+            <p className="text-xs text-[#71717a] mt-0.5">
               {meta.description}
               {!isLoading && (
                 <>
@@ -520,20 +520,20 @@ export default function CategoryPage() {
       {/* Content: two columns */}
       <div className="flex-1 overflow-hidden flex">
         {/* Left: document list */}
-        <div className="w-80 shrink-0 border-r border-neutral-200 overflow-y-auto">
+        <div className="w-80 shrink-0 border-r border-[#27272a] overflow-y-auto">
           {isLoading ? (
             <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-5 w-5 animate-spin text-neutral-300" />
+              <Loader2 className="h-5 w-5 animate-spin text-[#52525b]" />
             </div>
           ) : documents.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
-              <div className="w-12 h-12 rounded-xl bg-neutral-100 flex items-center justify-center mb-3">
-                <BookOpen className="h-6 w-6 text-neutral-300" />
+              <div className="w-12 h-12 rounded-xl bg-[#27272a] flex items-center justify-center mb-3">
+                <BookOpen className="h-6 w-6 text-[#52525b]" />
               </div>
-              <p className="text-sm font-medium text-neutral-600">
+              <p className="text-sm font-medium text-[#a1a1aa]">
                 No documents yet
               </p>
-              <p className="text-xs text-neutral-400 mt-1 leading-relaxed">
+              <p className="text-xs text-[#71717a] mt-1 leading-relaxed">
                 Upload files to build this knowledge category
               </p>
             </div>

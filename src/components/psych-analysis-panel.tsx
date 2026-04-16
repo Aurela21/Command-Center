@@ -53,22 +53,22 @@ export function PsychAnalysisPanel({
     <div className="space-y-6">
       {/* Analysis sections */}
       <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-neutral-900">
+        <h3 className="text-sm font-semibold text-[#fafafa]">
           Psychological Analysis
         </h3>
         <div className="grid gap-3">
           {ANALYSIS_SECTIONS.map(({ key, label, icon }) => (
             <div
               key={key}
-              className="rounded-lg border border-neutral-200 bg-white p-4"
+              className="rounded-lg border border-[#27272a] bg-[#18181b] p-4"
             >
               <div className="flex items-center gap-2 mb-1.5">
-                <span className="text-neutral-400">{icon}</span>
-                <span className="text-xs font-medium text-neutral-500 uppercase tracking-wide">
+                <span className="text-[#71717a]">{icon}</span>
+                <span className="text-xs font-medium text-[#a1a1aa] uppercase tracking-wide">
                   {label}
                 </span>
               </div>
-              <p className="text-sm text-neutral-700 leading-relaxed">
+              <p className="text-sm text-[#a1a1aa] leading-relaxed">
                 {analysis[key]}
               </p>
             </div>
@@ -76,10 +76,10 @@ export function PsychAnalysisPanel({
 
           {/* Emotional triggers as tags */}
           {analysis.emotionalTriggers.length > 0 && (
-            <div className="rounded-lg border border-neutral-200 bg-white p-4">
+            <div className="rounded-lg border border-[#27272a] bg-[#18181b] p-4">
               <div className="flex items-center gap-2 mb-2">
-                <Heart className="h-4 w-4 text-neutral-400" />
-                <span className="text-xs font-medium text-neutral-500 uppercase tracking-wide">
+                <Heart className="h-4 w-4 text-[#71717a]" />
+                <span className="text-xs font-medium text-[#a1a1aa] uppercase tracking-wide">
                   Emotional Triggers
                 </span>
               </div>
@@ -87,7 +87,7 @@ export function PsychAnalysisPanel({
                 {analysis.emotionalTriggers.map((trigger) => (
                   <span
                     key={trigger}
-                    className="text-xs px-2 py-1 rounded-full bg-rose-50 text-rose-600 border border-rose-100"
+                    className="text-xs px-2 py-1 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20"
                   >
                     {trigger}
                   </span>
@@ -99,11 +99,11 @@ export function PsychAnalysisPanel({
       </div>
 
       {/* Editable copy fields */}
-      <div className="space-y-4 rounded-xl border border-neutral-200 bg-white p-5">
-        <h3 className="text-sm font-semibold text-neutral-900">
+      <div className="space-y-4 rounded-xl border border-[#27272a] bg-[#18181b] p-5">
+        <h3 className="text-sm font-semibold text-[#fafafa]">
           Ad Copy
         </h3>
-        <p className="text-xs text-neutral-400 -mt-2">
+        <p className="text-xs text-[#71717a] -mt-2">
           Edit the copy below, then confirm to generate the new ad.
         </p>
 
@@ -116,7 +116,7 @@ export function PsychAnalysisPanel({
               id="ad-headline"
               value={headline}
               onChange={(e) => setHeadline(e.target.value)}
-              className="bg-neutral-50"
+              className="bg-[#09090b]"
             />
           </div>
 
@@ -130,8 +130,8 @@ export function PsychAnalysisPanel({
               onChange={(e) => setBody(e.target.value)}
               rows={3}
               className={cn(
-                "flex w-full rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2",
-                "text-sm ring-offset-background placeholder:text-neutral-400",
+                "flex w-full rounded-md border border-[#27272a] bg-[#09090b] px-3 py-2",
+                "text-sm ring-offset-background placeholder:text-[#71717a]",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                 "resize-none"
               )}
@@ -146,7 +146,7 @@ export function PsychAnalysisPanel({
               id="ad-cta"
               value={cta}
               onChange={(e) => setCta(e.target.value)}
-              className="bg-neutral-50"
+              className="bg-[#09090b]"
             />
           </div>
         </div>
@@ -155,7 +155,7 @@ export function PsychAnalysisPanel({
           <Button
             onClick={() => onConfirm({ headline, body, cta })}
             disabled={isGenerating || !headline.trim()}
-            className="bg-neutral-900 hover:bg-neutral-700 text-white"
+            className="bg-[#6366f1] hover:bg-[#6366f1]/80 text-white"
           >
             {isGenerating ? (
               <>

@@ -21,48 +21,48 @@ const CATEGORIES = [
     label: "Brand",
     description: "Brand guidelines, positioning, and identity assets",
     icon: Megaphone,
-    color: "bg-blue-50 text-blue-600 border-blue-100",
-    iconBg: "bg-blue-100",
+    color: "bg-blue-500/10 text-blue-600 border-blue-500/20",
+    iconBg: "bg-blue-500/10",
   },
   {
     id: "voice",
     label: "Voice",
     description: "Tone of voice guides, communication style, and messaging frameworks",
     icon: Mic,
-    color: "bg-violet-50 text-violet-600 border-violet-100",
-    iconBg: "bg-violet-100",
+    color: "bg-violet-500/10 text-violet-600 border-violet-500/20",
+    iconBg: "bg-violet-500/10",
   },
   {
     id: "style",
     label: "Style",
     description: "Visual style references, mood boards, and aesthetic direction",
     icon: Palette,
-    color: "bg-amber-50 text-amber-600 border-amber-100",
-    iconBg: "bg-amber-100",
+    color: "bg-amber-500/10 text-amber-600 border-amber-500/20",
+    iconBg: "bg-amber-500/10",
   },
   {
     id: "script_copy",
     label: "Script Copy",
     description: "Winning ad scripts, direct response copy, and swipe files",
     icon: FileText,
-    color: "bg-emerald-50 text-emerald-600 border-emerald-100",
-    iconBg: "bg-emerald-100",
+    color: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+    iconBg: "bg-emerald-500/10",
   },
   {
     id: "kling_prompts",
     label: "Kling Prompts",
     description: "Kling prompting best practices, templates, and example prompts",
     icon: Clapperboard,
-    color: "bg-rose-50 text-rose-600 border-rose-100",
-    iconBg: "bg-rose-100",
+    color: "bg-rose-500/10 text-rose-600 border-rose-500/20",
+    iconBg: "bg-rose-500/10",
   },
   {
     id: "product_assets",
     label: "Product Assets",
     description: "Product images and descriptions for @tag references in seed generation",
     icon: ShoppingBag,
-    color: "bg-orange-50 text-orange-600 border-orange-100",
-    iconBg: "bg-orange-100",
+    color: "bg-orange-500/10 text-orange-600 border-orange-500/20",
+    iconBg: "bg-orange-500/10",
   },
 ] as const;
 
@@ -97,13 +97,13 @@ export default function KnowledgePage() {
   const totalReady = documents.filter((d) => d.status === "ready").length;
 
   return (
-    <div className="h-full flex flex-col overflow-hidden bg-white">
+    <div className="h-full flex flex-col overflow-hidden bg-[#18181b]">
       {/* Header */}
-      <div className="shrink-0 px-8 py-6 border-b border-neutral-200">
-        <h1 className="text-base font-semibold text-neutral-900">
+      <div className="shrink-0 px-8 py-6 border-b border-[#27272a]">
+        <h1 className="text-base font-semibold text-[#fafafa]">
           Knowledge Base
         </h1>
-        <p className="text-xs text-neutral-400 mt-1">
+        <p className="text-xs text-[#71717a] mt-1">
           {isLoading ? (
             "Loading..."
           ) : (
@@ -120,7 +120,7 @@ export default function KnowledgePage() {
       <div className="flex-1 overflow-y-auto px-8 py-6">
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="h-6 w-6 animate-spin text-neutral-300" />
+            <Loader2 className="h-6 w-6 animate-spin text-[#52525b]" />
           </div>
         ) : (
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl">

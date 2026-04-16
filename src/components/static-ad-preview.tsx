@@ -349,7 +349,7 @@ export function StaticAdPreview({
           onMouseEnter={() => setShowShortcuts(true)}
           onMouseLeave={() => setShowShortcuts(false)}
         >
-          <HelpCircle className="h-4 w-4 text-neutral-300 hover:text-neutral-500 cursor-help" />
+          <HelpCircle className="h-4 w-4 text-[#52525b] hover:text-[#a1a1aa] cursor-help" />
           {showShortcuts && (
             <div className="absolute right-0 top-6 z-40 bg-neutral-900 text-white text-xs rounded-lg p-3 w-48 shadow-lg">
               <p className="font-medium mb-1.5">Keyboard Shortcuts</p>
@@ -369,12 +369,12 @@ export function StaticAdPreview({
       <div className="space-y-2">
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <p className="text-xs font-medium text-neutral-500 uppercase tracking-wide">
+            <p className="text-xs font-medium text-[#a1a1aa] uppercase tracking-wide">
               Reference
             </p>
             {(viewed.referenceImageUrl || inputImageUrl) ? (
               <div
-                className="relative rounded-lg border border-neutral-200 overflow-hidden bg-neutral-100 cursor-pointer group"
+                className="relative rounded-lg border border-[#27272a] overflow-hidden bg-[#18181b] cursor-pointer group"
                 onClick={() => setLightboxSrc(viewed.referenceImageUrl || inputImageUrl)}
               >
                 <img
@@ -387,17 +387,17 @@ export function StaticAdPreview({
                 </div>
               </div>
             ) : (
-              <div className="rounded-lg border border-neutral-200 bg-neutral-100 h-48 flex items-center justify-center">
-                <p className="text-xs text-neutral-400">No reference</p>
+              <div className="rounded-lg border border-[#27272a] bg-[#18181b] h-48 flex items-center justify-center">
+                <p className="text-xs text-[#71717a]">No reference</p>
               </div>
             )}
           </div>
           <div className="space-y-1.5">
-            <p className="text-xs font-medium text-neutral-500 uppercase tracking-wide">
+            <p className="text-xs font-medium text-[#a1a1aa] uppercase tracking-wide">
               Generated
             </p>
             <div
-              className="relative rounded-lg border border-neutral-200 overflow-hidden bg-neutral-100 cursor-pointer group"
+              className="relative rounded-lg border border-[#27272a] overflow-hidden bg-[#18181b] cursor-pointer group"
               onClick={() => setLightboxSrc(viewed.imageUrl)}
             >
               <img
@@ -413,8 +413,8 @@ export function StaticAdPreview({
         </div>
 
         {/* Version info bar */}
-        <div className="flex items-center gap-3 text-xs text-neutral-400">
-          <span className="font-medium text-neutral-600">
+        <div className="flex items-center gap-3 text-xs text-[#71717a]">
+          <span className="font-medium text-[#a1a1aa]">
             v{viewed.versionNumber}
           </span>
           <span>{timeAgo(viewed.createdAt)}</span>
@@ -440,7 +440,7 @@ export function StaticAdPreview({
                 "h-4 w-4 transition-colors",
                 viewed.isFavorite
                   ? "fill-amber-400 text-amber-400"
-                  : "text-neutral-300 hover:text-amber-400"
+                  : "text-[#52525b] hover:text-amber-400"
               )}
             />
           </button>
@@ -451,17 +451,17 @@ export function StaticAdPreview({
       {generations.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <p className="text-xs font-medium text-neutral-500 uppercase tracking-wide">
+            <p className="text-xs font-medium text-[#a1a1aa] uppercase tracking-wide">
               Generations ({generations.length})
             </p>
-            <div className="flex bg-neutral-100 rounded-md p-0.5 text-xs">
+            <div className="flex bg-[#27272a] rounded-md p-0.5 text-xs">
               <button
                 onClick={() => setFilterFavorites(false)}
                 className={cn(
                   "px-2 py-0.5 rounded transition-colors",
                   !filterFavorites
-                    ? "bg-white text-neutral-900 shadow-sm"
-                    : "text-neutral-500 hover:text-neutral-700"
+                    ? "bg-[#18181b] text-[#fafafa] shadow-sm"
+                    : "text-[#a1a1aa] hover:text-[#a1a1aa]"
                 )}
               >
                 All
@@ -471,8 +471,8 @@ export function StaticAdPreview({
                 className={cn(
                   "px-2 py-0.5 rounded transition-colors",
                   filterFavorites
-                    ? "bg-white text-neutral-900 shadow-sm"
-                    : "text-neutral-500 hover:text-neutral-700"
+                    ? "bg-[#18181b] text-[#fafafa] shadow-sm"
+                    : "text-[#a1a1aa] hover:text-[#a1a1aa]"
                 )}
               >
                 Favorites
@@ -483,8 +483,8 @@ export function StaticAdPreview({
           <div className="flex gap-2 overflow-x-auto pb-2">
             {/* Generating placeholder */}
             {isRegenerating && (
-              <div className="shrink-0 w-20 h-20 rounded-lg border-2 border-dashed border-neutral-300 bg-neutral-50 flex items-center justify-center">
-                <Loader2 className="h-5 w-5 text-neutral-400 animate-spin" />
+              <div className="shrink-0 w-20 h-20 rounded-lg border-2 border-dashed border-[#3f3f46] bg-[#09090b] flex items-center justify-center">
+                <Loader2 className="h-5 w-5 text-[#71717a] animate-spin" />
               </div>
             )}
 
@@ -492,10 +492,10 @@ export function StaticAdPreview({
               <div
                 key={gen.id}
                 className={cn(
-                  "shrink-0 w-20 h-20 rounded-lg border-2 overflow-hidden bg-neutral-100 transition-all relative group cursor-pointer",
+                  "shrink-0 w-20 h-20 rounded-lg border-2 overflow-hidden bg-[#18181b] transition-all relative group cursor-pointer",
                   viewedId === gen.id
-                    ? "border-neutral-900 ring-1 ring-neutral-900"
-                    : "border-neutral-200 hover:border-neutral-400"
+                    ? "border-[#6366f1] ring-1 ring-[#6366f1]"
+                    : "border-[#27272a] hover:border-[#3f3f46]"
                 )}
                 onClick={() => setViewedId(gen.id)}
               >
@@ -514,8 +514,8 @@ export function StaticAdPreview({
                   className={cn(
                     "absolute top-1 left-1 h-4.5 w-4.5 rounded border flex items-center justify-center transition-all",
                     selected.has(gen.id)
-                      ? "bg-neutral-900 border-neutral-900"
-                      : "bg-white/70 border-neutral-300 opacity-0 group-hover:opacity-100"
+                      ? "bg-[#6366f1] border-[#6366f1]"
+                      : "bg-white/70 border-[#3f3f46] opacity-0 group-hover:opacity-100"
                   )}
                 >
                   {selected.has(gen.id) && (
@@ -573,7 +573,7 @@ export function StaticAdPreview({
 
       {/* C) Action bar */}
       <div className="flex items-center justify-between text-xs">
-        <div className="flex items-center gap-3 text-neutral-400">
+        <div className="flex items-center gap-3 text-[#71717a]">
           <span>
             {selected.size > 0
               ? `${selected.size} of ${generations.length} selected`
@@ -581,13 +581,13 @@ export function StaticAdPreview({
           </span>
           <button
             onClick={selectAll}
-            className="text-neutral-500 hover:text-neutral-700"
+            className="text-[#a1a1aa] hover:text-[#a1a1aa]"
           >
             Select All
           </button>
           <button
             onClick={deselectAll}
-            className="text-neutral-500 hover:text-neutral-700"
+            className="text-[#a1a1aa] hover:text-[#a1a1aa]"
           >
             Deselect All
           </button>
@@ -609,24 +609,24 @@ export function StaticAdPreview({
       </div>
 
       {/* D) Product selector + copy editor + edit instructions + regenerate */}
-      <div className="space-y-3 rounded-xl border border-neutral-200 bg-white p-4">
+      <div className="space-y-3 rounded-xl border border-[#27272a] bg-[#18181b] p-4">
         {/* Collapsible product selector */}
         <button
           onClick={() => setProductOpen((o) => !o)}
           className="flex items-center gap-2 w-full text-left"
         >
-          <Package className="h-3.5 w-3.5 text-neutral-400" />
-          <span className="text-xs font-medium text-neutral-500 flex-1">
+          <Package className="h-3.5 w-3.5 text-[#71717a]" />
+          <span className="text-xs font-medium text-[#a1a1aa] flex-1">
             Product
             {selectedProductId && (
-              <span className="ml-1.5 text-neutral-400 font-normal">
+              <span className="ml-1.5 text-[#71717a] font-normal">
                 — {allProducts.find((p) => p.id === selectedProductId)?.name ?? ""}
               </span>
             )}
           </span>
           <ChevronDown
             className={cn(
-              "h-3.5 w-3.5 text-neutral-400 transition-transform",
+              "h-3.5 w-3.5 text-[#71717a] transition-transform",
               !productOpen && "-rotate-90"
             )}
           />
@@ -636,7 +636,7 @@ export function StaticAdPreview({
             <select
               value={selectedProductId}
               onChange={(e) => setSelectedProductId(e.target.value)}
-              className="flex h-9 w-full rounded-md border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="flex h-9 w-full rounded-md border border-[#27272a] bg-[#09090b] px-3 py-1.5 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               <option value="">Select a product...</option>
               {allProducts.map((p) => (
@@ -651,15 +651,15 @@ export function StaticAdPreview({
         {/* Collapsible copy editor */}
         <button
           onClick={() => setCopyOpen((o) => !o)}
-          className="flex items-center gap-2 w-full text-left border-t border-neutral-100 pt-3"
+          className="flex items-center gap-2 w-full text-left border-t border-[#1a1a1e] pt-3"
         >
-          <Type className="h-3.5 w-3.5 text-neutral-400" />
-          <span className="text-xs font-medium text-neutral-500 flex-1">
+          <Type className="h-3.5 w-3.5 text-[#71717a]" />
+          <span className="text-xs font-medium text-[#a1a1aa] flex-1">
             Ad Copy
           </span>
           <ChevronDown
             className={cn(
-              "h-3.5 w-3.5 text-neutral-400 transition-transform",
+              "h-3.5 w-3.5 text-[#71717a] transition-transform",
               !copyOpen && "-rotate-90"
             )}
           />
@@ -674,7 +674,7 @@ export function StaticAdPreview({
                 id="preview-headline"
                 value={headline}
                 onChange={(e) => setHeadline(e.target.value)}
-                className="bg-neutral-50 text-sm"
+                className="bg-[#09090b] text-sm"
               />
             </div>
             <div className="space-y-1">
@@ -687,8 +687,8 @@ export function StaticAdPreview({
                 onChange={(e) => setBody(e.target.value)}
                 rows={2}
                 className={cn(
-                  "flex w-full rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2",
-                  "text-sm placeholder:text-neutral-400",
+                  "flex w-full rounded-md border border-[#27272a] bg-[#09090b] px-3 py-2",
+                  "text-sm placeholder:text-[#71717a]",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                   "resize-none"
                 )}
@@ -702,17 +702,17 @@ export function StaticAdPreview({
                 id="preview-cta"
                 value={cta}
                 onChange={(e) => setCta(e.target.value)}
-                className="bg-neutral-50 text-sm"
+                className="bg-[#09090b] text-sm"
               />
             </div>
           </div>
         )}
 
         {/* Edit instructions */}
-        <div className="space-y-2 pt-1 border-t border-neutral-100">
+        <div className="space-y-2 pt-1 border-t border-[#1a1a1e]">
           <div className="flex items-center gap-2 pt-2">
-            <PenLine className="h-3.5 w-3.5 text-neutral-400" />
-            <span className="text-xs font-medium text-neutral-500">
+            <PenLine className="h-3.5 w-3.5 text-[#71717a]" />
+            <span className="text-xs font-medium text-[#a1a1aa]">
               Edit Instructions
             </span>
           </div>
@@ -751,7 +751,7 @@ export function StaticAdPreview({
               onRegenerate(editPrompt.trim() || undefined);
             }}
             disabled={isRegenerating}
-            className="bg-neutral-900 hover:bg-neutral-700 text-white gap-2"
+            className="bg-[#6366f1] hover:bg-[#6366f1]/80 text-white gap-2"
           >
             <RefreshCw
               className={`h-4 w-4 ${isRegenerating ? "animate-spin" : ""}`}

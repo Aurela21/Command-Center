@@ -58,7 +58,7 @@ function JobRow({ job }: { job: TrackedJob }) {
         ) : isFailed ? (
           <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
         ) : isQueued ? (
-          <div className={cn("h-3.5 w-3.5 rounded-full border-2", `border-neutral-300`)} />
+          <div className={cn("h-3.5 w-3.5 rounded-full border-2", `border-[#52525b]`)} />
         ) : (
           <Loader2 className={cn("h-3.5 w-3.5 animate-spin", colors.icon)} />
         )}
@@ -67,8 +67,8 @@ function JobRow({ job }: { job: TrackedJob }) {
       {/* Label */}
       <div className="w-40 shrink-0">
         <div className="flex items-center gap-1.5">
-          <Icon className="h-3 w-3 text-neutral-400" />
-          <span className="text-xs font-medium text-neutral-700 truncate">{job.label}</span>
+          <Icon className="h-3 w-3 text-[#71717a]" />
+          <span className="text-xs font-medium text-[#a1a1aa] truncate">{job.label}</span>
         </div>
       </div>
 
@@ -90,9 +90,9 @@ function JobRow({ job }: { job: TrackedJob }) {
         {isFailed ? (
           <span className="text-[11px] font-medium text-red-500">Failed</span>
         ) : isComplete ? (
-          <span className="text-[11px] text-neutral-400">{ago ?? "Done"}</span>
+          <span className="text-[11px] text-[#71717a]">{ago ?? "Done"}</span>
         ) : isQueued ? (
-          <span className="text-[11px] text-neutral-400">Queued</span>
+          <span className="text-[11px] text-[#71717a]">Queued</span>
         ) : (
           <span className={cn("text-[11px] font-medium tabular-nums", colors.text)}>
             {Math.round(job.progress)}%
@@ -266,26 +266,26 @@ export function QueueTracker({ scenes, heroGenerating }: Props) {
   if (allJobs.length === 0) return null;
 
   return (
-    <div className="fixed bottom-0 left-60 right-0 z-40 border-t border-neutral-200 bg-white shadow-lg">
+    <div className="fixed bottom-0 left-60 right-0 z-40 border-t border-[#27272a] bg-[#18181b] shadow-lg">
       {/* Header */}
       <button
         onClick={() => setCollapsed(!collapsed)}
-        className="w-full flex items-center justify-between px-4 py-2 hover:bg-neutral-50 transition-colors"
+        className="w-full flex items-center justify-between px-4 py-2 hover:bg-[#27272a] transition-colors"
       >
         <div className="flex items-center gap-2">
-          <div className={cn("h-2 w-2 rounded-full", activeCount > 0 ? "bg-emerald-500 animate-pulse" : "bg-neutral-300")} />
-          <span className="text-xs font-medium text-neutral-700">
+          <div className={cn("h-2 w-2 rounded-full", activeCount > 0 ? "bg-emerald-500 animate-pulse" : "bg-[#52525b]")} />
+          <span className="text-xs font-medium text-[#a1a1aa]">
             Queue
-            {activeCount > 0 && <span className="text-neutral-400 font-normal ml-1">({activeCount} active)</span>}
-            {completedJobs.length > 0 && activeCount === 0 && <span className="text-neutral-400 font-normal ml-1">({completedJobs.length} recent)</span>}
+            {activeCount > 0 && <span className="text-[#71717a] font-normal ml-1">({activeCount} active)</span>}
+            {completedJobs.length > 0 && activeCount === 0 && <span className="text-[#71717a] font-normal ml-1">({completedJobs.length} recent)</span>}
           </span>
         </div>
-        <ChevronDown className={cn("h-3.5 w-3.5 text-neutral-400 transition-transform", collapsed && "rotate-180")} />
+        <ChevronDown className={cn("h-3.5 w-3.5 text-[#71717a] transition-transform", collapsed && "rotate-180")} />
       </button>
 
       {/* Job list */}
       {!collapsed && (
-        <div className="max-h-48 overflow-y-auto border-t border-neutral-100">
+        <div className="max-h-48 overflow-y-auto border-t border-[#1a1a1e]">
           {allJobs.map((job) => (
             <JobRow key={job.id} job={job} />
           ))}

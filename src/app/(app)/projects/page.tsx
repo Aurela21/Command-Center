@@ -88,8 +88,8 @@ export default function ProjectsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-xl font-semibold text-neutral-900">Projects</h1>
-          <p className="text-sm text-neutral-400 mt-0.5">
+          <h1 className="text-xl font-semibold text-[#fafafa]">Projects</h1>
+          <p className="text-sm text-[#71717a] mt-0.5">
             {isLoading
               ? ""
               : `${projects?.length ?? 0} project${projects?.length !== 1 ? "s" : ""}`}
@@ -131,11 +131,11 @@ export default function ProjectsPage() {
         </div>
       ) : projects?.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
-          <div className="rounded-2xl bg-neutral-100 p-6 mb-4">
-            <Film className="h-10 w-10 text-neutral-300" />
+          <div className="rounded-2xl bg-[#27272a] p-6 mb-4">
+            <Film className="h-10 w-10 text-[#52525b]" />
           </div>
-          <p className="text-sm font-medium text-neutral-700">No projects yet</p>
-          <p className="text-sm text-neutral-400 mt-1">
+          <p className="text-sm font-medium text-[#a1a1aa]">No projects yet</p>
+          <p className="text-sm text-[#71717a] mt-1">
             Create a project to start building your video ad.
           </p>
           <div className="mt-6 flex gap-2">
@@ -173,36 +173,36 @@ export default function ProjectsPage() {
                 }
               }}
               className={cn(
-                "w-full flex items-center gap-4 px-5 py-4 rounded-xl border border-neutral-200 bg-white",
-                "hover:border-neutral-300 hover:shadow-sm transition-all text-left group"
+                "w-full flex items-center gap-4 px-5 py-4 rounded-xl border border-[#27272a] bg-[#18181b]",
+                "hover:border-[#3f3f46] hover:shadow-sm transition-all text-left group"
               )}
             >
               <div
                 className={cn(
                   "h-2.5 w-2.5 rounded-full shrink-0",
-                  STATUS_COLORS[project.status] ?? "bg-neutral-300"
+                  STATUS_COLORS[project.status] ?? "bg-[#52525b]"
                 )}
               />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium text-neutral-900 truncate">
+                  <p className="text-sm font-medium text-[#fafafa] truncate">
                     {project.name}
                   </p>
                   <span className={cn(
                     "text-[10px] font-medium px-1.5 py-0.5 rounded-full shrink-0",
                     (project as Project & { projectType?: string }).projectType === "concept"
-                      ? "bg-violet-100 text-violet-600"
-                      : "bg-neutral-100 text-neutral-500"
+                      ? "bg-violet-500/20 text-violet-400"
+                      : "bg-[#27272a] text-[#a1a1aa]"
                   )}>
                     {(project as Project & { projectType?: string }).projectType === "concept" ? "Concept" : "Iteration"}
                   </span>
                 </div>
-                <p className="text-xs text-neutral-400 mt-0.5">
+                <p className="text-xs text-[#71717a] mt-0.5">
                   {STATUS_LABELS[project.status] ?? project.status} ·{" "}
                   {new Date(project.createdAt!).toLocaleDateString()}
                 </p>
               </div>
-              <ChevronRight className="h-4 w-4 text-neutral-300 group-hover:text-neutral-500 shrink-0 transition-colors" />
+              <ChevronRight className="h-4 w-4 text-[#52525b] group-hover:text-[#a1a1aa] shrink-0 transition-colors" />
             </button>
           ))}
         </div>
@@ -226,14 +226,14 @@ export default function ProjectsPage() {
                     className={cn(
                       "flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all text-center",
                       newType === "reference"
-                        ? "border-neutral-900 bg-neutral-50"
-                        : "border-neutral-200 hover:border-neutral-300"
+                        ? "border-[#6366f1] bg-[#09090b]"
+                        : "border-[#27272a] hover:border-[#3f3f46]"
                     )}
                   >
-                    <Video className={cn("h-6 w-6", newType === "reference" ? "text-neutral-900" : "text-neutral-400")} />
+                    <Video className={cn("h-6 w-6", newType === "reference" ? "text-[#fafafa]" : "text-[#71717a]")} />
                     <div>
-                      <p className={cn("text-sm font-medium", newType === "reference" ? "text-neutral-900" : "text-neutral-600")}>From Reference</p>
-                      <p className="text-[11px] text-neutral-400 mt-0.5">Upload a video to recreate</p>
+                      <p className={cn("text-sm font-medium", newType === "reference" ? "text-[#fafafa]" : "text-[#a1a1aa]")}>From Reference</p>
+                      <p className="text-[11px] text-[#71717a] mt-0.5">Upload a video to recreate</p>
                     </div>
                   </button>
                   <button
@@ -242,14 +242,14 @@ export default function ProjectsPage() {
                     className={cn(
                       "flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all text-center",
                       newType === "concept"
-                        ? "border-violet-600 bg-violet-50"
-                        : "border-neutral-200 hover:border-neutral-300"
+                        ? "border-violet-600 bg-violet-500/10"
+                        : "border-[#27272a] hover:border-[#3f3f46]"
                     )}
                   >
-                    <Sparkles className={cn("h-6 w-6", newType === "concept" ? "text-violet-600" : "text-neutral-400")} />
+                    <Sparkles className={cn("h-6 w-6", newType === "concept" ? "text-violet-600" : "text-[#71717a]")} />
                     <div>
-                      <p className={cn("text-sm font-medium", newType === "concept" ? "text-violet-700" : "text-neutral-600")}>New Concept</p>
-                      <p className="text-[11px] text-neutral-400 mt-0.5">Build a video from scratch</p>
+                      <p className={cn("text-sm font-medium", newType === "concept" ? "text-violet-400" : "text-[#a1a1aa]")}>New Concept</p>
+                      <p className="text-[11px] text-[#71717a] mt-0.5">Build a video from scratch</p>
                     </div>
                   </button>
                 </div>
@@ -264,7 +264,7 @@ export default function ProjectsPage() {
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   placeholder="e.g. Summer Campaign v2"
-                  className="bg-white"
+                  className="bg-[#18181b]"
                 />
               </div>
             </div>
@@ -279,7 +279,7 @@ export default function ProjectsPage() {
               <Button
                 type="submit"
                 disabled={!newName.trim() || createMutation.isPending}
-                className="bg-neutral-900 hover:bg-neutral-700 text-white"
+                className="bg-[#6366f1] hover:bg-[#6366f1]/80 text-white"
               >
                 {createMutation.isPending ? "Creating…" : "Create"}
               </Button>
