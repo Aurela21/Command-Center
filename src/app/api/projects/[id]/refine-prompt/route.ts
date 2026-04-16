@@ -10,7 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { scenes, productProfiles, productImages, assetVersions } from "@/db/schema";
-import { eq, and, asc, sql } from "drizzle-orm";
+import { eq, and, asc, sql, not } from "drizzle-orm";
 import { refinePrompt, type RefineTarget } from "@/lib/claude";
 import { embed } from "@/lib/embeddings";
 
@@ -128,12 +128,12 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
   }
 
-  // Look up past rejection reasons for this scene — filtered by asset type
-  // so seed image rejections inform seed prompts, video rejections inform Kling prompts
+  // Look up past rejection reasons — this scene + other scenes in the project
   let rejectionHistory = "";
   try {
     const assetType = target === "seed_image" ? "seed_image" : "kling_output";
-    const rejectedVersions = await db
+
+    const thisSceneRejections = await db
       .select({
         rejectionReason: assetVersions.rejectionReason,
         generationPrompt: assetVersions.generationPrompt,
@@ -145,16 +145,52 @@ export async function POST(req: NextRequest, { params }: Params) {
           eq(assetVersions.assetType, assetType),
           eq(assetVersions.isRejected, true)
         )
-      );
-    if (rejectedVersions.length > 0) {
-      rejectionHistory = rejectedVersions
+      )
+      .limit(5);
+
+    const otherSceneRejections = await db
+      .select({
+        rejectionReason: assetVersions.rejectionReason,
+        generationPrompt: assetVersions.generationPrompt,
+      })
+      .from(assetVersions)
+      .innerJoin(scenes, eq(assetVersions.sceneId, scenes.id))
+      .where(
+        and(
+          eq(scenes.projectId, projectId),
+          not(eq(assetVersions.sceneId, sceneId)),
+          eq(assetVersions.assetType, assetType),
+          eq(assetVersions.isRejected, true)
+        )
+      )
+      .limit(5);
+
+    const fmt = (rows: typeof thisSceneRejections) =>
+      rows
         .filter((r) => r.rejectionReason)
         .map((r) => `- Prompt: "${r.generationPrompt?.slice(0, 80) ?? "unknown"}"\n  Issues: ${r.rejectionReason}`)
         .join("\n");
+
+    if (thisSceneRejections.length > 0) {
+      rejectionHistory += `REJECTED FROM THIS SCENE:\n${fmt(thisSceneRejections)}`;
+    }
+    if (otherSceneRejections.length > 0) {
+      if (rejectionHistory) rejectionHistory += "\n\n";
+      rejectionHistory += `REJECTED FROM OTHER SCENES IN THIS PROJECT:\n${fmt(otherSceneRejections)}`;
     }
   } catch {
     // Rejection history optional
   }
+
+  // Load product learnings for @tagged products
+  let productLearningsStr = "";
+  try {
+    const { buildLearningsSection, resolveProductFromTags } = await import("@/lib/learnings");
+    const productId = await resolveProductFromTags(prompt);
+    if (productId) {
+      productLearningsStr = await buildLearningsSection(productId);
+    }
+  } catch {}
 
   try {
     const refined = await refinePrompt({
@@ -167,6 +203,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       klingKnowledge: klingKnowledge || undefined,
       referenceFrameUrl,
       rejectionHistory: rejectionHistory || undefined,
+      productLearnings: productLearningsStr || undefined,
     });
 
     return NextResponse.json({ refined });

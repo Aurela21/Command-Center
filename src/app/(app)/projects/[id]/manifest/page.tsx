@@ -24,14 +24,36 @@ import {
   Sparkles,
   Pencil,
   PlusCircle,
+  Copy,
 } from "lucide-react";
 import { toast } from "sonner";
+import { Breadcrumbs } from "@/components/breadcrumbs";
+import { ProgressStepper, type Step } from "@/components/progress-stepper";
 import {
   SCENE_COLORS,
   candidateFrames,
   type MockScene,
 } from "./mock-data";
 import type { Project } from "@/db/schema";
+
+function getVideoSteps(status: string): Step[] {
+  const steps: Step[] = [
+    { id: "upload", label: "Upload", status: "upcoming" },
+    { id: "manifest", label: "Manifest", status: "locked" },
+    { id: "production", label: "Production", status: "locked" },
+  ];
+  if (["uploading", "analyzing"].includes(status)) {
+    steps[0].status = "current";
+  } else if (status === "manifest_review") {
+    steps[0].status = "completed";
+    steps[1].status = "current";
+  } else if (["producing", "complete"].includes(status)) {
+    steps[0].status = "completed";
+    steps[1].status = "completed";
+    steps[2].status = status === "complete" ? "completed" : "current";
+  }
+  return steps;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -49,9 +71,9 @@ function sceneColor(index: number): string {
 
 const R2_PUBLIC = process.env.NEXT_PUBLIC_R2_PUBLIC_URL ?? "";
 
-/** Build a public R2 URL for an extracted frame. Frames are uploaded at 1fps. */
-function frameUrl(projectId: string, secondIndex: number): string {
-  return `${R2_PUBLIC}/frames/${projectId}/f${String(secondIndex).padStart(4, "0")}.jpg`;
+/** Build a public R2 URL for an extracted frame. Frames are stored at 3fps indices. */
+function frameUrl(projectId: string, frameIndex: number): string {
+  return `${R2_PUBLIC}/frames/${projectId}/f${String(frameIndex).padStart(4, "0")}.jpg`;
 }
 
 // Map a DB scene row to the MockScene shape used by the UI
@@ -68,13 +90,14 @@ function dbSceneToMock(
     referenceFrameSource: string | null;
     boundarySource: string | null;
     description: string | null;
+    scenePrompt: string | null;
     targetClipDurationS: number | null;
   },
   projectId: string
 ): MockScene {
-  // One candidate per extracted frame (1fps) within the scene boundaries
+  // Every extracted 3fps frame within the scene boundaries
   const cFrameNums = candidateFrames(s.startFrame, s.endFrame);
-  const cUrls = cFrameNums.map((f) => frameUrl(projectId, Math.round(f / 30)));
+  const cUrls = cFrameNums.map((f) => frameUrl(projectId, f));
 
   return {
     id: s.id,
@@ -90,6 +113,7 @@ function dbSceneToMock(
     referenceFrameSource: (s.referenceFrameSource ?? "auto") as "auto" | "user_selected",
     boundarySource: (s.boundarySource ?? "ai") as "ai" | "user_adjusted" | "user_created",
     description: s.description ?? "",
+    scenePrompt: s.scenePrompt ?? "",
     targetClipDurationS: s.targetClipDurationS ?? 5,
   };
 }
@@ -248,6 +272,7 @@ function SceneDetailPanel({
   onUpdate,
   onSplit,
   onMerge,
+  onDuplicate,
   onRemove,
 }: {
   scene: MockScene;
@@ -257,6 +282,7 @@ function SceneDetailPanel({
   onUpdate: (patch: Partial<MockScene>) => void;
   onSplit: () => void;
   onMerge: () => void;
+  onDuplicate: () => void;
   onRemove: () => void;
 }) {
   const durationMs = scene.endTimeMs - scene.startTimeMs;
@@ -400,6 +426,10 @@ function SceneDetailPanel({
       </div>
 
       <div className="flex items-center gap-2 pt-1 border-t border-[#1a1a1e]">
+        <Button variant="outline" size="sm" onClick={onDuplicate} className="gap-1.5 text-xs h-8">
+          <Copy className="h-3.5 w-3.5" />
+          Duplicate
+        </Button>
         <Button variant="outline" size="sm" onClick={onSplit} className="gap-1.5 text-xs h-8">
           <Scissors className="h-3.5 w-3.5" />
           Split
@@ -560,7 +590,7 @@ export default function ManifestPage() {
         // Recompute candidate frames when boundaries change
         if (patch.startFrame !== undefined || patch.endFrame !== undefined) {
           const cFrameNums = candidateFrames(updated.startFrame, updated.endFrame);
-          const cUrls = cFrameNums.map((f) => frameUrl(id, Math.round(f / 30)));
+          const cUrls = cFrameNums.map((f) => frameUrl(id, f));
           updated.candidateFrames = cFrameNums;
           updated.candidateFrameUrls = cUrls;
         }
@@ -626,6 +656,28 @@ export default function ManifestPage() {
     setSelectedId(merged.id);
   }
 
+  function duplicateScene(id: string) {
+    const idx = scenes.findIndex((s) => s.id === id);
+    if (idx === -1) return;
+    const scene = scenes[idx];
+
+    const clone: MockScene = {
+      ...scene,
+      id: `${id}-dup-${Date.now()}`,
+      boundarySource: "user_created",
+      referenceFrameSource: "auto",
+    };
+
+    const updated = [
+      ...scenes.slice(0, idx + 1),
+      clone,
+      ...scenes.slice(idx + 1),
+    ].map((s, i) => ({ ...s, sceneOrder: i + 1 }));
+
+    setScenes(updated);
+    setSelectedId(clone.id);
+  }
+
   function removeScene(id: string) {
     if (scenes.length <= 1) return;
     const idx = scenes.findIndex((s) => s.id === id);
@@ -647,9 +699,11 @@ export default function ManifestPage() {
         startTimeMs: s.startTimeMs,
         endTimeMs: s.endTimeMs,
         referenceFrame: s.referenceFrame,
+        referenceFrameUrl: s.referenceFrameUrl,
         referenceFrameSource: s.referenceFrameSource,
         boundarySource: s.boundarySource,
         description: s.description,
+        scenePrompt: s.scenePrompt,
         targetClipDurationS: s.targetClipDurationS,
       }));
 
@@ -706,6 +760,15 @@ export default function ManifestPage() {
       {/* ── Header ── */}
       <div className="shrink-0 flex items-center justify-between px-8 py-4 border-b border-[#27272a]">
         <div>
+          <Breadcrumbs crumbs={[{ label: "Projects", href: "/projects" }, { label: project?.name ?? "...", href: `/projects/${id}/manifest` }, { label: "Manifest" }]} />
+          <ProgressStepper
+            steps={getVideoSteps(project?.status ?? "uploading")}
+            onStepClick={(stepId) => {
+              if (stepId === "upload") router.push(`/projects/${id}/upload`);
+              if (stepId === "manifest") return;
+              if (stepId === "production") router.push(`/projects/${id}/production`);
+            }}
+          />
           <h1 className="text-base font-semibold text-[#fafafa]">Scene Manifest</h1>
           <p className="text-xs text-[#71717a] mt-0.5">
             {scenes.length} scenes &middot; {msToTimecode(totalDurationMs)} total
@@ -762,6 +825,7 @@ export default function ManifestPage() {
               onUpdate={(patch) => updateScene(selectedScene.id, patch)}
               onSplit={() => splitScene(selectedScene.id)}
               onMerge={() => mergeScene(selectedScene.id)}
+              onDuplicate={() => duplicateScene(selectedScene.id)}
               onRemove={() => removeScene(selectedScene.id)}
             />
           )}

@@ -14,6 +14,10 @@ import { eq, and, inArray, sql, asc } from "drizzle-orm";
 import { createJob, completeJob, failJob } from "@/lib/job-queue";
 import { generateSeedImage } from "@/lib/nano-banana";
 import { uploadBuffer } from "@/lib/r2";
+import { analyzePoseComposition, comparePoseToSpec, scoreGeneration } from "@/lib/claude";
+import type { PoseCompositionSpec } from "@/lib/claude";
+import { qualityChecks } from "@/db/schema";
+import { toProductBundle, renderScenePrompt, type ProductBundle, type VideoSeedSpec } from "@/lib/nb2-prompt";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -105,11 +109,9 @@ export async function POST(req: NextRequest, { params }: Params) {
     resultData: { prompt },
   });
 
-  // Parse @tags from prompt and look up product profiles
+  // Resolve @tags to ProductBundles via nb2-prompt module
   const tagMatches = prompt.match(/@[\w-]+/g) ?? [];
-  type RefImg = { url: string; label?: string };
-  const refImages: RefImg[] = [];
-  let productContext = "";
+  const bundles: ProductBundle[] = [];
 
   for (const tag of tagMatches) {
     const slug = tag.slice(1);
@@ -125,55 +127,82 @@ export async function POST(req: NextRequest, { params }: Params) {
         .where(eq(productImages.productId, profile.id))
         .orderBy(asc(productImages.sortOrder));
 
-      for (const img of images) {
-        refImages.push({ url: img.fileUrl, label: img.label ?? undefined });
-      }
-
-      const labels = images.map((img) => img.label).filter(Boolean).join(", ");
-      productContext += `\n\nProduct "${profile.name}" (${tag}): ${profile.description || "No description."}`;
-      if (labels) productContext += `\nImage angles: ${labels}`;
-
+      bundles.push(toProductBundle(profile, images));
       console.log(`[generate-seed] Resolved ${tag} → ${images.length} images`);
     } else {
       console.warn(`[generate-seed] @tag "${slug}" not found in product_profiles`);
     }
   }
 
-  // In hero mode, add the scene's reference frame as pose reference (no label = pose ref)
+  // Resolve pose reference URL for hero mode
+  let poseReferenceUrl: string | undefined;
   if (heroImageUrl) {
-    let sceneFrameUrl = scene.referenceFrameUrl ?? scene.startFrameUrl ?? null;
-    if (!sceneFrameUrl) {
+    poseReferenceUrl = scene.referenceFrameUrl ?? scene.startFrameUrl ?? undefined;
+    if (!poseReferenceUrl) {
       const R2_PUBLIC = process.env.R2_PUBLIC_URL ?? process.env.NEXT_PUBLIC_R2_PUBLIC_URL ?? "";
       if (R2_PUBLIC) {
         const sec = Math.round(scene.referenceFrame / 30);
-        sceneFrameUrl = `${R2_PUBLIC}/frames/${projectId}/f${String(sec).padStart(4, "0")}.jpg`;
+        poseReferenceUrl = `${R2_PUBLIC}/frames/${projectId}/f${String(sec).padStart(4, "0")}.jpg`;
       }
-    }
-    if (sceneFrameUrl) {
-      refImages.unshift({ url: sceneFrameUrl }); // no label = pose ref
     }
   }
 
-  // Deduplicate by URL, cap at 6 (1 pose + 5 product = safe for Gemini)
-  const seenUrls = new Set<string>();
-  const uniqueRefs = refImages.filter((r) => {
-    if (seenUrls.has(r.url)) return false;
-    seenUrls.add(r.url);
-    return true;
-  }).slice(0, 6);
+  // Auto-analyze pose composition in hero mode (cache in startFrameAnalysis)
+  let poseSpec: PoseCompositionSpec | undefined;
+  if (heroImageUrl) {
+    const existingSpec = scene.startFrameAnalysis as { poseSpec?: PoseCompositionSpec } | null;
+    if (existingSpec?.poseSpec) {
+      poseSpec = existingSpec.poseSpec;
+      console.log(`[generate-seed] Using cached poseSpec for scene ${sceneId}`);
+    } else {
+      // Get the start frame URL for analysis
+      let analyzeUrl = scene.referenceFrameUrl ?? scene.startFrameUrl ?? null;
+      if (!analyzeUrl) {
+        const R2_PUBLIC = process.env.R2_PUBLIC_URL ?? process.env.NEXT_PUBLIC_R2_PUBLIC_URL ?? "";
+        if (R2_PUBLIC && scene.referenceFrame > 0) {
+          const sec = Math.round(scene.referenceFrame / 30);
+          analyzeUrl = `${R2_PUBLIC}/frames/${projectId}/f${String(sec).padStart(4, "0")}.jpg`;
+        }
+      }
+      if (analyzeUrl) {
+        try {
+          console.log(`[generate-seed] Analyzing pose composition for scene ${sceneId}`);
+          poseSpec = await analyzePoseComposition(analyzeUrl);
+          // Cache in startFrameAnalysis
+          await db
+            .update(scenes)
+            .set({
+              startFrameAnalysis: { ...(existingSpec ?? {}), poseSpec } as unknown as Record<string, unknown>,
+              updatedAt: sql`NOW()`,
+            })
+            .where(eq(scenes.id, sceneId));
+          console.log(`[generate-seed] Cached poseSpec for scene ${sceneId}`);
+        } catch (err) {
+          console.warn(`[generate-seed] Pose analysis failed, continuing without:`, err);
+        }
+      }
+    }
+  }
 
-  // Enrich prompt with product text context
-  const enrichedPrompt = productContext
-    ? `${prompt}\n\n--- Product Reference ---${productContext}`
-    : prompt;
+  // Build NB2 prompt payload via the prompt construction module
+  const nb2Spec: VideoSeedSpec = {
+    kind: "video-seed",
+    subject: prompt,
+    baseImageUrl: imageUrl,
+    poseReferenceUrl,
+    poseSpec,
+    products: bundles.length > 0 ? bundles : undefined,
+  };
+  const nb2Payload = renderScenePrompt(nb2Spec);
 
-  // Generate image via Nano Banana Pro
+  // Generate image via Nano Banana
   try {
-    console.log(`[generate-seed] Generating for scene ${sceneId} with ${uniqueRefs.length} ref image(s)`);
+    const refCount = nb2Payload.parts.filter((p) => p.kind === "image").length;
+    console.log(`[generate-seed] Generating for scene ${sceneId} with ${refCount} ref image(s) via NB2`);
     const { imageBase64 } = await generateSeedImage({
       imageUrl,
-      prompt: enrichedPrompt,
-      referenceImages: uniqueRefs.length > 0 ? uniqueRefs : undefined,
+      prompt,
+      nb2Payload,
     });
 
     // Enforce 9:16 aspect ratio — crop/resize to 720x1280
@@ -213,6 +242,52 @@ export async function POST(req: NextRequest, { params }: Params) {
       })
       .returning();
 
+    // Post-generation quality gate — compare against poseSpec if available
+    let poseMismatches: string[] | undefined;
+    if (poseSpec) {
+      try {
+        const comparison = await comparePoseToSpec({
+          generatedImageUrl: fileUrl,
+          poseSpec,
+        });
+        // Store in qualityScore on the asset version
+        await db
+          .update(assetVersions)
+          .set({ qualityScore: comparison as unknown as Record<string, unknown> })
+          .where(eq(assetVersions.id, av.id));
+        if (!comparison.match) {
+          poseMismatches = comparison.mismatches;
+          console.log(`[generate-seed] Pose mismatches (score ${comparison.score}):`, comparison.mismatches);
+        }
+      } catch (err) {
+        console.warn(`[generate-seed] Pose comparison failed:`, err);
+      }
+    }
+
+    // Auto-score the generated seed image (non-blocking)
+    let qualityScore: Record<string, unknown> | undefined;
+    try {
+      const score = await scoreGeneration({
+        prompt,
+        outputUrl: fileUrl,
+        referenceUrl: imageUrl ?? undefined,
+      });
+      qualityScore = { ...((av.qualityScore as Record<string, unknown>) ?? {}), ...score } as Record<string, unknown>;
+      await db
+        .update(assetVersions)
+        .set({ qualityScore })
+        .where(eq(assetVersions.id, av.id));
+      for (const [checkType, checkScore] of Object.entries(score.breakdown)) {
+        await db.insert(qualityChecks).values({
+          assetVersionId: av.id,
+          checkType,
+          score: checkScore as number,
+        });
+      }
+    } catch (err) {
+      console.warn("[generate-seed] Auto-scoring failed:", err);
+    }
+
     // Complete job + emit SSE
     await completeJob(job.id, { file_url: fileUrl }, av.id);
 
@@ -220,6 +295,8 @@ export async function POST(req: NextRequest, { params }: Params) {
       jobId: job.id,
       assetVersionId: av.id,
       imageUrl: fileUrl,
+      ...(qualityScore ? { qualityScore } : {}),
+      ...(poseMismatches ? { poseMismatches } : {}),
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

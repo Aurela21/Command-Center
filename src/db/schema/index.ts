@@ -8,3 +8,4 @@ export * from "./products";
 export * from "./chat";
 export * from "./static-ad-jobs";
 export * from "./static-ad-generations";
+export * from "./product-learnings";

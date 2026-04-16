@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { SCENE_COLORS } from "../manifest/mock-data";
 import type {
@@ -19,6 +20,29 @@ import { Tab3C } from "./tab-3c";
 import { QueueTracker } from "./queue-tracker";
 import { ChatPanel } from "./chat-panel";
 import { Brain, Loader2 } from "lucide-react";
+import { Breadcrumbs } from "@/components/breadcrumbs";
+import { ProgressStepper, type Step } from "@/components/progress-stepper";
+import { ProjectSettings } from "@/components/project-settings";
+import type { Project } from "@/db/schema";
+
+function getVideoSteps(status: string): Step[] {
+  const steps: Step[] = [
+    { id: "upload", label: "Upload", status: "upcoming" },
+    { id: "manifest", label: "Manifest", status: "locked" },
+    { id: "production", label: "Production", status: "locked" },
+  ];
+  if (["uploading", "analyzing"].includes(status)) {
+    steps[0].status = "current";
+  } else if (status === "manifest_review") {
+    steps[0].status = "completed";
+    steps[1].status = "current";
+  } else if (["producing", "complete"].includes(status)) {
+    steps[0].status = "completed";
+    steps[1].status = "completed";
+    steps[2].status = status === "complete" ? "completed" : "current";
+  }
+  return steps;
+}
 
 // ─── DB row types (mirrors what production-state returns) ────────────────────
 
@@ -198,17 +222,26 @@ function dbToState(
 // ─── Tab config ──────────────────────────────────────────────────────────────
 
 const TABS: { id: ProductionTab; label: string }[] = [
-  { id: "3b", label: "3A — Script & Motion" },
-  { id: "3a", label: "3B — Seed Images" },
-  { id: "review", label: "Review Pairs" },
-  { id: "3c", label: "3C — Video Generation" },
+  { id: "script", label: "Script" },
+  { id: "seed", label: "Seed Images" },
+  { id: "review", label: "Review" },
+  { id: "video", label: "Video" },
 ];
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function ProductionPage() {
   const { id: projectId } = useParams<{ id: string }>();
-  const [activeTab, setActiveTab] = useState<ProductionTab>("3b");
+  const router = useRouter();
+  const { data: project } = useQuery<Project>({
+    queryKey: ["project", projectId],
+    queryFn: async () => {
+      const res = await fetch(`/api/projects/${projectId}`);
+      if (!res.ok) throw new Error("Failed to load project");
+      return res.json();
+    },
+  });
+  const [activeTab, setActiveTab] = useState<ProductionTab>("script");
   const [scenes, setScenes] = useState<SceneProductionState[]>([]);
   const [script, setScript] = useState<string>("");
   const [loading, setLoading] = useState(true);
@@ -221,6 +254,7 @@ export default function ProductionPage() {
   const [productTags, setProductTags] = useState<ProductTag[]>([]);
   const [chatOpen, setChatOpen] = useState(false);
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
+  const [projectName, setProjectName] = useState<string>("");
 
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
@@ -342,6 +376,14 @@ export default function ProductionPage() {
       )
       .catch(() => {});
   }, []);
+
+  // Load project name for breadcrumbs
+  useEffect(() => {
+    fetch(`/api/projects/${projectId}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data?.name) setProjectName(data.name); })
+      .catch(() => {});
+  }, [projectId]);
 
   // Load initial production state
   useEffect(() => {
@@ -512,6 +554,15 @@ export default function ProductionPage() {
     <div className="h-full flex flex-col overflow-hidden bg-[#18181b]">
       {/* ── Header ── */}
       <div className="shrink-0 px-8 py-4 border-b border-[#27272a]">
+        <Breadcrumbs crumbs={[{ label: "Projects", href: "/projects" }, ...(projectName ? [{ label: projectName, href: `/projects/${projectId}/production` }] : []), { label: "Production" }]} />
+        <ProgressStepper
+          steps={getVideoSteps(project?.status ?? "producing")}
+          onStepClick={(stepId) => {
+            if (stepId === "upload") router.push(`/projects/${projectId}/upload`);
+            if (stepId === "manifest") router.push(`/projects/${projectId}/manifest`);
+            if (stepId === "production") return;
+          }}
+        />
         <div className="flex items-center justify-between mb-3">
           <div>
             <h1 className="text-base font-semibold text-[#fafafa]">
@@ -537,8 +588,10 @@ export default function ProductionPage() {
           </button>
         </div>
 
+        <ProjectSettings projectId={projectId} />
+
         {/* Tab bar */}
-        <div className="flex gap-1">
+        <div className="flex gap-1 mt-3">
           {TABS.map((tab) => (
             <button
               key={tab.id}
@@ -558,7 +611,7 @@ export default function ProductionPage() {
 
       {/* ── Tab content — all tabs stay mounted so state syncs instantly ── */}
       <div className="flex-1 overflow-hidden">
-        <div className={activeTab === "3b" ? "h-full" : "hidden"}>
+        <div className={activeTab === "script" ? "h-full" : "hidden"}>
           <Tab3B
             scenes={scenes}
             updateScene={updateScene}
@@ -568,7 +621,7 @@ export default function ProductionPage() {
             productTags={productTags}
           />
         </div>
-        <div className={activeTab === "3a" ? "h-full" : "hidden"}>
+        <div className={activeTab === "seed" ? "h-full" : "hidden"}>
           <Tab3A
             scenes={scenes}
             updateScene={updateScene}
@@ -607,12 +660,12 @@ export default function ProductionPage() {
             scenes={scenes}
             updateScene={updateScene}
             projectId={projectId}
-            onGoTo3A={(sceneId?: string) => { if (sceneId) setSelectedSceneId(sceneId); setActiveTab("3a"); }}
-            onGoTo3B={() => setActiveTab("3b")}
+            onGoToSeed={(sceneId?: string) => { if (sceneId) setSelectedSceneId(sceneId); setActiveTab("seed"); }}
+            onGoToScript={() => setActiveTab("script")}
             productTags={productTags}
           />
         </div>
-        <div className={activeTab === "3c" ? "h-full" : "hidden"}>
+        <div className={activeTab === "video" ? "h-full" : "hidden"}>
           <Tab3C
             scenes={scenes}
             updateScene={updateScene}

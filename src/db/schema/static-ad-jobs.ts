@@ -20,9 +20,12 @@ export const staticAdJobs = pgTable("static_ad_jobs", {
   psychAnalysis: jsonb("psych_analysis"), // StaticAdAnalysis from claude.ts
   extractedCopy: jsonb("extracted_copy"), // { headline, body, cta }
   finalCopy: jsonb("final_copy"), // { headline, body, cta } — user-edited
+  compositionSpec: jsonb("composition_spec"), // AdCompositionSpec from claude.ts
+  qualityScore: jsonb("quality_score"), // { overall, breakdown, notes } from scoreGeneration
   outputImageUrl: text("output_image_url"),
   outputFileSizeBytes: integer("output_file_size_bytes"),
   generationPrompt: text("generation_prompt"),
+  sessionTag: text("session_tag"),
   lastError: text("last_error"),
   createdAt: timestamp("created_at", { withTimezone: true }).default(
     sql`NOW()`

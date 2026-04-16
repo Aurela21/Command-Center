@@ -580,12 +580,12 @@ type Props = {
   scenes: SceneProductionState[];
   updateScene: (sceneId: string, patch: Partial<SceneProductionState>) => void;
   projectId: string;
-  onGoTo3A: (sceneId?: string) => void;
-  onGoTo3B: () => void;
+  onGoToSeed: (sceneId?: string) => void;
+  onGoToScript: () => void;
   productTags: ProductTag[];
 };
 
-export function TabReview({ scenes, updateScene, projectId, onGoTo3A, onGoTo3B, productTags }: Props) {
+export function TabReview({ scenes, updateScene, projectId, onGoToSeed, onGoToScript, productTags }: Props) {
   const [reoptimizing, setReoptimizing] = useState(false);
   const [bulkInstruction, setBulkInstruction] = useState("");
   const [bulkApplying, setBulkApplying] = useState(false);
@@ -869,7 +869,7 @@ export function TabReview({ scenes, updateScene, projectId, onGoTo3A, onGoTo3B, 
               allScenes={scenes}
               projectId={projectId}
               updateScene={updateScene}
-              onEditSeed={(sceneId: string) => onGoTo3A(sceneId)}
+              onEditSeed={(sceneId: string) => onGoToSeed(sceneId)}
               productTags={productTags}
             />
           ))}

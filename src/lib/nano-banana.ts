@@ -1,23 +1,28 @@
 /**
- * Nano Banana Pro — image generation via Google Gemini API
+ * Nano Banana — image generation via Google Gemini API
  *
- * Model: gemini-3-pro-image-preview (Nano Banana Pro)
+ * Thin API wrapper. Prompt construction lives in nb2-prompt.ts.
+ * This module handles: image download, base64 conversion, API call, response parsing.
+ *
  * Auth: API key via NANO_BANANA_API_KEY
  * Endpoint: POST https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent
- *
- * Synchronous — sends image + prompt, gets edited image back directly.
- * Falls back to Higgsfield Platform API if NANO_BANANA_API_KEY is not set.
  */
 
-const NB_MODEL = "gemini-3-pro-image-preview";
+import { NB2_MODEL_ID, type NB2PromptPayload, type NB2Part } from "./nb2-prompt";
+
 const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta";
 
 export type RefImage = { url: string; label?: string };
+
+import type { PoseCompositionSpec } from "./claude";
 
 export type NanoBananaRequest = {
   imageUrl: string | null; // public R2 URL for the reference frame (null for text-to-image)
   prompt: string; // change prompt describing what to generate
   referenceImages?: RefImage[]; // product images + pose refs with optional labels
+  poseSpec?: PoseCompositionSpec; // structured pose/composition data for precise spatial matching
+  /** When provided, skips legacy inline prompt building and uses the NB2 payload directly. */
+  nb2Payload?: NB2PromptPayload;
 };
 
 export type NanoBananaResult = {
@@ -39,13 +44,74 @@ async function downloadImageBase64(url: string): Promise<{ base64: string; mimeT
   return { base64: Buffer.from(buffer).toString("base64"), mimeType };
 }
 
+/**
+ * Convert an NB2PromptPayload into the Gemini API parts array.
+ * Downloads images and converts to base64 inlineData.
+ */
+async function payloadToGeminiParts(
+  payload: NB2PromptPayload
+): Promise<Array<Record<string, unknown>>> {
+  const parts: Array<Record<string, unknown>> = [];
+  for (const part of payload.parts) {
+    if (part.kind === "text") {
+      parts.push({ text: part.text });
+    } else {
+      try {
+        const img = await downloadImageBase64(part.url);
+        parts.push({ inlineData: { mimeType: img.mimeType, data: img.base64 } });
+      } catch (err) {
+        console.warn(`[nano-banana] Failed to download ref image: ${part.url}`, err);
+      }
+    }
+  }
+  return parts;
+}
+
 async function generateViaNanoBanana(
   req: NanoBananaRequest
 ): Promise<NanoBananaResult> {
   const key = nanoBananaKey();
   if (!key) throw new Error("NANO_BANANA_API_KEY is not set");
 
-  // Build parts with labeled images so Gemini knows each image's role
+  // NB2 prompt module path — skip legacy inline prompt building
+  if (req.nb2Payload) {
+    const geminiParts = await payloadToGeminiParts(req.nb2Payload);
+    const body: Record<string, unknown> = {
+      contents: [{ parts: geminiParts }],
+      generationConfig: { responseModalities: ["IMAGE", "TEXT"] },
+    };
+    if (req.nb2Payload.systemInstruction) {
+      body.system_instruction = {
+        parts: [{ text: req.nb2Payload.systemInstruction }],
+      };
+    }
+    console.log(`[nano-banana] NB2 path: calling ${NB2_MODEL_ID} with ${geminiParts.length} parts`);
+    const url = `${GEMINI_BASE}/models/${NB2_MODEL_ID}:generateContent?key=${key}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Nano Banana ${res.status}: ${text.slice(0, 300)}`);
+    }
+    const data = (await res.json()) as {
+      candidates?: Array<{ content?: { parts?: Array<{ inlineData?: { mimeType: string; data: string }; text?: string }> } }>;
+      error?: { message: string };
+    };
+    if (data.error) throw new Error(`Nano Banana error: ${data.error.message}`);
+    for (const candidate of data.candidates ?? []) {
+      for (const part of candidate.content?.parts ?? []) {
+        if (part.inlineData?.data) {
+          return { imageBase64: part.inlineData.data, mimeType: part.inlineData.mimeType || "image/png" };
+        }
+      }
+    }
+    throw new Error("Nano Banana returned no image in response");
+  }
+
+  // ── Legacy inline prompt building (backward compatible) ──
   const parts: Array<Record<string, unknown>> = [];
   const refs = req.referenceImages ?? [];
   let failedDownloads = 0;
@@ -94,7 +160,34 @@ async function generateViaNanoBanana(
   // Build final instruction with product fidelity and pose matching
   let instruction = req.prompt;
 
-  if (poseRef) {
+  if (poseRef && req.poseSpec) {
+    const ps = req.poseSpec;
+    instruction += `\n\nCRITICAL POSE SPECIFICATION — Match these EXACT spatial parameters:
+
+SUBJECT:
+- Body: ${ps.subject.bodyOrientation}
+- Head: ${ps.subject.headPosition}
+- Eyeline: ${ps.subject.eyeline}
+- Pose: ${ps.subject.pose}
+- Framing: ${ps.subject.framing}
+
+CAMERA:
+- Angle: ${ps.camera.angle}
+- Shot: ${ps.camera.shotType}
+- Lens: ${ps.camera.focalLength}
+
+PLACEMENT:
+- Horizontal: ${ps.subjectPlacement.horizontal}
+- Vertical: ${ps.subjectPlacement.vertical}
+- Scale: ${ps.subjectPlacement.scale}
+
+LIGHTING:
+- Key: ${ps.lighting.keyDirection}
+- Quality: ${ps.lighting.quality}
+- Contrast: ${ps.lighting.contrast}
+
+Keep the CHARACTER from IMAGE 1 (face, clothing, appearance). Apply the pose and composition above. IMAGE 2 is the visual reference for these spatial parameters.`;
+  } else if (poseRef) {
     instruction += "\n\nCRITICAL POSE: Keep the CHARACTER from IMAGE 1 (face, clothing, appearance) but put them in the EXACT POSE from IMAGE 2 (body position, hand placement, head angle, camera framing). The output should look like IMAGE 1's person doing IMAGE 2's pose.";
   }
 
@@ -118,9 +211,9 @@ async function generateViaNanoBanana(
     },
   };
 
-  console.log(`[nano-banana] Calling ${NB_MODEL} with ${parts.length - 1} image(s)`);
+  console.log(`[nano-banana] Calling ${NB2_MODEL_ID} with ${parts.length - 1} image(s)`);
 
-  const url = `${GEMINI_BASE}/models/${NB_MODEL}:generateContent?key=${key}`;
+  const url = `${GEMINI_BASE}/models/${NB2_MODEL_ID}:generateContent?key=${key}`;
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -211,6 +304,8 @@ export async function generateSeedImage(
 export type StaticAdRequest = {
   productImages: Array<{ url: string; label: string }>; // 1-3 hero images with labels
   prompt: string; // full generation prompt including copy + layout instructions (layout from Claude analysis, not a reference image)
+  /** When provided, skips legacy inline prompt building and uses the NB2 payload directly. */
+  nb2Payload?: NB2PromptPayload;
 };
 
 /**
@@ -226,6 +321,44 @@ export async function generateStaticAd(
 ): Promise<NanoBananaResult> {
   const key = nanoBananaKey();
   if (!key) throw new Error("NANO_BANANA_API_KEY is not set");
+
+  // NB2 prompt module path
+  if (req.nb2Payload) {
+    const geminiParts = await payloadToGeminiParts(req.nb2Payload);
+    const body: Record<string, unknown> = {
+      contents: [{ parts: geminiParts }],
+      generationConfig: { responseModalities: ["IMAGE", "TEXT"] },
+    };
+    if (req.nb2Payload.systemInstruction) {
+      body.system_instruction = {
+        parts: [{ text: req.nb2Payload.systemInstruction }],
+      };
+    }
+    console.log(`[nano-banana] NB2 static-ad path: ${geminiParts.length} parts`);
+    const url = `${GEMINI_BASE}/models/${NB2_MODEL_ID}:generateContent?key=${key}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Nano Banana static ad ${res.status}: ${text.slice(0, 300)}`);
+    }
+    const data = (await res.json()) as {
+      candidates?: Array<{ content?: { parts?: Array<{ inlineData?: { mimeType: string; data: string }; text?: string }> } }>;
+      error?: { message: string };
+    };
+    if (data.error) throw new Error(`Nano Banana error: ${data.error.message}`);
+    for (const candidate of data.candidates ?? []) {
+      for (const part of candidate.content?.parts ?? []) {
+        if (part.inlineData?.data) {
+          return { imageBase64: part.inlineData.data, mimeType: part.inlineData.mimeType || "image/png" };
+        }
+      }
+    }
+    throw new Error("Nano Banana returned no image for static ad generation");
+  }
 
   const parts: Array<Record<string, unknown>> = [];
 
@@ -282,7 +415,7 @@ ${req.prompt}`,
     `[nano-banana] Static ad generation: ${parts.length} parts (${req.productImages.length} product images)`
   );
 
-  const url = `${GEMINI_BASE}/models/${NB_MODEL}:generateContent?key=${key}`;
+  const url = `${GEMINI_BASE}/models/${NB2_MODEL_ID}:generateContent?key=${key}`;
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

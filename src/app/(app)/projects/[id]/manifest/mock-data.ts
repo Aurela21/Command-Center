@@ -12,27 +12,22 @@ export type MockScene = {
   referenceFrameSource: "auto" | "user_selected";
   boundarySource: "ai" | "user_adjusted" | "user_created";
   description: string;
+  scenePrompt: string; // Kling motion prompt from Pass 2 analysis
   targetClipDurationS: number;
 };
 
 /**
  * All extracted frames within [start, end] boundaries.
- * Frames are extracted at 1fps (one per second at 30fps).
- * Returns one frame number per second of video within the range.
+ * Frames are extracted at 3fps — indices map directly to R2 keys (f0000.jpg, f0001.jpg, …).
+ * Returns every 3fps index in the scene range.
  */
-export function candidateFrames(start: number, end: number, fps = 30): number[] {
-  const startSec = Math.floor(start / fps);
-  const endSec = Math.ceil(end / fps);
+export function candidateFrames(start: number, end: number): number[] {
   const frames: number[] = [];
-  for (let sec = startSec; sec <= endSec; sec++) {
-    const frameNum = sec * fps;
-    if (frameNum >= start && frameNum <= end) {
-      frames.push(frameNum);
-    }
+  for (let i = start; i <= end; i++) {
+    frames.push(i);
   }
-  // If no frames fell exactly in range, include boundary seconds
   if (frames.length === 0) {
-    frames.push(Math.round(((start + end) / 2 / fps)) * fps);
+    frames.push(Math.round((start + end) / 2));
   }
   return frames;
 }
@@ -55,6 +50,7 @@ export const MOCK_SCENES: MockScene[] = [
     boundarySource: "ai",
     description:
       "Athlete sprinting in slow motion, camera tracking at foot level. Dust particles catch warm morning light. High energy, aspirational opening — sets a kinetic tone.",
+    scenePrompt: "",
     targetClipDurationS: 3.5,
   },
   {
@@ -70,6 +66,7 @@ export const MOCK_SCENES: MockScene[] = [
     boundarySource: "ai",
     description:
       "Person in stiff, ill-fitting gym clothes visibly restricted mid-squat. Frustrated expression. Establishes the core pain point immediately.",
+    scenePrompt: "",
     targetClipDurationS: 4.0,
   },
   {
@@ -85,6 +82,7 @@ export const MOCK_SCENES: MockScene[] = [
     boundarySource: "ai",
     description:
       "Quick-cut montage: seam stress on a lateral lunge, sweat-soaked fabric bunching up, restricted overhead press. Three athletes, three identical frustrations.",
+    scenePrompt: "",
     targetClipDurationS: 4.5,
   },
   {
@@ -100,6 +98,7 @@ export const MOCK_SCENES: MockScene[] = [
     boundarySource: "user_adjusted",
     description:
       "Brand logo dissolves in from white. Tagline 'Move Without Limits' fades beneath it. Clean, confident, minimal. Holds for 1.5 seconds.",
+    scenePrompt: "",
     targetClipDurationS: 3.0,
   },
   {
@@ -115,6 +114,7 @@ export const MOCK_SCENES: MockScene[] = [
     boundarySource: "ai",
     description:
       "360° rotation of AirFlex Pro leggings on a floating studio pedestal. Macro shot of four-way stretch fabric and ventilation mesh panel. Premium product showcase.",
+    scenePrompt: "",
     targetClipDurationS: 4.5,
   },
   {
@@ -130,6 +130,7 @@ export const MOCK_SCENES: MockScene[] = [
     boundarySource: "ai",
     description:
       "Thermal imaging split-screen: competitor fabric showing heat-trapped red zones vs. AirFlex staying cool blue mid-HIIT workout. Athlete mid-sprint under studio lighting.",
+    scenePrompt: "",
     targetClipDurationS: 4.0,
   },
   {
@@ -145,6 +146,7 @@ export const MOCK_SCENES: MockScene[] = [
     boundarySource: "user_adjusted",
     description:
       "Gymnast full split, CrossFit athlete overhead press, yogi pigeon pose — all in AirFlex. 'No Restrictions' annotation overlay. Rapid but rhythmic editing.",
+    scenePrompt: "",
     targetClipDurationS: 4.0,
   },
   {
@@ -160,6 +162,7 @@ export const MOCK_SCENES: MockScene[] = [
     boundarySource: "ai",
     description:
       "Counter animation rolls to '50,000+ athletes trust AirFlex.' Five-star review cards scroll past. Three customer photo–quote pairings appear sequentially.",
+    scenePrompt: "",
     targetClipDurationS: 4.5,
   },
   {
@@ -175,6 +178,7 @@ export const MOCK_SCENES: MockScene[] = [
     boundarySource: "ai",
     description:
       "Sarah, marathon runner, direct-to-camera testimonial: 'I've tried everything. Nothing moves like this. It's the last pair I'll ever need.' Natural, authentic setting.",
+    scenePrompt: "",
     targetClipDurationS: 3.5,
   },
   {
@@ -190,6 +194,7 @@ export const MOCK_SCENES: MockScene[] = [
     boundarySource: "ai",
     description:
       "Mirror-matched split screen: left athlete struggling in old gear, right same athlete fluid and powerful in AirFlex. Movements synchronized frame-for-frame.",
+    scenePrompt: "",
     targetClipDurationS: 3.5,
   },
   {
@@ -205,6 +210,7 @@ export const MOCK_SCENES: MockScene[] = [
     boundarySource: "ai",
     description:
       "Full product lineup on clean white. Promo code 'FLEX30' pops in with bold typography. Shop Now button pulses. Limited-time urgency text fades up from bottom.",
+    scenePrompt: "",
     targetClipDurationS: 3.0,
   },
   {
@@ -220,6 +226,7 @@ export const MOCK_SCENES: MockScene[] = [
     boundarySource: "ai",
     description:
       "Logo lockup centered on white. Website URL fades in beneath. 'Move Without Limits' in bold. Clean hold — lets the brand breathe before cut to black.",
+    scenePrompt: "",
     targetClipDurationS: 3.0,
   },
 ];

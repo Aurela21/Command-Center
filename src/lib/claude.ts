@@ -422,6 +422,267 @@ Return JSON:
     : { headline: "", body: "", cta: "" };
 }
 
+// ─── Pose Composition Spec (Video Pipeline) ─────────────────────────────────
+
+export type PoseCompositionSpec = {
+  subject: {
+    type: string;
+    bodyOrientation: string;
+    headPosition: string;
+    eyeline: string;
+    pose: string;
+    framing: string;
+  };
+  camera: {
+    angle: string;
+    shotType: string;
+    focalLength: string;
+  };
+  subjectPlacement: {
+    horizontal: string;
+    vertical: string;
+    scale: string;
+  };
+  lighting: {
+    keyDirection: string;
+    quality: string;
+    contrast: string;
+  };
+};
+
+export async function analyzePoseComposition(
+  imageUrl: string
+): Promise<PoseCompositionSpec> {
+  const msg = await getClient().messages.create({
+    model: FAST,
+    max_tokens: 1024,
+    system:
+      "You are a cinematography and composition analyst. You extract precise spatial and positional data from images — body positioning, camera angles, lighting direction, and subject placement. Be specific and measurable, not vague.",
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "image", source: { type: "url", url: imageUrl } },
+          {
+            type: "text",
+            text: `Analyze the pose and composition of this frame. Be precise about left vs right, exact angles, specific body part positions. Say 'left arm bent 90 degrees at elbow, hand resting on left hip' not 'hand on hip'. Say 'subject centered horizontally, head at upper 30% of frame' not 'centered'.
+
+Return JSON:
+{
+  "subject": {
+    "type": "person | product | object",
+    "bodyOrientation": "e.g. facing camera, square shoulders / turned 30 degrees left",
+    "headPosition": "e.g. centered, slight left tilt / turned right 15 degrees",
+    "eyeline": "e.g. direct to camera / looking left and down 20 degrees",
+    "pose": "e.g. standing, left hand on hip bent at 90 degrees, right arm relaxed at side",
+    "framing": "e.g. waist-up / full body / close-up head and shoulders"
+  },
+  "camera": {
+    "angle": "e.g. eye level / low angle 15 degrees up / high angle 30 degrees down",
+    "shotType": "e.g. medium close-up / wide shot / extreme close-up",
+    "focalLength": "e.g. 50mm shallow DOF / 35mm wide / 85mm compressed"
+  },
+  "subjectPlacement": {
+    "horizontal": "e.g. center-right, rule of thirds right line / dead center",
+    "vertical": "e.g. head at upper third / centered vertically / feet at bottom edge",
+    "scale": "e.g. subject fills 60% of frame height / subject fills 40% of frame width"
+  },
+  "lighting": {
+    "keyDirection": "e.g. front-left 45 degrees / direct overhead / backlit from right",
+    "quality": "e.g. soft diffused / hard directional with sharp shadows",
+    "contrast": "e.g. low contrast, fill light present / high contrast, deep shadows"
+  }
+}`,
+          },
+        ],
+      },
+    ],
+  });
+
+  const text = msg.content[0].type === "text" ? msg.content[0].text : "";
+  const json = text.match(/\{[\s\S]*\}/)?.[0];
+  return json
+    ? (JSON.parse(json) as PoseCompositionSpec)
+    : {
+        subject: { type: "person", bodyOrientation: "", headPosition: "", eyeline: "", pose: "", framing: "" },
+        camera: { angle: "", shotType: "", focalLength: "" },
+        subjectPlacement: { horizontal: "", vertical: "", scale: "" },
+        lighting: { keyDirection: "", quality: "", contrast: "" },
+      };
+}
+
+export async function comparePoseToSpec(params: {
+  generatedImageUrl: string;
+  poseSpec: PoseCompositionSpec;
+}): Promise<{ match: boolean; mismatches: string[]; score: number }> {
+  const msg = await getClient().messages.create({
+    model: FAST,
+    max_tokens: 512,
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "image", source: { type: "url", url: params.generatedImageUrl } },
+          {
+            type: "text",
+            text: `Compare this generated image against the following pose/composition specification. For each field, check if the image matches.
+
+SPECIFICATION:
+${JSON.stringify(params.poseSpec, null, 2)}
+
+Return JSON:
+{
+  "match": true/false (true if 80%+ of fields match),
+  "mismatches": ["Subject is facing left but spec says facing camera", ...],
+  "score": 0-100 overall match percentage
+}`,
+          },
+        ],
+      },
+    ],
+  });
+
+  const text = msg.content[0].type === "text" ? msg.content[0].text : "";
+  const json = text.match(/\{[\s\S]*\}/)?.[0];
+  return json
+    ? (JSON.parse(json) as { match: boolean; mismatches: string[]; score: number })
+    : { match: false, mismatches: ["Unable to analyze"], score: 0 };
+}
+
+// ─── Ad Composition Spec (Static Ad Pipeline) ──────────────────────────────
+
+export type AdCompositionSpec = {
+  layout: {
+    type: string;
+    readingPattern: string;
+    gridStructure: string;
+  };
+  productPlacement: {
+    position: string;
+    scale: string;
+    angle: string;
+    cropStyle: string;
+  };
+  textZones: {
+    headlinePosition: string;
+    bodyPosition: string;
+    ctaPosition: string;
+  };
+  visualWeight: {
+    primaryFocalPoint: string;
+    secondaryFocalPoint: string;
+    negativeSpace: string;
+  };
+  colorLayout: {
+    backgroundTreatment: string;
+    dominantColorZones: string;
+    contrastStrategy: string;
+  };
+};
+
+export async function analyzeAdComposition(
+  imageUrl: string
+): Promise<AdCompositionSpec> {
+  const msg = await getClient().messages.create({
+    model: FAST,
+    max_tokens: 1024,
+    system:
+      "You are a graphic design and advertising layout analyst. You extract precise spatial composition data from ad images — product placement, text positioning, visual weight distribution, and color zoning. Be specific and measurable.",
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "image", source: { type: "url", url: imageUrl } },
+          {
+            type: "text",
+            text: `Analyze the layout composition of this ad image. Be precise: say 'product occupies left 35% of frame, vertically centered' not 'product on the left'. Say 'headline top-right, right-aligned, starting at 15% from top edge' not 'headline at top'.
+
+Return JSON:
+{
+  "layout": {
+    "type": "e.g. single product centered / split layout / full bleed",
+    "readingPattern": "e.g. Z-pattern / F-pattern / center-radial",
+    "gridStructure": "e.g. product left 40%, copy right 60% / product center, text overlay"
+  },
+  "productPlacement": {
+    "position": "e.g. center-left, occupying 35% of frame width",
+    "scale": "e.g. product fills 40% of frame height",
+    "angle": "e.g. 45-degree hero angle from front-left / straight-on front view",
+    "cropStyle": "e.g. full product visible / cropped at base / floating with shadow"
+  },
+  "textZones": {
+    "headlinePosition": "e.g. top-right quadrant, right-aligned, 20% from top",
+    "bodyPosition": "e.g. below headline, right-aligned, 30% frame width",
+    "ctaPosition": "e.g. bottom-right, pill button shape, 10% from bottom"
+  },
+  "visualWeight": {
+    "primaryFocalPoint": "e.g. product at center-left",
+    "secondaryFocalPoint": "e.g. headline at top-right",
+    "negativeSpace": "e.g. generous whitespace left margin, tight right"
+  },
+  "colorLayout": {
+    "backgroundTreatment": "e.g. solid dark gradient / lifestyle scene / flat color",
+    "dominantColorZones": "e.g. warm tones left (product), cool tones right (copy area)",
+    "contrastStrategy": "e.g. light text on dark background, CTA inverts to bright on dark"
+  }
+}`,
+          },
+        ],
+      },
+    ],
+  });
+
+  const text = msg.content[0].type === "text" ? msg.content[0].text : "";
+  const json = text.match(/\{[\s\S]*\}/)?.[0];
+  return json
+    ? (JSON.parse(json) as AdCompositionSpec)
+    : {
+        layout: { type: "", readingPattern: "", gridStructure: "" },
+        productPlacement: { position: "", scale: "", angle: "", cropStyle: "" },
+        textZones: { headlinePosition: "", bodyPosition: "", ctaPosition: "" },
+        visualWeight: { primaryFocalPoint: "", secondaryFocalPoint: "", negativeSpace: "" },
+        colorLayout: { backgroundTreatment: "", dominantColorZones: "", contrastStrategy: "" },
+      };
+}
+
+export async function compareAdToSpec(params: {
+  generatedImageUrl: string;
+  compositionSpec: AdCompositionSpec;
+}): Promise<{ match: boolean; mismatches: string[]; score: number }> {
+  const msg = await getClient().messages.create({
+    model: FAST,
+    max_tokens: 512,
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "image", source: { type: "url", url: params.generatedImageUrl } },
+          {
+            type: "text",
+            text: `Compare this generated ad image against the following layout/composition specification. Check product placement, text zone positions, layout structure, and visual weight distribution.
+
+SPECIFICATION:
+${JSON.stringify(params.compositionSpec, null, 2)}
+
+Return JSON:
+{
+  "match": true/false (true if 80%+ of layout fields match),
+  "mismatches": ["Product is on the right but spec says center-left", ...],
+  "score": 0-100 overall layout match percentage
+}`,
+          },
+        ],
+      },
+    ],
+  });
+
+  const text = msg.content[0].type === "text" ? msg.content[0].text : "";
+  const json = text.match(/\{[\s\S]*\}/)?.[0];
+  return json
+    ? (JSON.parse(json) as { match: boolean; mismatches: string[]; score: number })
+    : { match: false, mismatches: ["Unable to analyze"], score: 0 };
+}
+
 // ─── Prompt refinement layer ────────────────────────────────────────────────
 
 export type RefineTarget = "seed_image" | "kling_video";
@@ -436,6 +697,7 @@ export async function refinePrompt(params: {
   klingKnowledge?: string;       // from Kling Prompts knowledge category
   referenceFrameUrl?: string;    // can be sent to Claude for visual context
   rejectionHistory?: string;     // past rejection reasons to avoid repeating mistakes
+  productLearnings?: string;    // learned from past generations of this product
 }): Promise<string> {
   const content: Anthropic.MessageParam["content"] = [];
 
@@ -476,6 +738,7 @@ CRITICAL: Do NOT invent product feature descriptions. If referencing a product, 
   if (params.productContext) context += `\n\nProduct details:\n${params.productContext}`;
   if (params.styleKnowledge) context += `\n\nStyle reference:\n${params.styleKnowledge}`;
   if (params.klingKnowledge) context += `\n\nKling prompting best practices:\n${params.klingKnowledge}`;
+  if (params.productLearnings) context += `\n\nLEARNED FROM PAST GENERATIONS OF THIS PRODUCT:\n${params.productLearnings}`;
   if (params.rejectionHistory) context += `\n\nPREVIOUS REJECTED GENERATIONS (avoid these issues):\n${params.rejectionHistory}`;
 
   content.push({
@@ -501,4 +764,74 @@ Return ONLY the refined prompt text, nothing else.`,
 
   const text = msg.content[0].type === "text" ? msg.content[0].text : "";
   return text.trim().replace(/^["']|["']$/g, "");
+}
+
+// ─── Approval analysis ──────────────────────────────────────────────────────
+
+export async function analyzeApproval(
+  imageUrl: string,
+  generationPrompt: string | null,
+  productName?: string
+): Promise<string> {
+  try {
+    const msg = await getClient().messages.create({
+      model: FAST,
+      max_tokens: 300,
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "image", source: { type: "url", url: imageUrl } },
+            {
+              type: "text",
+              text: `This AI-generated image was APPROVED by the user — they liked this output.${generationPrompt ? `\n\nGeneration prompt: "${generationPrompt}"` : ""}${productName ? `\n\nProduct: ${productName}` : ""}
+
+Analyze what this generation got RIGHT in 2-4 bullet points. Focus on:
+- What product details were accurately reproduced
+- What composition choices worked well
+- What the prompt got right that should be repeated
+Be specific and actionable — these insights will guide future generations. Return ONLY the bullet points.`,
+            },
+          ],
+        },
+      ],
+    });
+
+    return msg.content[0].type === "text" ? msg.content[0].text.trim() : "Analysis unavailable";
+  } catch (err) {
+    console.warn("[analyzeApproval] Failed:", err);
+    return "Analysis unavailable";
+  }
+}
+
+// ─── Product learning distillation ──────────────────────────────────────────
+
+export async function distillLearning(
+  rawAnalysis: string,
+  type: "positive" | "negative"
+): Promise<string> {
+  try {
+    const msg = await getClient().messages.create({
+      model: FAST,
+      max_tokens: 50,
+      messages: [
+        {
+          role: "user",
+          content: `Distill these observations into ONE concise, actionable prompt engineering insight (max 30 words). Start with "${type === "positive" ? "DO:" : "AVOID:"}".
+
+Example: "DO: specify charcoal as dark gray, not blue-black — model defaults to cool tones"
+Example: "AVOID: placing product at extreme left — CTA gets cropped on mobile"
+
+Observations:
+${rawAnalysis}
+
+Return ONLY the single insight line.`,
+        },
+      ],
+    });
+
+    return msg.content[0].type === "text" ? msg.content[0].text.trim() : rawAnalysis.slice(0, 100);
+  } catch {
+    return rawAnalysis.slice(0, 100);
+  }
 }

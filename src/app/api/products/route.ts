@@ -1,11 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { productProfiles } from "@/db/schema";
-import { desc } from "drizzle-orm";
+import { desc, sql } from "drizzle-orm";
 
 export async function GET() {
   const rows = await db
-    .select()
+    .select({
+      id: productProfiles.id,
+      name: productProfiles.name,
+      slug: productProfiles.slug,
+      description: productProfiles.description,
+      imageCount: productProfiles.imageCount,
+      createdAt: productProfiles.createdAt,
+      updatedAt: productProfiles.updatedAt,
+      learningsCount: sql<number>`(
+        SELECT COUNT(*)::int FROM product_learnings
+        WHERE product_learnings.product_id = ${productProfiles.id}
+      )`.as("learnings_count"),
+    })
     .from(productProfiles)
     .orderBy(desc(productProfiles.createdAt));
   return NextResponse.json(rows);

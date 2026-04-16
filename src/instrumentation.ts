@@ -48,6 +48,21 @@ export async function register() {
           created_at TIMESTAMPTZ DEFAULT NOW(),
           updated_at TIMESTAMPTZ DEFAULT NOW()
         );
+        ALTER TABLE static_ad_jobs ADD COLUMN IF NOT EXISTS composition_spec JSONB;
+        ALTER TABLE static_ad_jobs ADD COLUMN IF NOT EXISTS quality_score JSONB;
+        ALTER TABLE static_ad_generations ADD COLUMN IF NOT EXISTS quality_check JSONB;
+        ALTER TABLE static_ad_generations ADD COLUMN IF NOT EXISTS is_rejected BOOLEAN DEFAULT FALSE;
+        ALTER TABLE static_ad_generations ADD COLUMN IF NOT EXISTS rejection_reason TEXT;
+        ALTER TABLE static_ad_generations ADD COLUMN IF NOT EXISTS quality_score JSONB;
+        CREATE TABLE IF NOT EXISTS product_learnings (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          product_id UUID NOT NULL REFERENCES product_profiles(id) ON DELETE CASCADE,
+          type TEXT NOT NULL,
+          source TEXT NOT NULL,
+          source_id TEXT,
+          learning TEXT NOT NULL,
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        );
       `);
     } catch {}
 

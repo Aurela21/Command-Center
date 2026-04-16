@@ -101,6 +101,25 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   console.log(`[reject-version] Rejected ${assetVersionId}: ${rejectionReason.slice(0, 80)}…`);
 
+  // Fire-and-forget: record negative learning for the product
+  (async () => {
+    try {
+      const { recordLearning, resolveProductFromTags } = await import("@/lib/learnings");
+      const productId = await resolveProductFromTags(av.generationPrompt);
+      if (productId) {
+        await recordLearning({
+          productId,
+          type: "negative",
+          source: av.assetType === "seed_image" ? "seed_image" : "kling_video",
+          sourceId: assetVersionId,
+          rawAnalysis: rejectionReason,
+        });
+      }
+    } catch (err) {
+      console.warn("[reject-version] Learning recording failed:", err);
+    }
+  })();
+
   return NextResponse.json({
     id: updated.id,
     rejectionReason,

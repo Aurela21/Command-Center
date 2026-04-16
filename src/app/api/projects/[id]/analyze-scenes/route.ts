@@ -61,17 +61,25 @@ export async function POST(_req: NextRequest, { params }: Params) {
     const allFramePaths = await extractFramesAtFps(tmpVideoPath, tmpFrameDir, FPS_EXTRACT);
     console.log(`[analyze-scenes] Extracted ${allFramePaths.length} frames at ${FPS_EXTRACT}fps`);
 
-    // 3. Upload ALL 3fps frames to R2
+    // 3. Upload ALL 3fps frames to R2 (parallel, batched for backpressure)
     type FrameEntry = { index: number; timeS: number; frameNumber: number; r2Url: string };
-    const allFrames: FrameEntry[] = [];
 
-    for (let i = 0; i < allFramePaths.length; i++) {
-      const frameBuffer = readFileSync(allFramePaths[i]);
-      const timeS = i / FPS_EXTRACT;
-      const frameNumber = Math.round(timeS * fps);
-      const r2Key = `frames/${projectId}/f${String(i).padStart(4, "0")}.jpg`;
-      const r2Url = await uploadBuffer(r2Key, frameBuffer, "image/jpeg");
-      allFrames.push({ index: i, timeS, frameNumber, r2Url });
+    const UPLOAD_CONCURRENCY = 20;
+    const allFrames: FrameEntry[] = new Array(allFramePaths.length);
+
+    for (let batch = 0; batch < allFramePaths.length; batch += UPLOAD_CONCURRENCY) {
+      const slice = allFramePaths.slice(batch, batch + UPLOAD_CONCURRENCY);
+      await Promise.all(
+        slice.map(async (framePath, j) => {
+          const i = batch + j;
+          const frameBuffer = readFileSync(framePath);
+          const timeS = i / FPS_EXTRACT;
+          const frameNumber = Math.round(timeS * fps);
+          const r2Key = `frames/${projectId}/f${String(i).padStart(4, "0")}.jpg`;
+          const r2Url = await uploadBuffer(r2Key, frameBuffer, "image/jpeg");
+          allFrames[i] = { index: i, timeS, frameNumber, r2Url };
+        })
+      );
     }
     console.log(`[analyze-scenes] Uploaded ${allFrames.length} frames to R2`);
 
@@ -81,9 +89,18 @@ export async function POST(_req: NextRequest, { params }: Params) {
       .set({ totalFrames: allFrames.length, updatedAt: sql`NOW()` })
       .where(eq(projects.id, projectId));
 
-    // 4. PASS 1: Scene boundary detection — send ALL 3fps frames (dynamic count)
-    // 30s video → 90 frames, 90s video → 270 frames — no artificial cap
-    const detectionFrames = allFrames;
+    // 4. PASS 1: Scene boundary detection
+    // Claude API limit: 100 images per request. Subsample evenly if needed.
+    const MAX_PASS1_FRAMES = 95; // leave headroom under 100
+    let detectionFrames: FrameEntry[];
+    if (allFrames.length <= MAX_PASS1_FRAMES) {
+      detectionFrames = allFrames;
+    } else {
+      const stride = allFrames.length / MAX_PASS1_FRAMES;
+      detectionFrames = Array.from({ length: MAX_PASS1_FRAMES }, (_, i) =>
+        allFrames[Math.min(Math.round(i * stride), allFrames.length - 1)]
+      );
+    }
 
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const durationS = durationMs / 1000;
@@ -121,21 +138,21 @@ export async function POST(_req: NextRequest, { params }: Params) {
             ...detectionImages,
             {
               type: "text",
-              text: `You are analyzing ALL ${detectionFrames.length} frames from a ${durationS.toFixed(1)}-second video ad extracted at ${FPS_EXTRACT}fps.
+              text: `You are analyzing ${detectionFrames.length} frames from a ${durationS.toFixed(1)}-second video ad (${allFrames.length} total frames extracted at ${FPS_EXTRACT}fps${detectionFrames.length < allFrames.length ? `, evenly sampled to ${detectionFrames.length} for analysis` : ""}).
 
-Every frame from the video is included — use them all to identify scene boundaries precisely.
+Use these frames to identify scene boundaries precisely.
 
-Identify the distinct scenes. Aim for 6–12 scenes. Each scene = a meaningful visual segment (shot change, subject change, or narrative beat).
+Identify EVERY distinct scene — a scene is any meaningful visual segment (shot change, camera angle change, subject change, or narrative beat). Do NOT combine fast cuts into one scene. Each cut or transition is a new scene. ${durationS < 20 ? "Expect 4–10 scenes." : durationS < 45 ? "Expect 8–20 scenes." : durationS < 90 ? "Expect 15–30 scenes." : "Expect 20–40 scenes."} Use more scenes rather than fewer — the user can always merge scenes later, but missing a cut loses information.
 
 For each scene return:
-- sceneOrder, startFrame (index in ${FPS_EXTRACT}fps sequence), endFrame, startTimeMs, endTimeMs
-- referenceFrame: the most representative frame index
+- sceneOrder, startFrame (index in the full ${FPS_EXTRACT}fps sequence, 0 to ${allFrames.length - 1}), endFrame, startTimeMs, endTimeMs
+- referenceFrame: the most representative frame index (in the full sequence)
 - description: 1–2 sentences of what happens
 - targetClipDurationS: 3.0–10.0
 
 Scenes must be contiguous and cover the full video (0 to ${allFrames.length - 1} frame indices / ${durationMs}ms).
 Frame timing: index / ${FPS_EXTRACT} = seconds (e.g. frame 9 = 3.0s, frame 45 = 15.0s).
-${visionContext}
+${detectionFrames.length < allFrames.length ? `\nThe ${detectionFrames.length} frames shown map to these indices in the full sequence: [${detectionFrames.map((f) => f.index).join(", ")}]\n` : ""}${visionContext}
 
 Return ONLY valid JSON: { "scenes": [{ "sceneOrder": 1, "startFrame": 0, "endFrame": 12, "startTimeMs": 0, "endTimeMs": 4000, "referenceFrame": 6, "description": "...", "targetClipDurationS": 4.0 }] }`,
             },
@@ -163,36 +180,33 @@ Return ONLY valid JSON: { "scenes": [{ "sceneOrder": 1, "startFrame": 0, "endFra
 
     console.log(`[analyze-scenes] Pass 1: ${detected.scenes.length} scenes detected`);
 
-    // 5. PASS 2: Per-scene motion analysis with 3fps frames
-    const sceneResults: Array<typeof detected.scenes[0] & { klingPrompt: string }> = [];
+    // 5. PASS 2: Per-scene motion analysis with 3fps frames (all scenes in parallel)
+    const sceneResults = await Promise.all(
+      detected.scenes.map(async (scene) => {
+        const sceneFrames = allFrames.filter(
+          (f) => f.index >= scene.startFrame && f.index < scene.endFrame
+        ).slice(0, 15);
 
-    for (const scene of detected.scenes) {
-      // Get all 3fps frames within this scene's boundaries (cap at 15)
-      const sceneFrames = allFrames.filter(
-        (f) => f.index >= scene.startFrame && f.index < scene.endFrame
-      ).slice(0, 15);
+        if (sceneFrames.length === 0) {
+          return { ...scene, klingPrompt: "" };
+        }
 
-      if (sceneFrames.length === 0) {
-        sceneResults.push({ ...scene, klingPrompt: "" });
-        continue;
-      }
+        const sceneImages: Anthropic.ImageBlockParam[] = sceneFrames.map((f) => ({
+          type: "image",
+          source: { type: "url", url: f.r2Url },
+        }));
 
-      const sceneImages: Anthropic.ImageBlockParam[] = sceneFrames.map((f) => ({
-        type: "image",
-        source: { type: "url", url: f.r2Url },
-      }));
-
-      const pass2 = await client.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 300,
-        messages: [
-          {
-            role: "user",
-            content: [
-              ...sceneImages,
-              {
-                type: "text",
-                text: `These ${sceneFrames.length} frames are from scene ${scene.sceneOrder} of a video ad (${((scene.endTimeMs - scene.startTimeMs) / 1000).toFixed(1)}s).
+        const pass2 = await client.messages.create({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 300,
+          messages: [
+            {
+              role: "user",
+              content: [
+                ...sceneImages,
+                {
+                  type: "text",
+                  text: `These ${sceneFrames.length} frames are from scene ${scene.sceneOrder} of a video ad (${((scene.endTimeMs - scene.startTimeMs) / 1000).toFixed(1)}s).
 Scene description: ${scene.description}
 
 Study the MOTION SEQUENCE across these frames. Write a precise Kling video generation prompt (max 35 words) that describes:
@@ -206,16 +220,17 @@ Rules:
 - Write EXACTLY what you see happening across the frames, not a generic description.
 
 Return ONLY the prompt text, nothing else.`,
-              },
-            ],
-          },
-        ],
-      });
+                },
+              ],
+            },
+          ],
+        });
 
-      const klingPrompt = pass2.content[0].type === "text" ? pass2.content[0].text.trim() : "";
-      sceneResults.push({ ...scene, klingPrompt });
-      console.log(`[analyze-scenes] Pass 2: Scene ${scene.sceneOrder} → "${klingPrompt.slice(0, 60)}…"`);
-    }
+        const klingPrompt = pass2.content[0].type === "text" ? pass2.content[0].text.trim() : "";
+        console.log(`[analyze-scenes] Pass 2: Scene ${scene.sceneOrder} → "${klingPrompt.slice(0, 60)}…"`);
+        return { ...scene, klingPrompt };
+      })
+    );
 
     // 6. Delete existing scenes and insert new ones
     await db.delete(scenes).where(eq(scenes.projectId, projectId));

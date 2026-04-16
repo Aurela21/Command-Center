@@ -14,7 +14,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Plus, Film, ChevronRight, Video, Sparkles } from "lucide-react";
+import { Plus, Film, ChevronRight, Video, Sparkles, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { Project } from "@/db/schema";
@@ -48,6 +48,18 @@ export default function ProjectsPage() {
       if (!res.ok) throw new Error("Failed to load projects");
       return res.json();
     },
+  });
+
+  const [typeFilter, setTypeFilter] = useState<"all" | "reference" | "concept">("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [search, setSearch] = useState("");
+
+  const filtered = (projects ?? []).filter((p) => {
+    const pt = (p as Project & { projectType?: string }).projectType;
+    if (typeFilter !== "all" && pt !== typeFilter) return false;
+    if (statusFilter !== "all" && p.status !== statusFilter) return false;
+    if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
   });
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -92,7 +104,7 @@ export default function ProjectsPage() {
           <p className="text-sm text-[#71717a] mt-0.5">
             {isLoading
               ? ""
-              : `${projects?.length ?? 0} project${projects?.length !== 1 ? "s" : ""}`}
+              : `${filtered.length} project${filtered.length !== 1 ? "s" : ""}`}
           </p>
         </div>
         <div className="flex gap-2">
@@ -105,7 +117,7 @@ export default function ProjectsPage() {
             className="bg-violet-600 hover:bg-violet-500 text-white gap-2"
           >
             <Sparkles className="h-4 w-4" />
-            New Concept
+            From Scratch
           </Button>
           <Button
             onClick={() => {
@@ -117,10 +129,55 @@ export default function ProjectsPage() {
             className="gap-2"
           >
             <Video className="h-4 w-4" />
-            Iteration
+            From Reference
           </Button>
         </div>
       </div>
+
+      {/* Filters */}
+      {!isLoading && (projects?.length ?? 0) > 0 && (
+        <div className="flex items-center gap-3 mb-4">
+          <div className="flex items-center gap-1">
+            {(["all", "reference", "concept"] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTypeFilter(t)}
+                className={cn(
+                  "text-xs font-medium px-3 py-1.5 rounded-lg transition-colors",
+                  typeFilter === t
+                    ? "bg-[#6366f1] text-white"
+                    : "bg-[#18181b] text-[#a1a1aa] border border-[#27272a] hover:border-[#3f3f46]"
+                )}
+              >
+                {t === "all" ? "All" : t === "reference" ? "From Reference" : "From Scratch"}
+              </button>
+            ))}
+          </div>
+          <div className="flex-1" />
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="bg-[#18181b] border border-[#27272a] text-[#a1a1aa] text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#6366f1]"
+          >
+            <option value="all">All Statuses</option>
+            <option value="uploading">Uploading</option>
+            <option value="analyzing">Analyzing</option>
+            <option value="manifest_review">Manifest Review</option>
+            <option value="producing">Producing</option>
+            <option value="complete">Complete</option>
+          </select>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#52525b]" />
+            <input
+              type="text"
+              placeholder="Search..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="bg-[#18181b] border border-[#27272a] text-[#fafafa] placeholder:text-[#52525b] text-xs rounded-lg pl-8 pr-3 py-1.5 w-44 focus:outline-none focus:ring-1 focus:ring-[#6366f1]"
+            />
+          </div>
+        </div>
+      )}
 
       {/* Project list */}
       {isLoading ? (
@@ -144,7 +201,7 @@ export default function ProjectsPage() {
               className="bg-violet-600 hover:bg-violet-500 text-white gap-2"
             >
               <Sparkles className="h-4 w-4" />
-              New Concept
+              From Scratch
             </Button>
             <Button
               onClick={() => { setNewName(""); setNewType("reference"); setDialogOpen(true); }}
@@ -152,13 +209,20 @@ export default function ProjectsPage() {
               className="gap-2"
             >
               <Video className="h-4 w-4" />
-              Iteration
+              From Reference
             </Button>
           </div>
         </div>
+      ) : filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <p className="text-sm font-medium text-[#a1a1aa]">No matching projects</p>
+          <p className="text-sm text-[#71717a] mt-1">
+            Try adjusting your filters.
+          </p>
+        </div>
       ) : (
         <div className="space-y-2">
-          {projects?.map((project) => (
+          {filtered.map((project) => (
             <button
               key={project.id}
               onClick={() => {
@@ -194,7 +258,7 @@ export default function ProjectsPage() {
                       ? "bg-violet-500/20 text-violet-400"
                       : "bg-[#27272a] text-[#a1a1aa]"
                   )}>
-                    {(project as Project & { projectType?: string }).projectType === "concept" ? "Concept" : "Iteration"}
+                    {(project as Project & { projectType?: string }).projectType === "concept" ? "From Scratch" : "From Reference"}
                   </span>
                 </div>
                 <p className="text-xs text-[#71717a] mt-0.5">
@@ -248,7 +312,7 @@ export default function ProjectsPage() {
                   >
                     <Sparkles className={cn("h-6 w-6", newType === "concept" ? "text-violet-600" : "text-[#71717a]")} />
                     <div>
-                      <p className={cn("text-sm font-medium", newType === "concept" ? "text-violet-400" : "text-[#a1a1aa]")}>New Concept</p>
+                      <p className={cn("text-sm font-medium", newType === "concept" ? "text-violet-400" : "text-[#a1a1aa]")}>From Scratch</p>
                       <p className="text-[11px] text-[#71717a] mt-0.5">Build a video from scratch</p>
                     </div>
                   </button>

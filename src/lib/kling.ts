@@ -121,6 +121,31 @@ export async function pollKlingJob(
       })
       .returning();
 
+    // Auto-score the generated video (non-blocking)
+    try {
+      const { scoreGeneration } = await import("./claude");
+      const { qualityChecks } = await import("@/db/schema");
+      const videoPrompt = ((job.resultData as Record<string, unknown>)?.prompt as string) ?? "";
+      const score = await scoreGeneration({
+        prompt: videoPrompt,
+        outputUrl: fileUrl,
+        durationS: job.etaSeconds ?? undefined,
+      });
+      await db
+        .update(assetVersions)
+        .set({ qualityScore: score as unknown as Record<string, unknown> })
+        .where(eq(assetVersions.id, av.id));
+      for (const [checkType, checkScore] of Object.entries(score.breakdown)) {
+        await db.insert(qualityChecks).values({
+          assetVersionId: av.id,
+          checkType,
+          score: checkScore as number,
+        });
+      }
+    } catch (err) {
+      console.warn("[kling] Auto-scoring failed:", err);
+    }
+
     await completeJob(internalJobId, { file_url: fileUrl }, av.id);
   } else if (res.status === "failed") {
     const [job] = await db

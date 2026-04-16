@@ -6,11 +6,13 @@ import {
   productProfiles,
   productImages,
 } from "@/db/schema";
-import { eq, sql, asc, desc, max } from "drizzle-orm";
+import { eq, sql, asc, max } from "drizzle-orm";
 import { generateStaticAd } from "@/lib/nano-banana";
 import { uploadBuffer } from "@/lib/r2";
 import { emit } from "@/lib/event-bus";
-import type { StaticAdAnalysis } from "@/lib/claude";
+import type { StaticAdAnalysis, AdCompositionSpec } from "@/lib/claude";
+import { compareAdToSpec } from "@/lib/claude";
+import { toProductBundle, renderScenePrompt, type StaticAdSpec } from "@/lib/nb2-prompt";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -106,16 +108,105 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
   }
 
-  // Build generation prompt
+  // Load product learnings
+  let learningsSection = "";
+  try {
+    if (job.productId) {
+      const { buildLearningsSection } = await import("@/lib/learnings");
+      learningsSection = await buildLearningsSection(job.productId);
+    }
+  } catch {}
+
+  // Load rejection history for this job + same product
+  let rejectionHistory = "";
+  try {
+    const { and: andOp, not: notOp } = await import("drizzle-orm");
+
+    const thisJobRejections = await db
+      .select({
+        editPrompt: staticAdGenerations.editPrompt,
+        rejectionReason: staticAdGenerations.rejectionReason,
+      })
+      .from(staticAdGenerations)
+      .where(
+        andOp(
+          eq(staticAdGenerations.jobId, id),
+          eq(staticAdGenerations.isRejected, true)
+        )
+      )
+      .limit(4);
+
+    if (thisJobRejections.length > 0) {
+      rejectionHistory +=
+        "From this ad:\n" +
+        thisJobRejections
+          .filter((r) => r.rejectionReason)
+          .map(
+            (r) =>
+              `- Edit: "${r.editPrompt?.slice(0, 60) ?? "none"}" → Issues: ${r.rejectionReason}`
+          )
+          .join("\n");
+    }
+
+    if (job.productId) {
+      const otherJobRejections = await db
+        .select({ rejectionReason: staticAdGenerations.rejectionReason })
+        .from(staticAdGenerations)
+        .innerJoin(staticAdJobs, eq(staticAdGenerations.jobId, staticAdJobs.id))
+        .where(
+          andOp(
+            eq(staticAdJobs.productId, job.productId),
+            notOp(eq(staticAdJobs.id, id)),
+            eq(staticAdGenerations.isRejected, true)
+          )
+        )
+        .limit(4);
+
+      if (otherJobRejections.length > 0) {
+        if (rejectionHistory) rejectionHistory += "\n\n";
+        rejectionHistory +=
+          "From other ads for this product:\n" +
+          otherJobRejections
+            .filter((r) => r.rejectionReason)
+            .map((r) => `- Issues: ${r.rejectionReason}`)
+            .join("\n");
+      }
+    }
+  } catch {}
+
+  // Build NB2 prompt via the prompt construction module
   const analysis = job.psychAnalysis as unknown as StaticAdAnalysis | null;
-  const prompt = buildGenerationPrompt(
-    productName,
-    productDescription,
-    productImgs.map((img) => img.label),
-    finalCopy,
-    analysis,
-    resolvedEditPrompt,
-  );
+  const compositionSpec = job.compositionSpec as unknown as AdCompositionSpec | null;
+
+  // Build product bundle from DB data
+  const bundles = job.productId
+    ? [toProductBundle(
+        { name: productName, description: productDescription || null },
+        (await db
+          .select({ fileUrl: productImages.fileUrl, label: productImages.label, sortOrder: productImages.sortOrder })
+          .from(productImages)
+          .where(eq(productImages.productId, job.productId))
+          .orderBy(asc(productImages.sortOrder))
+        ),
+      )]
+    : [];
+
+  const nb2Spec: StaticAdSpec = {
+    kind: "static-ad",
+    subject: `Product: "${productName}"${productDescription ? ` — ${productDescription}` : ""}. Place the product from the photos into a clean, professional static ad.`,
+    copy: finalCopy,
+    products: bundles.length > 0 ? bundles : undefined,
+    psychAnalysis: analysis,
+    compositionSpec,
+    learnings: learningsSection || undefined,
+    rejectionHistory: rejectionHistory || undefined,
+    editInstructions: resolvedEditPrompt || undefined,
+  };
+  const nb2Payload = renderScenePrompt(nb2Spec);
+  const prompt = nb2Payload.parts
+    .filter((p) => p.kind === "text")
+    .map((p) => (p as { kind: "text"; text: string }).text)
+    .join("\n\n");
 
   try {
     emit({ type: "static-ad:progress", jobId: id, progress: 30, stage: "generating" });
@@ -123,6 +214,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const result = await generateStaticAd({
       productImages: productImgs,
       prompt,
+      nb2Payload,
     });
 
     emit({ type: "static-ad:progress", jobId: id, progress: 80, stage: "generating" });
@@ -159,6 +251,45 @@ export async function POST(req: NextRequest, { params }: Params) {
       })
       .returning();
 
+    // Auto-score the generated ad (non-blocking)
+    let generationScore: Record<string, unknown> | undefined;
+    try {
+      const { scoreGeneration } = await import("@/lib/claude");
+      const score = await scoreGeneration({
+        prompt,
+        outputUrl: outputImageUrl,
+      });
+      generationScore = score as unknown as Record<string, unknown>;
+      await db
+        .update(staticAdGenerations)
+        .set({ qualityScore: generationScore })
+        .where(eq(staticAdGenerations.id, generation.id));
+    } catch (err) {
+      console.warn("[static-ads/generate] Auto-scoring failed:", err);
+    }
+
+    // Post-generation quality gate — compare against compositionSpec if available
+    let layoutMismatches: string[] | undefined;
+    if (compositionSpec) {
+      try {
+        const comparison = await compareAdToSpec({
+          generatedImageUrl: outputImageUrl,
+          compositionSpec,
+        });
+        // Store quality check on the generation row
+        await db
+          .update(staticAdGenerations)
+          .set({ qualityCheck: comparison as unknown as Record<string, unknown> })
+          .where(eq(staticAdGenerations.id, generation.id));
+        if (!comparison.match) {
+          layoutMismatches = comparison.mismatches;
+          console.log(`[static-ads/generate] Layout mismatches (score ${comparison.score}):`, comparison.mismatches);
+        }
+      } catch (err) {
+        console.warn(`[static-ads/generate] Layout comparison failed:`, err);
+      }
+    }
+
     // Update job (outputImageUrl used for list page thumbnails)
     const [updated] = await db
       .update(staticAdJobs)
@@ -167,6 +298,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         outputImageUrl,
         outputFileSizeBytes: buffer.length,
         generationPrompt: prompt,
+        qualityScore: (generationScore ?? null) as unknown as Record<string, unknown>,
         updatedAt: sql`NOW()`,
       })
       .where(eq(staticAdJobs.id, id))
@@ -180,7 +312,10 @@ export async function POST(req: NextRequest, { params }: Params) {
       versionNumber,
     });
 
-    return NextResponse.json(updated);
+    return NextResponse.json({
+      ...updated,
+      ...(layoutMismatches ? { layoutMismatches } : {}),
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[static-ads/generate] Generation failed:", msg);
@@ -196,39 +331,3 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
 }
 
-function buildGenerationPrompt(
-  productName: string,
-  productDescription: string,
-  productImageLabels: string[],
-  copy: { headline: string; body: string; cta: string },
-  analysis: StaticAdAnalysis | null,
-  editPrompt?: string | null
-): string {
-  let prompt = `Product: "${productName}"${productDescription ? ` — ${productDescription}` : ""}
-
-Place the product from the photos into a clean, professional static ad.
-
-Text to include in the ad:
-Headline: ${copy.headline}
-Body: ${copy.body}
-CTA: ${copy.cta}`;
-
-  if (analysis) {
-    prompt += `
-
-PSYCHOLOGICAL STRUCTURE TO PRESERVE:
-- Visual hierarchy: ${analysis.visualHierarchy}
-- Color psychology: ${analysis.colorPsychology}
-- Attention mechanics: ${analysis.attentionMechanics}
-- CTA approach: ${analysis.ctaAnalysis}`;
-  }
-
-  if (editPrompt) {
-    prompt += `
-
-USER EDIT INSTRUCTIONS (HIGH PRIORITY — apply these changes to the output):
-${editPrompt}`;
-  }
-
-  return prompt;
-}

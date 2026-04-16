@@ -19,6 +19,7 @@ import {
   ChevronDown,
   Type,
   Package,
+  ThumbsDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PromptWithMentions } from "@/app/(app)/projects/[id]/production/tab-3a";
@@ -34,6 +35,9 @@ type Generation = {
   generationPrompt: string | null;
   editPrompt: string | null;
   isFavorite: boolean;
+  isRejected: boolean;
+  rejectionReason: string | null;
+  qualityScore: { overall: number; notes: string } | null;
   createdAt: string;
 };
 
@@ -70,6 +74,12 @@ function Lightbox({ src, onClose }: { src: string; onClose: () => void }) {
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
+
+function ordinal(n: number): string {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
 
 function fmtBytes(b: number) {
   return b < 1e6
@@ -200,7 +210,7 @@ export function StaticAdPreview({
     ? generations.filter((g) => g.isFavorite)
     : generations;
 
-  // Favorite toggle mutation
+  // Favorite toggle mutation (optimistic)
   const favMutation = useMutation({
     mutationFn: async ({
       genId,
@@ -220,10 +230,50 @@ export function StaticAdPreview({
       if (!res.ok) throw new Error("Failed to update");
       return res.json();
     },
-    onSuccess: () => {
-      qc.invalidateQueries({
-        queryKey: ["static-ad-generations", jobId],
-      });
+    onMutate: async ({ genId, isFavorite }) => {
+      await qc.cancelQueries({ queryKey: ["static-ad-generations", jobId] });
+      const prev = qc.getQueryData<Generation[]>(["static-ad-generations", jobId]);
+      qc.setQueryData<Generation[]>(["static-ad-generations", jobId], (old) =>
+        old?.map((g) => (g.id === genId ? { ...g, isFavorite } : g))
+      );
+      return { prev };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData(["static-ad-generations", jobId], ctx.prev);
+      toast.error("Failed to update favorite");
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["static-ad-generations", jobId] });
+    },
+  });
+
+  // Reject mutation (optimistic)
+  const rejectMutation = useMutation({
+    mutationFn: async (genId: string) => {
+      const res = await fetch(
+        `/api/static-ads/${jobId}/generations/${genId}/reject`,
+        { method: "POST" }
+      );
+      if (!res.ok) throw new Error("Failed to reject");
+      return res.json() as Promise<{ id: string; rejectionReason: string }>;
+    },
+    onMutate: async (genId) => {
+      await qc.cancelQueries({ queryKey: ["static-ad-generations", jobId] });
+      const prev = qc.getQueryData<Generation[]>(["static-ad-generations", jobId]);
+      qc.setQueryData<Generation[]>(["static-ad-generations", jobId], (old) =>
+        old?.map((g) => (g.id === genId ? { ...g, isRejected: true } : g))
+      );
+      return { prev };
+    },
+    onSuccess: (data) => {
+      toast.success(`Rejected: ${data.rejectionReason.slice(0, 80)}...`);
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData(["static-ad-generations", jobId], ctx.prev);
+      toast.error("Rejection failed");
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["static-ad-generations", jobId] });
     },
   });
 
@@ -452,7 +502,7 @@ export function StaticAdPreview({
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <p className="text-xs font-medium text-[#a1a1aa] uppercase tracking-wide">
-              Generations ({generations.length})
+              {generations.length} generation{generations.length !== 1 ? "s" : ""}
             </p>
             <div className="flex bg-[#27272a] rounded-md p-0.5 text-xs">
               <button
@@ -493,9 +543,11 @@ export function StaticAdPreview({
                 key={gen.id}
                 className={cn(
                   "shrink-0 w-20 h-20 rounded-lg border-2 overflow-hidden bg-[#18181b] transition-all relative group cursor-pointer",
-                  viewedId === gen.id
-                    ? "border-[#6366f1] ring-1 ring-[#6366f1]"
-                    : "border-[#27272a] hover:border-[#3f3f46]"
+                  gen.isRejected
+                    ? "opacity-50 border-red-500/50"
+                    : viewedId === gen.id
+                      ? "border-[#6366f1] ring-1 ring-[#6366f1]"
+                      : "border-[#27272a] hover:border-[#3f3f46]"
                 )}
                 onClick={() => setViewedId(gen.id)}
               >
@@ -505,23 +557,32 @@ export function StaticAdPreview({
                   className="w-full h-full object-cover"
                 />
 
-                {/* Checkbox — top-left */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleSelect(gen.id);
-                  }}
-                  className={cn(
-                    "absolute top-1 left-1 h-4.5 w-4.5 rounded border flex items-center justify-center transition-all",
-                    selected.has(gen.id)
-                      ? "bg-[#6366f1] border-[#6366f1]"
-                      : "bg-white/70 border-[#3f3f46] opacity-0 group-hover:opacity-100"
-                  )}
-                >
-                  {selected.has(gen.id) && (
-                    <Check className="h-3 w-3 text-white" />
-                  )}
-                </button>
+                {/* Rejected overlay */}
+                {gen.isRejected && (
+                  <div className="absolute top-1 left-1 bg-red-500 rounded-full p-0.5">
+                    <X className="h-2.5 w-2.5 text-white" />
+                  </div>
+                )}
+
+                {/* Checkbox — top-left (hidden when rejected) */}
+                {!gen.isRejected && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleSelect(gen.id);
+                    }}
+                    className={cn(
+                      "absolute top-1 left-1 h-4.5 w-4.5 rounded border flex items-center justify-center transition-all",
+                      selected.has(gen.id)
+                        ? "bg-[#6366f1] border-[#6366f1]"
+                        : "bg-white/70 border-[#3f3f46] opacity-0 group-hover:opacity-100"
+                    )}
+                  >
+                    {selected.has(gen.id) && (
+                      <Check className="h-3 w-3 text-white" />
+                    )}
+                  </button>
+                )}
 
                 {/* Favorite star — top-right */}
                 <button
@@ -549,10 +610,41 @@ export function StaticAdPreview({
                   />
                 </button>
 
+                {/* Reject button — bottom-left, next to version */}
+                {!gen.isRejected && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      rejectMutation.mutate(gen.id);
+                    }}
+                    className="absolute bottom-0 left-[2.2rem] opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 p-0.5 rounded-t"
+                    title="Reject"
+                  >
+                    <ThumbsDown className="h-3 w-3 text-white hover:text-red-400" />
+                  </button>
+                )}
+
                 {/* Version label — bottom-left */}
                 <span className="absolute bottom-0 left-0 text-[10px] font-medium text-white bg-black/50 px-1 py-0.5 rounded-tr">
                   v{gen.versionNumber}
                 </span>
+
+                {/* Quality score badge — bottom-right above download */}
+                {gen.qualityScore && (
+                  <span
+                    className={cn(
+                      "absolute bottom-5 right-0 text-[9px] font-bold px-1 py-0.5 rounded-l",
+                      gen.qualityScore.overall >= 80
+                        ? "bg-green-500/80 text-white"
+                        : gen.qualityScore.overall >= 60
+                          ? "bg-amber-500/80 text-white"
+                          : "bg-red-500/80 text-white"
+                    )}
+                    title={gen.qualityScore.notes}
+                  >
+                    {gen.qualityScore.overall}
+                  </span>
+                )}
 
                 {/* Download — bottom-right */}
                 <a
@@ -756,7 +848,7 @@ export function StaticAdPreview({
             <RefreshCw
               className={`h-4 w-4 ${isRegenerating ? "animate-spin" : ""}`}
             />
-            {editPrompt.trim() ? "Generate with Edits" : "Generate Another"}
+            {editPrompt.trim() ? `Regenerate with Edits (${ordinal(generations.length + 1)})` : `Generate Another (${ordinal(generations.length + 1)})`}
           </Button>
         </div>
       </div>

@@ -100,7 +100,7 @@ export type SSEEvent =
       substage?: string;
     };
 
-export type ProductionTab = "3a" | "3b" | "review" | "3c";
+export type ProductionTab = "script" | "seed" | "review" | "video";
 
 export type HeroImage = {
   id: string;

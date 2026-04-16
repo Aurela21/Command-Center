@@ -102,46 +102,48 @@ export async function analyzeImageBatch(
   const apiKey = process.env.GOOGLE_VISION_API_KEY;
   if (!apiKey) throw new Error("GOOGLE_VISION_API_KEY is not set");
 
-  // Vision API allows max 16 images per request
+  // Vision API allows max 16 images per request — fire all batches in parallel
   const BATCH_SIZE = 16;
-  const results: VisionAnalysis[] = [];
-
+  const batches: string[][] = [];
   for (let i = 0; i < imageUrls.length; i += BATCH_SIZE) {
-    const batch = imageUrls.slice(i, i + BATCH_SIZE);
-
-    const res = await fetch(`${VISION_ENDPOINT}?key=${apiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        requests: batch.map((url) => ({
-          image: { source: { imageUri: url } },
-          features: [
-            { type: "LABEL_DETECTION", maxResults: 15 },
-            { type: "OBJECT_LOCALIZATION", maxResults: 10 },
-            { type: "IMAGE_PROPERTIES" },
-          ],
-        })),
-      }),
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Google Vision batch ${res.status}: ${text}`);
-    }
-
-    const data = await res.json();
-    for (const r of data.responses ?? []) {
-      results.push({
-        labels: r.labelAnnotations ?? [],
-        objects: r.localizedObjectAnnotations ?? [],
-        faces: [],
-        dominantColors:
-          r.imagePropertiesAnnotation?.dominantColors?.colors ?? [],
-        text: null,
-        safeSearch: null,
-      });
-    }
+    batches.push(imageUrls.slice(i, i + BATCH_SIZE));
   }
 
-  return results;
+  const batchResults = await Promise.all(
+    batches.map(async (batch) => {
+      const res = await fetch(`${VISION_ENDPOINT}?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          requests: batch.map((url) => ({
+            image: { source: { imageUri: url } },
+            features: [
+              { type: "LABEL_DETECTION", maxResults: 15 },
+              { type: "OBJECT_LOCALIZATION", maxResults: 10 },
+              { type: "IMAGE_PROPERTIES" },
+            ],
+          })),
+        }),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Google Vision batch ${res.status}: ${text}`);
+      }
+
+      const data = await res.json();
+      return (data.responses ?? []).map((r: Record<string, unknown>) => ({
+        labels: (r.labelAnnotations ?? []) as VisionLabel[],
+        objects: (r.localizedObjectAnnotations ?? []) as VisionObject[],
+        faces: [] as VisionFace[],
+        dominantColors:
+          ((r.imagePropertiesAnnotation as Record<string, unknown>)
+            ?.dominantColors as Record<string, unknown>)?.colors as VisionColor[] ?? [],
+        text: null,
+        safeSearch: null,
+      })) as VisionAnalysis[];
+    })
+  );
+
+  return batchResults.flat();
 }

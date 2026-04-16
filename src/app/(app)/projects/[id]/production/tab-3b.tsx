@@ -214,6 +214,9 @@ export function Tab3B({
   const [bulkApplying, setBulkApplying] = useState(false);
   const [bulkSelected, setBulkSelected] = useState<Set<string>>(() => new Set(scenes.map((s) => s.sceneId)));
 
+  // Staged script — generated but not yet applied to scene prompts
+  const [stagedSegments, setStagedSegments] = useState<string[] | null>(null);
+
   function toggleBulkScene(sceneId: string) {
     setBulkSelected((prev) => {
       const next = new Set(prev);
@@ -284,17 +287,8 @@ export function Tab3B({
         sceneSegments: string[];
       };
       onScriptChange(data.fullScript);
-      scenes.forEach((scene, i) => {
-        const prompt = data.sceneSegments[i] ?? "";
-        if (prompt) {
-          updateScene(scene.sceneId, { klingPrompt: prompt, klingPromptApproved: false });
-          fetch(`/api/projects/${projectId}/scenes/${scene.sceneId}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ scriptSegment: prompt, klingPromptApproved: false }),
-          }).catch(console.error);
-        }
-      });
+      // Stage the segments for review — don't apply yet
+      setStagedSegments(data.sceneSegments);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("[generate-script]", msg);
@@ -302,6 +296,22 @@ export function Tab3B({
     } finally {
       setGenerating(false);
     }
+  }
+
+  function applyStaged() {
+    if (!stagedSegments) return;
+    scenes.forEach((scene, i) => {
+      const prompt = stagedSegments[i] ?? "";
+      if (prompt) {
+        updateScene(scene.sceneId, { klingPrompt: prompt, klingPromptApproved: false });
+        fetch(`/api/projects/${projectId}/scenes/${scene.sceneId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ scriptSegment: prompt, klingPromptApproved: false }),
+        }).catch(console.error);
+      }
+    });
+    setStagedSegments(null);
   }
 
   async function handleReoptimize() {
@@ -430,9 +440,68 @@ export function Tab3B({
           </p>
         )}
 
-        {/* Script output */}
-        {script && (
-          <div className="mt-4">
+      </div>
+
+      {/* Scene prompts (scrollable) */}
+      <div className="flex-1 overflow-y-auto px-8 py-5">
+        {/* Staged script preview — editable per-scene before applying */}
+        {stagedSegments && (
+          <div className="mb-4 space-y-3">
+            <div className="flex items-center justify-between sticky top-0 bg-[#18181b] py-2 z-10">
+              <p className="text-xs font-medium uppercase tracking-widest text-[#71717a]">
+                Generated Script — Review &amp; Edit
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setStagedSegments(null)}
+                  className="text-xs text-[#71717a] hover:text-[#a1a1aa] transition-colors"
+                >
+                  Discard
+                </button>
+                <Button
+                  onClick={applyStaged}
+                  size="sm"
+                  className="gap-1.5 bg-[#6366f1] hover:bg-[#6366f1]/80 text-white h-8 text-xs"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                  Add to Prompts
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2 rounded-xl border border-violet-500/20 bg-violet-500/5 p-4">
+              {scenes.map((scene, i) => (
+                <div key={scene.sceneId} className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{ backgroundColor: scene.color }}
+                    />
+                    <span className="text-[10px] font-medium text-[#a1a1aa] tabular-nums">
+                      Scene {String(scene.sceneOrder).padStart(2, "0")}
+                    </span>
+                    <span className="text-[10px] text-[#52525b]">
+                      {scene.targetClipDurationS.toFixed(1)}s
+                    </span>
+                  </div>
+                  <textarea
+                    value={stagedSegments[i] ?? ""}
+                    onChange={(e) => {
+                      const updated = [...stagedSegments];
+                      updated[i] = e.target.value;
+                      setStagedSegments(updated);
+                    }}
+                    rows={2}
+                    className="w-full text-xs font-mono rounded-md border border-[#27272a] px-3 py-2 bg-[#09090b] resize-none focus:outline-none focus:ring-2 focus:ring-violet-500/30 transition-all text-[#a1a1aa] leading-relaxed"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Script output (read-only, shown after staged is applied or from prior generation) */}
+        {script && !stagedSegments && (
+          <div className="mb-4">
             <p className="text-xs font-medium uppercase tracking-widest text-[#71717a] mb-2">
               Generated Script
             </p>
@@ -444,10 +513,6 @@ export function Tab3B({
             />
           </div>
         )}
-      </div>
-
-      {/* Scene prompts (scrollable) */}
-      <div className="flex-1 overflow-y-auto px-8 py-5">
         <div className="flex items-center justify-between mb-4">
           <p className="text-xs font-medium uppercase tracking-widest text-[#71717a]">
             Scene Prompts

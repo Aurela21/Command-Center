@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { staticAdJobs, productProfiles } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
-import { analyzeStaticAd, generateAdCopy } from "@/lib/claude";
+import { analyzeStaticAd, analyzeAdComposition, generateAdCopy } from "@/lib/claude";
 import { emit } from "@/lib/event-bus";
 
 export const runtime = "nodejs";
@@ -38,9 +38,12 @@ export async function POST(_req: NextRequest, { params }: Params) {
   emit({ type: "static-ad:progress", jobId: id, progress: 10, stage: "analyzing" });
 
   try {
-    // Run Claude Vision analysis
+    // Run Claude Vision analysis + composition spec in parallel
     emit({ type: "static-ad:progress", jobId: id, progress: 30, stage: "analyzing" });
-    const psychAnalysis = await analyzeStaticAd(job.inputImageUrl);
+    const [psychAnalysis, compositionSpec] = await Promise.all([
+      analyzeStaticAd(job.inputImageUrl),
+      analyzeAdComposition(job.inputImageUrl),
+    ]);
 
     emit({ type: "static-ad:progress", jobId: id, progress: 60, stage: "analyzing" });
 
@@ -66,12 +69,13 @@ export async function POST(_req: NextRequest, { params }: Params) {
 
     emit({ type: "static-ad:progress", jobId: id, progress: 90, stage: "analyzing" });
 
-    // Save analysis + extracted copy
+    // Save analysis + composition spec + extracted copy
     const [updated] = await db
       .update(staticAdJobs)
       .set({
         status: "analyzed",
         psychAnalysis: psychAnalysis as unknown as Record<string, unknown>,
+        compositionSpec: compositionSpec as unknown as Record<string, unknown>,
         extractedCopy: suggestedCopy as unknown as Record<string, unknown>,
         updatedAt: sql`NOW()`,
       })
@@ -82,6 +86,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
 
     return NextResponse.json({
       psychAnalysis,
+      compositionSpec,
       extractedCopy: suggestedCopy,
       job: updated,
     });

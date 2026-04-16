@@ -58,6 +58,43 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     }
   }
 
+  // Fire-and-forget: analyze approval and record positive learning
+  if (body.approvedSeedImageId) {
+    (async () => {
+      try {
+        const [approvedAv] = await db
+          .select()
+          .from(assetVersions)
+          .where(eq(assetVersions.id, body.approvedSeedImageId!));
+        if (!approvedAv) return;
+
+        const { analyzeApproval } = await import("@/lib/claude");
+        const analysis = await analyzeApproval(
+          approvedAv.fileUrl,
+          approvedAv.generationPrompt
+        );
+
+        const { recordLearning, resolveProductFromTags } = await import(
+          "@/lib/learnings"
+        );
+        const productId = await resolveProductFromTags(
+          approvedAv.generationPrompt
+        );
+        if (productId) {
+          await recordLearning({
+            productId,
+            type: "positive",
+            source: "seed_image",
+            sourceId: body.approvedSeedImageId!,
+            rawAnalysis: analysis,
+          });
+        }
+      } catch (err) {
+        console.warn("[scenes] Approval analysis failed:", err);
+      }
+    })();
+  }
+
   // Build the scene patch
   const patch: Record<string, unknown> = { updatedAt: sql`NOW()` };
   if ("approvedSeedImageId" in body) patch.approvedSeedImageId = body.approvedSeedImageId ?? null;

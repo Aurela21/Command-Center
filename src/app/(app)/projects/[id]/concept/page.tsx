@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Check, Loader2, Pencil, Plus, Sparkles, Trash2, X } from "lucide-react";
+import { Breadcrumbs } from "@/components/breadcrumbs";
 import { PromptWithMentions, type ProductTag } from "../production/tab-3a";
 
 type GeneratedScene = {
@@ -25,6 +26,15 @@ export default function ConceptPage() {
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [proceeding, setProceeding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [projectName, setProjectName] = useState<string>("");
+
+  // Fetch project name for breadcrumbs
+  useEffect(() => {
+    fetch(`/api/projects/${projectId}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data?.name) setProjectName(data.name); })
+      .catch(() => {});
+  }, [projectId]);
 
   // Fetch product tags for @mentions
   const [productTags, setProductTags] = useState<ProductTag[]>([]);
@@ -106,6 +116,7 @@ export default function ConceptPage() {
 
   return (
     <div className="max-w-3xl mx-auto px-8 py-10">
+      <Breadcrumbs crumbs={[{ label: "Projects", href: "/projects" }, ...(projectName ? [{ label: projectName, href: `/projects/${projectId}/concept` }] : []), { label: "Concept Setup" }]} />
       <div className="mb-8">
         <h1 className="text-xl font-semibold text-[#fafafa]">New Concept</h1>
         <p className="text-sm text-neutral-400 mt-0.5">

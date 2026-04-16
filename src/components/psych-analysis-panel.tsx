@@ -14,6 +14,7 @@ import {
   Focus,
   Lightbulb,
   Loader2,
+  ChevronDown,
 } from "lucide-react";
 import type { StaticAdAnalysis } from "@/lib/claude";
 
@@ -48,54 +49,26 @@ export function PsychAnalysisPanel({
   const [headline, setHeadline] = useState(extractedCopy.headline);
   const [body, setBody] = useState(extractedCopy.body);
   const [cta, setCta] = useState(extractedCopy.cta);
+  const [expanded, setExpanded] = useState(false);
+
+  const summaryTriggers = analysis.emotionalTriggers.slice(0, 2).join(", ");
+  const summaryFraming = analysis.copyFraming.length > 60
+    ? analysis.copyFraming.slice(0, 60) + "..."
+    : analysis.copyFraming;
 
   return (
     <div className="space-y-6">
-      {/* Analysis sections */}
-      <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-[#fafafa]">
-          Psychological Analysis
-        </h3>
-        <div className="grid gap-3">
-          {ANALYSIS_SECTIONS.map(({ key, label, icon }) => (
-            <div
-              key={key}
-              className="rounded-lg border border-[#27272a] bg-[#18181b] p-4"
-            >
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="text-[#71717a]">{icon}</span>
-                <span className="text-xs font-medium text-[#a1a1aa] uppercase tracking-wide">
-                  {label}
-                </span>
-              </div>
-              <p className="text-sm text-[#a1a1aa] leading-relaxed">
-                {analysis[key]}
-              </p>
-            </div>
-          ))}
-
-          {/* Emotional triggers as tags */}
-          {analysis.emotionalTriggers.length > 0 && (
-            <div className="rounded-lg border border-[#27272a] bg-[#18181b] p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Heart className="h-4 w-4 text-[#71717a]" />
-                <span className="text-xs font-medium text-[#a1a1aa] uppercase tracking-wide">
-                  Emotional Triggers
-                </span>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {analysis.emotionalTriggers.map((trigger) => (
-                  <span
-                    key={trigger}
-                    className="text-xs px-2 py-1 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20"
-                  >
-                    {trigger}
-                  </span>
-                ))}
-              </div>
-            </div>
+      {/* Summary line */}
+      <div className="rounded-lg border border-[#27272a] bg-[#18181b] px-4 py-3">
+        <p className="text-sm text-[#a1a1aa] leading-relaxed">
+          {summaryTriggers && (
+            <>
+              <span className="text-rose-400 font-medium">{summaryTriggers}</span>
+              {" — "}
+            </>
           )}
-        </div>
+          {summaryFraming}
+        </p>
       </div>
 
       {/* Editable copy fields */}
@@ -171,6 +144,70 @@ export function PsychAnalysisPanel({
           </Button>
         </div>
       </div>
+
+      {/* Toggle for full analysis */}
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="flex items-center gap-1.5 text-xs font-medium text-[#71717a] hover:text-[#a1a1aa] transition-colors"
+      >
+        <ChevronDown
+          className={cn(
+            "h-3.5 w-3.5 transition-transform",
+            !expanded && "-rotate-90"
+          )}
+        />
+        {expanded ? "Hide analysis" : "Show full analysis"}
+      </button>
+
+      {/* Full analysis sections (collapsed by default) */}
+      {expanded && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-[#fafafa]">
+            Psychological Analysis
+          </h3>
+          <div className="grid gap-3">
+            {ANALYSIS_SECTIONS.map(({ key, label, icon }) => (
+              <div
+                key={key}
+                className="rounded-lg border border-[#27272a] bg-[#18181b] p-4"
+              >
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-[#71717a]">{icon}</span>
+                  <span className="text-xs font-medium text-[#a1a1aa] uppercase tracking-wide">
+                    {label}
+                  </span>
+                </div>
+                <p className="text-sm text-[#a1a1aa] leading-relaxed">
+                  {analysis[key]}
+                </p>
+              </div>
+            ))}
+
+            {/* Emotional triggers as tags */}
+            {analysis.emotionalTriggers.length > 0 && (
+              <div className="rounded-lg border border-[#27272a] bg-[#18181b] p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Heart className="h-4 w-4 text-[#71717a]" />
+                  <span className="text-xs font-medium text-[#a1a1aa] uppercase tracking-wide">
+                    Emotional Triggers
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {analysis.emotionalTriggers.map((trigger) => (
+                    <span
+                      key={trigger}
+                      className="text-xs px-2 py-1 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                    >
+                      {trigger}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

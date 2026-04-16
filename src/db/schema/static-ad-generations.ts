@@ -4,6 +4,7 @@ import {
   text,
   integer,
   boolean,
+  jsonb,
   timestamp,
   unique,
 } from "drizzle-orm/pg-core";
@@ -24,6 +25,10 @@ export const staticAdGenerations = pgTable(
     generationPrompt: text("generation_prompt"),
     editPrompt: text("edit_prompt"),
     isFavorite: boolean("is_favorite").default(false),
+    isRejected: boolean("is_rejected").default(false),
+    rejectionReason: text("rejection_reason"),
+    qualityScore: jsonb("quality_score"), // { overall, breakdown, notes } from scoreGeneration
+    qualityCheck: jsonb("quality_check"), // { match, mismatches, score } from compareAdToSpec
     createdAt: timestamp("created_at", { withTimezone: true }).default(
       sql`NOW()`
     ),

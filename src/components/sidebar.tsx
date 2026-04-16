@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useParams, useRouter } from "next/navigation";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -14,12 +14,10 @@ import {
   Lock,
   Circle,
   LogOut,
-  ChevronDown,
-  Layers,
   Sparkles,
   ImagePlus,
+  ShoppingBag,
 } from "lucide-react";
-import { useRef, useState, useCallback } from "react";
 import type { Project } from "@/db/schema";
 
 type NavItem = {
@@ -81,7 +79,6 @@ export function Sidebar() {
   const pathname = usePathname();
   const params = useParams();
   const router = useRouter();
-  const qc = useQueryClient();
   const projectId = typeof params?.id === "string" ? params.id : null;
 
   const { data: project } = useQuery<Project>({
@@ -93,41 +90,6 @@ export function Sidebar() {
     },
     enabled: !!projectId,
   });
-
-  // Inline-editable project name
-  const [editing, setEditing] = useState(false);
-  const [nameValue, setNameValue] = useState("");
-  const [iterationOpen, setIterationOpen] = useState(true);
-  const nameRef = useRef<HTMLInputElement>(null);
-
-  const renameMutation = useMutation({
-    mutationFn: async (name: string) => {
-      const res = await fetch(`/api/projects/${projectId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
-      });
-      if (!res.ok) throw new Error("Failed to rename");
-      return res.json();
-    },
-    onSuccess: (updated) => {
-      qc.setQueryData(["project", projectId], updated);
-    },
-  });
-
-  const startEdit = useCallback(() => {
-    setNameValue(project?.name ?? "");
-    setEditing(true);
-    setTimeout(() => nameRef.current?.select(), 0);
-  }, [project?.name]);
-
-  const commitEdit = useCallback(() => {
-    setEditing(false);
-    const trimmed = nameValue.trim();
-    if (trimmed && trimmed !== project?.name) {
-      renameMutation.mutate(trimmed);
-    }
-  }, [nameValue, project?.name, renameMutation]);
 
   // Determine locked states from project status
   // TODO: change uploadDone back to `status !== "uploading"` once the upload flow is wired up
@@ -184,20 +146,6 @@ export function Sidebar() {
         ]
     : [];
 
-  const isInIteration = projectId && (
-    pathname.includes("/upload") ||
-    pathname.includes("/manifest") ||
-    pathname.includes("/production") ||
-    pathname.includes("/concept")
-  );
-
-  const knowledgeItem: NavItem = {
-    label: "Knowledge Base",
-    href: "/knowledge",
-    icon: <BookOpen className="h-4 w-4" />,
-    locked: false,
-  };
-
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
@@ -208,37 +156,12 @@ export function Sidebar() {
     <aside className="w-60 shrink-0 border-r border-[#27272a] bg-[#0f0f12] flex flex-col h-screen sticky top-0">
       {/* Header */}
       <div className="px-4 py-4 border-b border-[#1a1a1e]">
-        {projectId ? (
-          editing ? (
-            <input
-              ref={nameRef}
-              value={nameValue}
-              onChange={(e) => setNameValue(e.target.value)}
-              onBlur={commitEdit}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") commitEdit();
-                if (e.key === "Escape") setEditing(false);
-              }}
-              className="w-full text-sm font-medium text-[#fafafa] bg-transparent border-b border-[#3f3f46] outline-none pb-0.5"
-              autoFocus
-            />
-          ) : (
-            <button
-              onClick={startEdit}
-              className="w-full text-left text-sm font-medium text-[#fafafa] hover:text-[#a1a1aa] truncate transition-colors"
-              title="Click to rename"
-            >
-              {project?.name ?? "Loading…"}
-            </button>
-          )
-        ) : (
-          <span className="text-sm font-medium text-[#71717a]">
-            No project selected
-          </span>
-        )}
+        <span className="text-sm font-medium text-[#fafafa]">
+          Command Center
+        </span>
       </div>
 
-      {/* Project nav */}
+      {/* Global nav */}
       <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
         <NavLink
           item={{
@@ -249,52 +172,15 @@ export function Sidebar() {
           }}
           active={pathname === "/projects"}
         />
-        {projectId && (
-          <>
-            <button
-              onClick={() => setIterationOpen((o) => !o)}
-              className={cn(
-                "flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors w-full",
-                isInIteration
-                  ? "bg-[#18181b] text-[#fafafa] font-medium"
-                  : "text-[#a1a1aa] hover:text-[#fafafa] hover:bg-[#27272a]"
-              )}
-            >
-              {isConcept ? (
-                <Sparkles className="h-4 w-4 shrink-0" />
-              ) : (
-                <Layers className="h-4 w-4 shrink-0" />
-              )}
-              <span className="flex-1 text-left truncate">
-                {isConcept ? "New Concept" : "Iteration"}
-              </span>
-              <ChevronDown
-                className={cn(
-                  "h-3.5 w-3.5 shrink-0 transition-transform",
-                  !iterationOpen && "-rotate-90"
-                )}
-              />
-            </button>
-            {iterationOpen && (
-              <div className="ml-3 pl-3 border-l border-[#1a1a1e] space-y-0.5 mt-0.5">
-                {iterationSubItems.map((item) => (
-                  <NavLink
-                    key={item.href}
-                    item={item}
-                    active={pathname === item.href}
-                  />
-                ))}
-              </div>
-            )}
-            <Separator className="my-2" />
-          </>
-        )}
-
         <NavLink
-          item={knowledgeItem}
-          active={pathname.startsWith("/knowledge")}
+          item={{
+            label: "Products",
+            href: "/knowledge/product_assets",
+            icon: <ShoppingBag className="h-4 w-4" />,
+            locked: false,
+          }}
+          active={pathname.startsWith("/knowledge/product_assets")}
         />
-
         <NavLink
           item={{
             label: "Static Ads",
@@ -304,6 +190,37 @@ export function Sidebar() {
           }}
           active={pathname.startsWith("/static-ads")}
         />
+        <NavLink
+          item={{
+            label: "Knowledge Base",
+            href: "/knowledge",
+            icon: <BookOpen className="h-4 w-4" />,
+            locked: false,
+          }}
+          active={pathname === "/knowledge" || (pathname.startsWith("/knowledge") && !pathname.startsWith("/knowledge/product_assets"))}
+        />
+
+        {/* Project nav */}
+        {projectId && (
+          <>
+            <Separator className="my-2" />
+            <div className="px-3 py-1.5">
+              <p className="text-xs font-medium text-[#fafafa] truncate">
+                {project?.name ?? "Loading\u2026"}
+              </p>
+              <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] font-medium leading-tight bg-[#27272a] text-[#a1a1aa]">
+                {isConcept ? "From Scratch" : "From Reference"}
+              </span>
+            </div>
+            {iterationSubItems.map((item) => (
+              <NavLink
+                key={item.href}
+                item={item}
+                active={pathname === item.href}
+              />
+            ))}
+          </>
+        )}
       </nav>
 
       {/* Footer */}

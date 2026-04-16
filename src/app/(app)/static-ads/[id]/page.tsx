@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft,
+  Copy,
   Loader2,
   AlertTriangle,
   RefreshCw,
@@ -17,6 +18,8 @@ import {
   ImagePlus,
 } from "lucide-react";
 import { toast } from "sonner";
+import { Breadcrumbs } from "@/components/breadcrumbs";
+import { ProgressStepper, type Step } from "@/components/progress-stepper";
 import { StaticAdUpload } from "@/components/static-ad-upload";
 import { PsychAnalysisPanel } from "@/components/psych-analysis-panel";
 import { StaticAdPreview } from "@/components/static-ad-preview";
@@ -43,6 +46,33 @@ type StaticAdJobDetail = {
   productName: string | null;
   productSlug: string | null;
 };
+
+function getAdSteps(status: string): Step[] {
+  const steps: Step[] = [
+    { id: "upload", label: "Upload", status: "upcoming" },
+    { id: "analysis", label: "Analysis", status: "upcoming" },
+    { id: "review", label: "Review", status: "upcoming" },
+    { id: "generate", label: "Generate", status: "upcoming" },
+  ];
+  if (status === "uploading") {
+    steps[0].status = "current";
+  } else if (status === "analyzing") {
+    steps[0].status = "completed";
+    steps[1].status = "current";
+  } else if (status === "analyzed") {
+    steps[0].status = "completed";
+    steps[1].status = "completed";
+    steps[2].status = "current";
+  } else if (["confirmed", "generating"].includes(status)) {
+    steps[0].status = "completed";
+    steps[1].status = "completed";
+    steps[2].status = "completed";
+    steps[3].status = "current";
+  } else if (status === "completed") {
+    steps.forEach((s) => (s.status = "completed"));
+  }
+  return steps;
+}
 
 export default function StaticAdJobPage() {
   const params = useParams();
@@ -217,6 +247,22 @@ export default function StaticAdJobPage() {
     router.push("/static-ads");
   }, [router]);
 
+  const handleDuplicate = useCallback(async () => {
+    try {
+      const res = await fetch("/api/static-ads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ duplicateFromId: jobId }),
+      });
+      if (!res.ok) throw new Error("Failed to duplicate");
+      const newJob = (await res.json()) as { id: string };
+      qc.invalidateQueries({ queryKey: ["static-ad-jobs"] });
+      router.push(`/static-ads/${newJob.id}`);
+    } catch {
+      toast.error("Failed to duplicate ad");
+    }
+  }, [jobId, qc, router]);
+
   if (isLoading) {
     return (
       <div className="max-w-4xl mx-auto px-8 py-10">
@@ -255,6 +301,8 @@ export default function StaticAdJobPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-8 py-10">
+      <Breadcrumbs crumbs={[{ label: "Static Ads", href: "/static-ads" }, { label: job.productName ?? "Static Ad" }]} />
+      <ProgressStepper steps={getAdSteps(job.status)} />
       {/* Header */}
       <div className="flex items-center gap-3 mb-8">
         <button
@@ -272,16 +320,26 @@ export default function StaticAdJobPage() {
             {progress > 0 && ` — ${progress}%`}
           </p>
         </div>
-        {/* "New Reference Ad" button — show when completed and not already in a new round */}
+        {/* Action buttons — show when completed and not already in a new round */}
         {job.status === "completed" && !newRoundActive && (
-          <Button
-            onClick={handleStartNewRound}
-            variant="outline"
-            className="gap-2"
-          >
-            <ImagePlus className="h-4 w-4" />
-            New Reference Ad
-          </Button>
+          <>
+            <Button
+              onClick={handleDuplicate}
+              variant="outline"
+              className="gap-2"
+            >
+              <Copy className="h-4 w-4" />
+              Duplicate
+            </Button>
+            <Button
+              onClick={handleStartNewRound}
+              variant="outline"
+              className="gap-2"
+            >
+              <ImagePlus className="h-4 w-4" />
+              New Reference Ad
+            </Button>
+          </>
         )}
       </div>
 

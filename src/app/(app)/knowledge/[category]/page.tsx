@@ -20,6 +20,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { Breadcrumbs } from "@/components/breadcrumbs";
 import type { KnowledgeDocument } from "@/db/schema";
 import type { SearchResult } from "@/app/api/knowledge/search/route";
 
@@ -487,13 +488,7 @@ export default function CategoryPage() {
       <div className="shrink-0 px-8 py-5 border-b border-[#27272a]">
         <div className="flex items-start justify-between">
           <div>
-            <button
-              onClick={() => router.push("/knowledge")}
-              className="inline-flex items-center gap-1.5 text-xs text-[#71717a] hover:text-[#a1a1aa] transition-colors mb-2"
-            >
-              <ArrowLeft className="h-3 w-3" />
-              Knowledge Base
-            </button>
+            <Breadcrumbs crumbs={[{ label: "Knowledge", href: "/knowledge" }, { label: meta.label }]} />
             <h1 className="text-base font-semibold text-[#fafafa]">
               {meta.label}
             </h1>

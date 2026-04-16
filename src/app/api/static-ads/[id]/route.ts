@@ -52,6 +52,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     updates.psychAnalysis = body.psychAnalysis;
   if (body.productId !== undefined) updates.productId = body.productId;
   if (body.status !== undefined) updates.status = body.status;
+  if (body.sessionTag !== undefined) updates.sessionTag = body.sessionTag;
   if (body.lastError !== undefined) updates.lastError = body.lastError;
 
   if (Object.keys(updates).length === 0) {
