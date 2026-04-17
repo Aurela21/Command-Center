@@ -38,7 +38,8 @@ export async function POST(_req: NextRequest, { params }: Params) {
 
   // Spawn subprocess
   const scriptPath = resolve(process.cwd(), "scripts/process-document.mjs");
-  const child = spawn("node", ["--max-old-space-size=1024", scriptPath, id, doc.fileUrl, doc.fileType], {
+  const args = ["--max-old-space-size=1024", scriptPath, id, doc.fileUrl, doc.fileType];
+  const child = spawn("node", args, {
     stdio: "inherit",
     detached: true,
     env: { ...process.env },
