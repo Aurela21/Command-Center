@@ -18,7 +18,7 @@ import type { StaticAdAnalysis, AdCompositionSpec } from "./claude";
 // ─── Model & Limits ────────────────────────────────────────────────────────
 
 /** Gemini 3.1 Flash Image API model identifier. */
-export const NB2_MODEL_ID = "gemini-3-1-flash-image-preview" as const;
+export const NB2_MODEL_ID = "gemini-3.1-flash-image-preview" as const;
 
 /** Hard API limit: max reference images per call (§9 of knowledge doc). */
 export const MAX_REFERENCE_IMAGES = 14;

@@ -154,30 +154,31 @@ function dbToState(
   let videoJobId: string | undefined;
   let videoUrl: string | undefined;
 
-  // Only treat a kling job as active if it's recent (last 5 min) or already submitted to API
-  const klingIsActive =
-    latestKling &&
-    (latestKling.status === "completed" ||
-      latestKling.status === "failed" ||
-      latestKling.status === "processing" ||
-      (["queued", "submitted", "retrying"].includes(latestKling.status) &&
-        (latestKling.externalJobId != null ||
-          new Date(latestKling.createdAt).getTime() > Date.now() - 5 * 60 * 1000)));
-
-  if (klingIsActive && latestKling) {
-    videoJobId = latestKling.id;
+  // Only treat a kling job as "in progress" if it's recent and not finished.
+  // Completed/failed jobs are terminal — they populate videoUrl/videoVersions
+  // but don't set videoJobStatus to anything the queue tracker would show.
+  if (latestKling) {
     const s = latestKling.status;
     if (s === "completed") {
       videoJobStatus = "completed";
       videoJobProgress = 100;
       videoUrl = klingAssets[0]?.fileUrl;
-    } else if (s === "failed") {
+    } else if (s === "failed" &&
+      new Date(latestKling.createdAt).getTime() > Date.now() - 10 * 60 * 1000) {
+      // Only show failures from the last 10 minutes
       videoJobStatus = "failed";
       videoJobError = latestKling.lastError ?? undefined;
-    } else if (s === "processing") {
+      videoJobId = latestKling.id;
+    } else if (s === "processing" &&
+      new Date(latestKling.createdAt).getTime() > Date.now() - 30 * 60 * 1000) {
       videoJobStatus = "processing";
-    } else {
+      videoJobId = latestKling.id;
+    } else if (
+      ["queued", "submitted", "retrying"].includes(s) &&
+      new Date(latestKling.createdAt).getTime() > Date.now() - 5 * 60 * 1000
+    ) {
       videoJobStatus = "queued";
+      videoJobId = latestKling.id;
     }
   }
 
@@ -588,6 +589,7 @@ export default function ProductionPage() {
           </button>
         </div>
 
+        <QueueTracker scenes={scenes} heroGenerating={heroGenerating} />
         <ProjectSettings projectId={projectId} />
 
         {/* Tab bar */}
@@ -673,9 +675,6 @@ export default function ProductionPage() {
           />
         </div>
       </div>
-
-      {/* Global queue tracker */}
-      <QueueTracker scenes={scenes} heroGenerating={heroGenerating} />
 
       {/* AI Chat panel */}
       <ChatPanel

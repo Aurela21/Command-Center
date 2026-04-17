@@ -815,6 +815,7 @@ function SeedDetailPanel({
   const [aiInstruction, setAiInstruction] = useState("");
   const [suggestedPrompt, setSuggestedPrompt] = useState<string | null>(null);
   const [suggesting, setSuggesting] = useState(false);
+  const [swapPromptEdits, setSwapPromptEdits] = useState<Record<string, string>>({});
 
   // Auto-generate suggested seed prompt when scene has a kling prompt
   useEffect(() => {
@@ -851,6 +852,14 @@ function SeedDetailPanel({
       .finally(() => setSuggesting(false));
     return () => controller.abort();
   }, [scene.klingPrompt, scene.referenceFrame, scene.sceneId, projectId, approvedHeroUrl]);
+
+  // Build deterministic product swap prompts — one per product, no API call
+  const swapPrompts = productTags.map((p) => ({
+    slug: p.slug,
+    name: p.name,
+    prompt: `Recreate this exact image — same subject, same pose, same setting, same lighting, same camera angle, same composition — but replace the garment the subject is wearing with the @${p.slug}. The @${p.slug} product reference images are the source of truth for what the product looks like. Keep everything else identical to the reference frame. Use frame ${scene.referenceFrame} as reference.`,
+  }));
+
   const [genProgress, setGenProgress] = useState(0);
   const genStartRef = useRef<number | null>(null);
 
@@ -1103,108 +1112,161 @@ function SeedDetailPanel({
   }
 
   return (
-    <div className="p-7 space-y-7 max-w-2xl">
-      {/* Scene header */}
-      <div className="flex items-end gap-4">
-        <span className="text-7xl font-light leading-none text-[#1a1a1e] tabular-nums select-none">
-          {String(scene.sceneOrder).padStart(2, "0")}
-        </span>
-        <div className="mb-1 space-y-1">
-          <p className="text-sm font-medium text-[#a1a1aa]">
-            {scene.targetClipDurationS.toFixed(1)}s target clip
-          </p>
-          <p className="text-xs text-[#71717a] leading-relaxed line-clamp-2 max-w-sm">
-            {scene.description}
-          </p>
-        </div>
-      </div>
-
-      {/* Hero mode indicator */}
-      {approvedHeroUrl && (
-        <div className="rounded-lg border border-violet-500/20 bg-violet-500/10 px-4 py-3 flex items-center gap-3">
-          <img
-            src={approvedHeroUrl}
-            alt="Hero model"
-            className="w-8 h-12 rounded object-cover border border-violet-200 shrink-0"
-          />
-          <div>
-            <p className="text-[10px] font-medium uppercase tracking-widest text-violet-400">
-              Hero Mode Active
+    <div className="flex h-full overflow-hidden">
+      {/* ── LEFT: Prompting ── */}
+      <div className="w-1/2 overflow-y-auto p-6 space-y-5 border-r border-[#27272a]">
+        {/* Scene header */}
+        <div className="flex items-end gap-3">
+          <span className="text-5xl font-light leading-none text-[#1a1a1e] tabular-nums select-none">
+            {String(scene.sceneOrder).padStart(2, "0")}
+          </span>
+          <div className="mb-0.5 space-y-0.5">
+            <p className="text-sm font-medium text-[#a1a1aa]">
+              {scene.targetClipDurationS.toFixed(1)}s target clip
             </p>
-            <p className="text-[11px] text-[#a1a1aa]">
-              Seeds will use the approved hero model as base — prompts should describe pose & framing only
+            <p className="text-xs text-[#71717a] leading-relaxed line-clamp-2">
+              {scene.description}
             </p>
           </div>
         </div>
-      )}
 
-      {/* Script & Motion from 3A */}
-      {scene.klingPrompt && (
-        <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 px-4 py-3 space-y-1">
-          <p className="text-[10px] font-medium uppercase tracking-widest text-blue-400">
-            Script & Motion (from 3A)
-          </p>
-          <p className="text-xs text-[#a1a1aa] leading-relaxed">
-            {scene.klingPrompt}
-          </p>
-        </div>
-      )}
-
-      {/* Reference frame picker (collapsible) */}
-      <ReferenceFramePicker
-        scene={scene}
-        projectId={projectId}
-        updateScene={updateScene}
-        extractedFrameCount={extractedFrameCount}
-        r2PublicUrl={r2PublicUrl}
-      />
-
-      {/* Suggested seed prompt */}
-      {(suggesting || suggestedPrompt) && (
-        <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 space-y-2">
-          <p className="text-[10px] font-medium uppercase tracking-widest text-emerald-500">
-            Suggested Seed Prompt
-          </p>
-          {suggesting ? (
-            <div className="flex items-center gap-2 py-1">
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-400" />
-              <span className="text-xs text-[#71717a]">Generating suggestion…</span>
+        {/* Hero mode indicator */}
+        {approvedHeroUrl && (
+          <div className="rounded-lg border border-violet-500/20 bg-violet-500/10 px-3 py-2 flex items-center gap-2.5">
+            <img
+              src={approvedHeroUrl}
+              alt="Hero model"
+              className="w-7 h-10 rounded object-cover border border-violet-200 shrink-0"
+            />
+            <div>
+              <p className="text-[10px] font-medium uppercase tracking-widest text-violet-400">
+                Hero Mode Active
+              </p>
+              <p className="text-[11px] text-[#a1a1aa]">
+                Prompts should describe pose & framing only
+              </p>
             </div>
-          ) : suggestedPrompt ? (
-            <>
-              <textarea
-                value={suggestedPrompt}
-                onChange={(e) => setSuggestedPrompt(e.target.value)}
-                rows={4}
-                className="w-full text-xs rounded-md border border-emerald-200 bg-[#18181b] px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-300 transition-all text-[#a1a1aa] leading-relaxed"
-              />
-              <Button
-                onClick={() => {
-                  updateScene(scene.sceneId, { nanoBananaPrompt: suggestedPrompt });
-                }}
-                variant="outline"
-                className="gap-2 h-8 text-xs border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-              >
-                <Check className="h-3 w-3" />
-                Use this prompt
-              </Button>
-            </>
-          ) : null}
-        </div>
-      )}
+          </div>
+        )}
 
-      {/* Brief prompt with @mention autocomplete */}
-      <div>
-        <p className="text-xs font-medium uppercase tracking-widest text-[#71717a] mb-3">
-          Seed Image Prompt
-        </p>
-        <PromptWithMentions
-          value={scene.nanoBananaPrompt}
-          onChange={(val) => updateScene(scene.sceneId, { nanoBananaPrompt: val })}
-          products={productTags}
-          placeholder="Describe the seed image… Type @ to reference a product"
+        {/* Script & Motion */}
+        {scene.klingPrompt && (
+          <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 px-3 py-2.5 space-y-1">
+            <p className="text-[10px] font-medium uppercase tracking-widest text-blue-400">
+              Script & Motion
+            </p>
+            <p className="text-xs text-[#a1a1aa] leading-relaxed">
+              {scene.klingPrompt}
+            </p>
+          </div>
+        )}
+
+        {/* Reference frame picker */}
+        <ReferenceFramePicker
+          scene={scene}
+          projectId={projectId}
+          updateScene={updateScene}
+          extractedFrameCount={extractedFrameCount}
+          r2PublicUrl={r2PublicUrl}
         />
-        <div className="mt-2.5 space-y-2">
+
+        {/* Seed Image Prompt */}
+        <div>
+          <p className="text-xs font-medium uppercase tracking-widest text-[#71717a] mb-2">
+            Seed Image Prompt
+          </p>
+          <PromptWithMentions
+            value={scene.nanoBananaPrompt}
+            onChange={(val) => updateScene(scene.sceneId, { nanoBananaPrompt: val })}
+            products={productTags}
+            placeholder="Describe the seed image… Type @ to reference a product"
+            rows={4}
+          />
+          <Button
+            onClick={handleGenerate}
+            disabled={generating || !scene.nanoBananaPrompt.trim()}
+            className="mt-2 gap-2 bg-[#6366f1] hover:bg-[#6366f1]/80 text-white h-9 text-sm disabled:opacity-40 w-full"
+          >
+            {generating ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Generating…
+              </>
+            ) : (
+              <>
+                <Wand2 className="h-3.5 w-3.5" />
+                Generate
+              </>
+            )}
+          </Button>
+        </div>
+
+        {/* Suggested Seed Prompt (green) */}
+        {(suggesting || suggestedPrompt) && (
+          <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 space-y-2">
+            <p className="text-[11px] font-medium uppercase tracking-widest text-emerald-500">
+              Suggested Seed Prompt
+            </p>
+            {suggesting ? (
+              <div className="flex items-center gap-2 py-1">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-400" />
+                <span className="text-xs text-[#71717a]">Generating…</span>
+              </div>
+            ) : suggestedPrompt ? (
+              <>
+                <textarea
+                  value={suggestedPrompt}
+                  onChange={(e) => setSuggestedPrompt(e.target.value)}
+                  rows={3}
+                  className="w-full text-xs rounded-md border border-emerald-500/20 bg-[#18181b] px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/30 transition-all text-[#e4e4e7] leading-relaxed"
+                />
+                <Button
+                  onClick={() => updateScene(scene.sceneId, { nanoBananaPrompt: suggestedPrompt })}
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 h-7 text-xs border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+                >
+                  <Check className="h-3 w-3" />
+                  Use this prompt
+                </Button>
+              </>
+            ) : null}
+          </div>
+        )}
+
+        {/* Product Swap Prompts (orange) — one per product, deterministic */}
+        {swapPrompts.length > 0 && (scene.referenceFrameUrl || scene.referenceFrame > 0) && (
+          <div className="rounded-lg border border-orange-500/30 bg-orange-500/10 px-4 py-3 space-y-2.5">
+            <p className="text-[11px] font-medium uppercase tracking-widest text-orange-500">
+              Product Swap Prompt
+            </p>
+            {swapPrompts.map((sp) => (
+              <div key={sp.slug} className="space-y-1.5">
+                {swapPrompts.length > 1 && (
+                  <p className="text-[10px] font-medium text-orange-400">@{sp.slug}</p>
+                )}
+                <textarea
+                  value={swapPromptEdits[sp.slug] ?? sp.prompt}
+                  onChange={(e) => setSwapPromptEdits((prev) => ({ ...prev, [sp.slug]: e.target.value }))}
+                  rows={3}
+                  className="w-full text-xs rounded-md border border-orange-500/20 bg-[#18181b] px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-orange-500/30 transition-all text-[#e4e4e7] leading-relaxed"
+                />
+                <Button
+                  onClick={() => updateScene(scene.sceneId, { nanoBananaPrompt: swapPromptEdits[sp.slug] ?? sp.prompt })}
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 h-7 text-xs border-orange-500/30 text-orange-400 hover:bg-orange-500/10"
+                >
+                  <Package className="h-3 w-3" />
+                  Use swap prompt
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Enhance + Generate */}
+        <div className="space-y-2">
           <div className="flex gap-2">
             <div className="flex-1">
               <PromptWithMentions
@@ -1253,7 +1315,6 @@ function SeedDetailPanel({
               )}
             </Button>
           )}
-          {/* Upload seed image button */}
           <SeedUploadButton
             projectId={projectId}
             sceneId={scene.sceneId}
@@ -1261,218 +1322,217 @@ function SeedDetailPanel({
             addSeedVersion={addSeedVersion}
           />
         </div>
+
+        {/* Enhanced prompt (shown after enhancement) */}
+        {refinedPrompt !== null && (
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-medium uppercase tracking-widest text-[#71717a]">
+                Enhanced Prompt
+              </p>
+              <button
+                onClick={() => setRefinedPrompt(null)}
+                className="text-[11px] text-[#71717a] hover:text-[#a1a1aa] transition-colors"
+              >
+                Discard
+              </button>
+            </div>
+            <textarea
+              value={refinedPrompt}
+              onChange={(e) => setRefinedPrompt(e.target.value)}
+              rows={4}
+              className="w-full text-sm rounded-md border border-blue-500/20 bg-blue-500/10 px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300 transition-all text-[#a1a1aa] leading-relaxed"
+            />
+            <Button
+              onClick={handleGenerate}
+              disabled={generating}
+              className="mt-2 gap-2 bg-[#6366f1] hover:bg-[#6366f1]/80 text-white h-9 text-sm disabled:opacity-40"
+            >
+              {generating ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Generating…
+                </>
+              ) : (
+                <>
+                  <Wand2 className="h-3.5 w-3.5" />
+                  Generate with Enhanced Prompt
+                </>
+              )}
+            </Button>
+          </div>
+        )}
       </div>
 
-      {/* Refined prompt (shown after enhancement) */}
-      {refinedPrompt !== null && (
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-medium uppercase tracking-widest text-[#71717a]">
-              Enhanced Prompt
-            </p>
-            <button
-              onClick={() => setRefinedPrompt(null)}
-              className="text-[11px] text-[#71717a] hover:text-[#a1a1aa] transition-colors"
-            >
-              Discard
-            </button>
-          </div>
-          <textarea
-            value={refinedPrompt}
-            onChange={(e) => setRefinedPrompt(e.target.value)}
-            rows={5}
-            className="w-full text-sm rounded-md border border-blue-500/20 bg-blue-500/10 px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300 transition-all text-[#a1a1aa] leading-relaxed"
-          />
-          <Button
-            onClick={handleGenerate}
-            disabled={generating}
-            className="mt-2.5 gap-2 bg-[#6366f1] hover:bg-[#6366f1]/80 text-white h-9 text-sm disabled:opacity-40"
-          >
-            {generating ? (
-              <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Generating…
-              </>
-            ) : (
-              <>
-                <Wand2 className="h-3.5 w-3.5" />
-                Generate with Enhanced Prompt
-              </>
-            )}
-          </Button>
-        </div>
-      )}
-
-      {/* Generated versions */}
-      {scene.seedVersions.length > 0 ? (
-        <div>
-          {(() => {
-            const active = scene.seedVersions.filter((v) => !v.isRejected);
-            const rejected = scene.seedVersions.filter((v) => v.isRejected);
-            return (
-              <>
-                <p className="text-xs font-medium uppercase tracking-widest text-[#71717a] mb-3">
-                  Generated Versions
-                  {rejected.length > 0 && (
-                    <span className="text-[#52525b] font-normal ml-1">
-                      ({rejected.length} rejected)
-                    </span>
-                  )}
-                </p>
-                <div className="grid grid-cols-2 gap-3">
-                  {active.map((v: SeedVersion, i: number) => {
-                    const isApproved = v.id === scene.approvedSeedVersionId;
-                    return (
-                      <div
-                        key={v.id}
-                        className={cn(
-                          "rounded-lg border-2 overflow-hidden transition-all group/card",
-                          isApproved
-                            ? "border-[#6366f1] ring-2 ring-[#6366f1] ring-offset-1"
-                            : "border-[#1a1a1e] hover:border-[#3f3f46]"
-                        )}
-                      >
+      {/* ── RIGHT: Generations ── */}
+      <div className="w-1/2 overflow-y-auto p-6">
+        {scene.seedVersions.length > 0 ? (
+          <div>
+            {(() => {
+              const active = scene.seedVersions.filter((v) => !v.isRejected);
+              const rejected = scene.seedVersions.filter((v) => v.isRejected);
+              return (
+                <>
+                  <p className="text-xs font-medium uppercase tracking-widest text-[#71717a] mb-3">
+                    Generated Versions
+                    {rejected.length > 0 && (
+                      <span className="text-[#52525b] font-normal ml-1">
+                        ({rejected.length} rejected)
+                      </span>
+                    )}
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {active.map((v: SeedVersion, i: number) => {
+                      const isApproved = v.id === scene.approvedSeedVersionId;
+                      return (
                         <div
-                          className="aspect-[9/16] relative overflow-hidden"
-                          style={{
-                            backgroundColor: v.imageUrl ? undefined : scene.color,
-                          }}
+                          key={v.id}
+                          className={cn(
+                            "rounded-lg border-2 overflow-hidden transition-all group/card",
+                            isApproved
+                              ? "border-[#6366f1] ring-2 ring-[#6366f1] ring-offset-1"
+                              : "border-[#1a1a1e] hover:border-[#3f3f46]"
+                          )}
                         >
-                          {v.imageUrl ? (
-                            <img
-                              src={v.imageUrl}
-                              alt={`Seed v${i + 1}`}
-                              className="absolute inset-0 w-full h-full object-cover"
-                            />
-                          ) : null}
-                          {isApproved && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                              <div className="bg-white rounded-full p-1">
-                                <Check className="h-3.5 w-3.5 text-[#6366f1]" />
+                          <div
+                            className="aspect-[9/16] relative overflow-hidden"
+                            style={{
+                              backgroundColor: v.imageUrl ? undefined : scene.color,
+                            }}
+                          >
+                            {v.imageUrl ? (
+                              <img
+                                src={v.imageUrl}
+                                alt={`Seed v${i + 1}`}
+                                className="absolute inset-0 w-full h-full object-cover"
+                              />
+                            ) : null}
+                            {isApproved && (
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                                <div className="bg-white rounded-full p-1">
+                                  <Check className="h-3.5 w-3.5 text-[#6366f1]" />
+                                </div>
                               </div>
+                            )}
+                            <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover/card:opacity-100 transition-opacity">
+                              {v.imageUrl && (
+                                <a
+                                  href={v.imageUrl}
+                                  download={`seed-scene${String(scene.sceneOrder).padStart(2, "0")}-v${i + 1}.jpg`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="p-1.5 rounded-lg bg-black/40 text-white hover:bg-[#27272a]/80 transition-colors"
+                                  title="Download"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    fetch(v.imageUrl!)
+                                      .then((r) => r.blob())
+                                      .then((blob) => {
+                                        const url = URL.createObjectURL(blob);
+                                        const a = document.createElement("a");
+                                        a.href = url;
+                                        a.download = `seed-scene${String(scene.sceneOrder).padStart(2, "0")}-v${i + 1}.jpg`;
+                                        a.click();
+                                        URL.revokeObjectURL(url);
+                                      });
+                                  }}
+                                >
+                                  <Download className="h-3 w-3" />
+                                </a>
+                              )}
+                              {!isApproved && (
+                                <button
+                                  onClick={() => handleReject(v.id)}
+                                  className="p-1.5 rounded-lg bg-black/40 text-white hover:bg-red-500/80 transition-colors"
+                                  title="Reject"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              )}
                             </div>
-                          )}
-                          {/* Download + Trash buttons */}
-                          <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover/card:opacity-100 transition-opacity">
-                            {v.imageUrl && (
-                              <a
-                                href={v.imageUrl}
-                                download={`seed-scene${String(scene.sceneOrder).padStart(2, "0")}-v${i + 1}.jpg`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="p-1.5 rounded-lg bg-black/40 text-white hover:bg-[#27272a]/80 transition-colors"
-                                title="Download"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  // Force download via fetch for cross-origin URLs
-                                  e.preventDefault();
-                                  fetch(v.imageUrl!)
-                                    .then((r) => r.blob())
-                                    .then((blob) => {
-                                      const url = URL.createObjectURL(blob);
-                                      const a = document.createElement("a");
-                                      a.href = url;
-                                      a.download = `seed-scene${String(scene.sceneOrder).padStart(2, "0")}-v${i + 1}.jpg`;
-                                      a.click();
-                                      URL.revokeObjectURL(url);
-                                    });
-                                }}
-                              >
-                                <Download className="h-3 w-3" />
-                              </a>
-                            )}
-                            {!isApproved && (
-                              <button
-                                onClick={() => handleReject(v.id)}
-                                className="p-1.5 rounded-lg bg-black/40 text-white hover:bg-red-500/80 transition-colors"
-                                title="Reject"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </button>
-                            )}
                           </div>
+                          <SeedCardFooter
+                            version={v}
+                            index={i}
+                            isApproved={isApproved}
+                            projectId={projectId}
+                            currentSceneId={scene.sceneId}
+                            allScenes={allScenes}
+                            productTags={productTags}
+                            onApprove={() => handleApproveSeed(v.id)}
+                            onUnapprove={handleUnapprove}
+                            onPromptSaved={(newPrompt) => {
+                              updateScene(scene.sceneId, {
+                                seedVersions: scene.seedVersions.map((sv) =>
+                                  sv.id === v.id ? { ...sv, prompt: newPrompt } : sv
+                                ),
+                              });
+                            }}
+                            onApplyToScenes={handleApplyToScenes}
+                            onEditVersion={handleEditVersion}
+                          />
                         </div>
-                        <SeedCardFooter
-                          version={v}
-                          index={i}
-                          isApproved={isApproved}
-                          projectId={projectId}
-                          currentSceneId={scene.sceneId}
-                          allScenes={allScenes}
-                          productTags={productTags}
-                          onApprove={() => handleApproveSeed(v.id)}
-                          onUnapprove={handleUnapprove}
-                          onPromptSaved={(newPrompt) => {
-                            updateScene(scene.sceneId, {
-                              seedVersions: scene.seedVersions.map((sv) =>
-                                sv.id === v.id ? { ...sv, prompt: newPrompt } : sv
-                              ),
-                            });
-                          }}
-                          onApplyToScenes={handleApplyToScenes}
-                          onEditVersion={handleEditVersion}
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
 
-                {/* Rejected versions (collapsed) */}
-                {rejected.length > 0 && (
-                  <details className="mt-4">
-                    <summary className="text-xs text-[#71717a] cursor-pointer hover:text-[#a1a1aa] transition-colors">
-                      {rejected.length} rejected version{rejected.length !== 1 ? "s" : ""} — click to view
-                    </summary>
-                    <div className="mt-2 space-y-2">
-                      {rejected.map((v, i) => (
-                        <div key={v.id} className="flex gap-3 p-2 rounded-lg bg-red-500/5 border border-red-500/20">
-                          {v.imageUrl && (
-                            <img
-                              src={v.imageUrl}
-                              alt={`Rejected v${i + 1}`}
-                              className="w-12 h-12 rounded object-cover shrink-0 opacity-60"
-                            />
-                          )}
-                          <div className="min-w-0">
-                            <p className="text-[11px] font-medium text-red-600">Rejected</p>
-                            {v.rejectionReason && (
-                              <p className="text-[11px] text-[#a1a1aa] leading-relaxed mt-0.5 whitespace-pre-line">
-                                {v.rejectionReason}
-                              </p>
+                  {rejected.length > 0 && (
+                    <details className="mt-4">
+                      <summary className="text-xs text-[#71717a] cursor-pointer hover:text-[#a1a1aa] transition-colors">
+                        {rejected.length} rejected version{rejected.length !== 1 ? "s" : ""} — click to view
+                      </summary>
+                      <div className="mt-2 space-y-2">
+                        {rejected.map((v, i) => (
+                          <div key={v.id} className="flex gap-3 p-2 rounded-lg bg-red-500/5 border border-red-500/20">
+                            {v.imageUrl && (
+                              <img
+                                src={v.imageUrl}
+                                alt={`Rejected v${i + 1}`}
+                                className="w-12 h-12 rounded object-cover shrink-0 opacity-60"
+                              />
                             )}
+                            <div className="min-w-0">
+                              <p className="text-[11px] font-medium text-red-600">Rejected</p>
+                              {v.rejectionReason && (
+                                <p className="text-[11px] text-[#a1a1aa] leading-relaxed mt-0.5 whitespace-pre-line">
+                                  {v.rejectionReason}
+                                </p>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  </details>
-                )}
-              </>
-            );
-          })()}
-        </div>
-      ) : generating ? (
-        <div className="flex flex-col items-center justify-center py-12 text-center border border-dashed border-[#27272a] rounded-xl">
-          <Loader2 className="h-8 w-8 text-[#52525b] mb-3 animate-spin" />
-          <p className="text-sm text-[#71717a] mb-3">Generating seed image…</p>
-          <div className="w-48 h-2 bg-[#27272a] rounded-full overflow-hidden">
-            <div
-              className="h-full bg-[#6366f1] rounded-full transition-all duration-500 ease-out"
-              style={{ width: `${genProgress}%` }}
-            />
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                </>
+              );
+            })()}
           </div>
-          <p className="text-xs text-[#52525b] mt-2 tabular-nums">
-            {genProgress}%
-          </p>
-        </div>
-      ) : (
-        <div className="flex flex-col items-center justify-center py-12 text-center border border-dashed border-[#27272a] rounded-xl">
-          <Wand2 className="h-8 w-8 text-[#27272a] mb-3" />
-          <p className="text-sm text-[#71717a]">No seed images yet</p>
-          <p className="text-xs text-[#71717a] mt-1">
-            Add a prompt above and click Generate
-          </p>
-        </div>
-      )}
+        ) : generating ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center border border-dashed border-[#27272a] rounded-xl">
+            <Loader2 className="h-8 w-8 text-[#52525b] mb-3 animate-spin" />
+            <p className="text-sm text-[#71717a] mb-3">Generating seed image…</p>
+            <div className="w-48 h-2 bg-[#27272a] rounded-full overflow-hidden">
+              <div
+                className="h-full bg-[#6366f1] rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${genProgress}%` }}
+              />
+            </div>
+            <p className="text-xs text-[#52525b] mt-2 tabular-nums">
+              {genProgress}%
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-16 text-center border border-dashed border-[#27272a] rounded-xl">
+            <Wand2 className="h-8 w-8 text-[#27272a] mb-3" />
+            <p className="text-sm text-[#71717a]">No seed images yet</p>
+            <p className="text-xs text-[#71717a] mt-1">
+              Write a prompt and click Generate
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -1669,243 +1729,191 @@ function HeroModelPanel({
         />
       </button>
 
-      {/* Expanded content */}
+      {/* Expanded content — compact horizontal layout */}
       {expanded && (
-        <div className="px-6 pb-5 space-y-4">
-          {/* Mode toggle */}
-          <div className="flex gap-1 bg-[#27272a] rounded-lg p-0.5 w-fit">
-            {extractedFrameCount > 0 && (
+        <div className="px-6 pb-4 space-y-3">
+          {/* Row 1: mode toggle + source frame + prompt + generate — all inline */}
+          <div className="flex gap-3 items-start">
+            {/* Source frame thumbnail (From Frame mode) */}
+            {mode === "frame" && frames[selectedFrame] && (
               <button
-                onClick={() => setMode("frame")}
-                className={cn(
-                  "px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
-                  mode === "frame"
-                    ? "bg-[#18181b] text-[#fafafa] shadow-sm"
-                    : "text-[#a1a1aa] hover:text-[#fafafa]"
-                )}
+                onClick={() => setShowFramePicker(!showFramePicker)}
+                className="shrink-0 relative group/frame"
+                title="Change frame"
               >
-                From Frame
+                <img
+                  src={frames[selectedFrame]}
+                  alt={`Frame ${selectedFrame}`}
+                  className="w-12 h-20 rounded-lg object-cover border border-[#27272a]"
+                />
+                <div className="absolute inset-0 bg-black/0 group-hover/frame:bg-black/30 rounded-lg transition-colors flex items-center justify-center">
+                  <Pencil className="h-3 w-3 text-white opacity-0 group-hover/frame:opacity-100 transition-opacity" />
+                </div>
+                <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 text-[9px] bg-[#27272a] text-[#a1a1aa] px-1 rounded">f{selectedFrame}</span>
               </button>
             )}
-            <button
-              onClick={() => setMode("scratch")}
-              className={cn(
-                "px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
-                mode === "scratch"
-                  ? "bg-[#18181b] text-[#fafafa] shadow-sm"
-                  : "text-[#a1a1aa] hover:text-[#fafafa]"
-              )}
-            >
-              From Scratch
-            </button>
-            <button
-              onClick={() => setMode("upload")}
-              className={cn(
-                "px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
-                mode === "upload"
-                  ? "bg-[#18181b] text-[#fafafa] shadow-sm"
-                  : "text-[#a1a1aa] hover:text-[#fafafa]"
-              )}
-            >
-              Upload
-            </button>
-          </div>
 
-          {/* Frame picker — only in "From Frame" mode */}
-          {mode === "frame" && (
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-medium text-[#a1a1aa]">Source Frame</p>
+            {/* Prompt + mode toggle + button */}
+            <div className="flex-1 min-w-0 space-y-2">
+              {/* Mode toggle */}
+              <div className="flex gap-1 bg-[#27272a] rounded-lg p-0.5 w-fit">
+                {extractedFrameCount > 0 && (
+                  <button
+                    onClick={() => setMode("frame")}
+                    className={cn(
+                      "px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors",
+                      mode === "frame"
+                        ? "bg-[#18181b] text-[#fafafa] shadow-sm"
+                        : "text-[#a1a1aa] hover:text-[#fafafa]"
+                    )}
+                  >
+                    From Frame
+                  </button>
+                )}
                 <button
-                  onClick={() => setShowFramePicker(!showFramePicker)}
-                  className="text-[11px] text-violet-500 hover:text-violet-700 transition-colors flex items-center gap-1"
+                  onClick={() => setMode("scratch")}
+                  className={cn(
+                    "px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors",
+                    mode === "scratch"
+                      ? "bg-[#18181b] text-[#fafafa] shadow-sm"
+                      : "text-[#a1a1aa] hover:text-[#fafafa]"
+                  )}
                 >
-                  {showFramePicker ? "Hide frames" : "Choose frame"}
-                  <ChevronRight className={cn("h-3 w-3 transition-transform", showFramePicker && "rotate-90")} />
+                  From Scratch
+                </button>
+                <button
+                  onClick={() => setMode("upload")}
+                  className={cn(
+                    "px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors",
+                    mode === "upload"
+                      ? "bg-[#18181b] text-[#fafafa] shadow-sm"
+                      : "text-[#a1a1aa] hover:text-[#fafafa]"
+                  )}
+                >
+                  Upload
                 </button>
               </div>
 
-              {frames[selectedFrame] && !showFramePicker && (
-                <div className="flex items-center gap-3">
-                  <img
-                    src={frames[selectedFrame]}
-                    alt={`Frame ${selectedFrame}`}
-                    className="w-16 h-28 rounded-lg object-cover border border-[#27272a]"
+              {mode === "upload" ? (
+                <div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleUpload(file);
+                      e.target.value = "";
+                    }}
                   />
-                  <span className="text-xs text-[#a1a1aa]">Frame {selectedFrame}</span>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    className="w-full py-4 rounded-lg border-2 border-dashed border-[#3f3f46] hover:border-violet-400 bg-[#18181b] flex items-center justify-center gap-2 transition-colors"
+                  >
+                    {uploading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 text-violet-400 animate-spin" />
+                        <span className="text-xs text-[#a1a1aa]">Uploading…</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4 text-[#71717a]" />
+                        <span className="text-xs text-[#a1a1aa]">Upload image (resized to 9:16)</span>
+                      </>
+                    )}
+                  </button>
                 </div>
-              )}
-
-              {showFramePicker && (
-                <div className="grid grid-cols-8 gap-1.5 max-h-48 overflow-y-auto rounded-lg border border-[#27272a] p-2 bg-[#18181b]">
-                  {frames.map((url, i) => (
-                    <button
-                      key={i}
-                      onClick={() => { setSelectedFrame(i); setShowFramePicker(false); }}
-                      className={cn(
-                        "aspect-[9/16] rounded overflow-hidden border-2 transition-all",
-                        i === selectedFrame
-                          ? "border-violet-500 ring-1 ring-violet-500"
-                          : "border-transparent hover:border-[#3f3f46]"
-                      )}
-                    >
-                      <img src={url} alt={`Frame ${i}`} className="w-full h-full object-cover" />
-                    </button>
-                  ))}
+              ) : (
+                <div className="flex gap-2 items-end">
+                  <div className="flex-1">
+                    <PromptWithMentions
+                      value={prompt}
+                      onChange={setPrompt}
+                      products={productTags}
+                      placeholder={mode === "scratch"
+                        ? "e.g. young woman wearing red @airplane-hoodie, standing in front of brick wall, natural lighting..."
+                        : "e.g. model in reference wearing blue @airplane-hoodie, brick wall, natural lighting..."
+                      }
+                      rows={2}
+                    />
+                  </div>
+                  <Button
+                    onClick={handleGenerate}
+                    disabled={generating || !prompt.trim()}
+                    className="gap-1.5 bg-violet-600 hover:bg-violet-500 text-white h-[52px] text-xs disabled:opacity-40 shrink-0"
+                  >
+                    {generating ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Wand2 className="h-3.5 w-3.5" />
+                    )}
+                    {generating ? "Generating…" : "Generate"}
+                  </Button>
                 </div>
               )}
             </div>
-          )}
+          </div>
 
-          {mode === "upload" ? (
-            /* Upload mode */
-            <div className="space-y-3">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleUpload(file);
-                  e.target.value = "";
-                }}
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                className="w-full py-8 rounded-xl border-2 border-dashed border-violet-200 hover:border-violet-400 bg-violet-50/30 flex flex-col items-center gap-2 transition-colors"
-              >
-                {uploading ? (
-                  <>
-                    <Loader2 className="h-6 w-6 text-violet-400 animate-spin" />
-                    <span className="text-sm text-violet-500">Uploading & resizing to 9:16…</span>
-                  </>
-                ) : (
-                  <>
-                    <Plus className="h-6 w-6 text-violet-400" />
-                    <span className="text-sm text-violet-600 font-medium">Click to upload an image</span>
-                    <span className="text-[11px] text-[#71717a]">Will be resized to 720x1280 (9:16)</span>
-                  </>
-                )}
-              </button>
+          {/* Frame picker (only when toggled) */}
+          {mode === "frame" && showFramePicker && (
+            <div className="grid grid-cols-10 gap-1.5 max-h-36 overflow-y-auto rounded-lg border border-[#27272a] p-2 bg-[#18181b]">
+              {frames.map((url, i) => (
+                <button
+                  key={i}
+                  onClick={() => { setSelectedFrame(i); setShowFramePicker(false); }}
+                  className={cn(
+                    "aspect-[9/16] rounded overflow-hidden border-2 transition-all",
+                    i === selectedFrame
+                      ? "border-violet-500 ring-1 ring-violet-500"
+                      : "border-transparent hover:border-[#3f3f46]"
+                  )}
+                >
+                  <img src={url} alt={`Frame ${i}`} className="w-full h-full object-cover" />
+                </button>
+              ))}
             </div>
-          ) : (
-            /* Generate mode (frame or scratch) */
-            <>
-              <div>
-                <p className="text-xs font-medium text-[#a1a1aa] mb-1.5">
-                  {mode === "scratch" ? "Describe your character from scratch" : "Describe your model + setting"}
-                </p>
-                <PromptWithMentions
-                  value={prompt}
-                  onChange={setPrompt}
-                  products={productTags}
-                  placeholder={mode === "scratch"
-                    ? "e.g. young woman wearing red @airplane-hoodie, standing in front of brick wall, natural lighting, portrait style, 9:16 vertical..."
-                    : "e.g. model in reference wearing blue @airplane-hoodie standing in front of a brick wall, natural lighting, portrait style..."
-                  }
-                  rows={3}
-                />
-              </div>
-              <Button
-                onClick={handleGenerate}
-                disabled={generating || !prompt.trim()}
-                className="gap-2 bg-violet-600 hover:bg-violet-500 text-white h-9 text-sm disabled:opacity-40"
-              >
-                {generating ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    Generating Hero…
-                  </>
-                ) : (
-                  <>
-                    <Wand2 className="h-3.5 w-3.5" />
-                    Generate Model & Setting
-                  </>
-                )}
-              </Button>
-            </>
           )}
 
-          {/* Generated hero images */}
+          {/* Generated hero images — horizontal strip */}
           {heroImages.length > 0 && (
-            <div>
-              <p className="text-xs font-medium uppercase tracking-widest text-[#71717a] mb-2">
-                Click an image to use as your hero model
-              </p>
-              <div className="grid grid-cols-4 gap-3">
-                {heroImages.map((h) => {
-                  const isApproved = h.url === approvedHeroUrl;
-                  return (
-                    <button
-                      key={h.id}
-                      type="button"
-                      onClick={() => isApproved ? handleUnapprove() : handleApprove(h.url)}
-                      className={cn(
-                        "rounded-lg border-2 overflow-hidden transition-all text-left group/hero cursor-pointer",
-                        isApproved
-                          ? "border-violet-600 ring-2 ring-violet-600 ring-offset-1"
-                          : "border-[#27272a] hover:border-violet-400 hover:shadow-md"
-                      )}
-                    >
-                      <div className="aspect-[9/16] relative overflow-hidden">
-                        <img
-                          src={h.url}
-                          alt="Hero model"
-                          className="absolute inset-0 w-full h-full object-cover"
-                        />
-                        {isApproved ? (
-                          <div className="absolute inset-0 flex items-center justify-center bg-violet-600/20">
-                            <div className="bg-white rounded-full p-1.5 shadow-lg">
-                              <Check className="h-4 w-4 text-violet-600" />
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover/hero:bg-black/20 transition-colors">
-                            <span className="text-white text-xs font-medium bg-black/60 px-3 py-1.5 rounded-full opacity-0 group-hover/hero:opacity-100 transition-opacity">
-                              Select
-                            </span>
-                          </div>
-                        )}
-                        {/* Remove button — stop propagation so it doesn't trigger select */}
-                        {!isApproved && (
-                          <div
-                            role="button"
-                            tabIndex={0}
-                            onClick={(e) => { e.stopPropagation(); handleRemove(h.id); }}
-                            onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); handleRemove(h.id); } }}
-                            className="absolute top-1.5 right-1.5 p-1.5 rounded-lg bg-black/40 text-white opacity-0 group-hover/hero:opacity-100 transition-opacity hover:bg-red-500/80"
-                            title="Remove"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </div>
-                        )}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              <span className="text-[10px] text-[#52525b] uppercase tracking-wider shrink-0">Heroes</span>
+              {heroImages.map((h) => {
+                const isApproved = h.url === approvedHeroUrl;
+                return (
+                  <button
+                    key={h.id}
+                    type="button"
+                    onClick={() => isApproved ? handleUnapprove() : handleApprove(h.url)}
+                    className={cn(
+                      "shrink-0 w-12 h-20 rounded-lg border-2 overflow-hidden transition-all relative group/hero",
+                      isApproved
+                        ? "border-violet-600 ring-1 ring-violet-600"
+                        : "border-[#27272a] hover:border-violet-400"
+                    )}
+                  >
+                    <img src={h.url} alt="Hero" className="w-full h-full object-cover" />
+                    {isApproved && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-violet-600/20">
+                        <Check className="h-3.5 w-3.5 text-white drop-shadow" />
                       </div>
-                      <div className="bg-[#18181b] px-2.5 py-2">
-                        <p className="text-[11px] text-[#a1a1aa] line-clamp-2 leading-relaxed">
-                          {h.prompt}
-                        </p>
-                        <div className="flex items-center justify-between mt-1">
-                          <span className="text-[10px] text-[#52525b]">
-                            Frame {h.sourceFrame}
-                          </span>
-                          <span
-                            className={cn(
-                              "text-[11px] font-medium px-2 py-0.5 rounded",
-                              isApproved
-                                ? "bg-violet-600 text-white"
-                                : "bg-[#27272a] text-[#a1a1aa]"
-                            )}
-                          >
-                            {isApproved ? "Selected" : "Click to select"}
-                          </span>
-                        </div>
+                    )}
+                    {!isApproved && (
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => { e.stopPropagation(); handleRemove(h.id); }}
+                        onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); handleRemove(h.id); } }}
+                        className="absolute top-0.5 right-0.5 p-0.5 rounded bg-black/50 text-white opacity-0 group-hover/hero:opacity-100 transition-opacity hover:bg-red-500/80"
+                      >
+                        <X className="h-2.5 w-2.5" />
                       </div>
-                    </button>
-                  );
-                })}
-              </div>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>

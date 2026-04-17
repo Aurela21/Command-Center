@@ -444,9 +444,15 @@ function ScenePairRow({
         <span className="text-xs tabular-nums font-medium text-[#71717a]">
           {String(scene.sceneOrder).padStart(2, "0")}
         </span>
-        <p className="text-[10px] text-[#52525b] tabular-nums mt-0.5">
-          {scene.targetClipDurationS.toFixed(1)}s
-        </p>
+        <select
+          value={scene.targetClipDurationS}
+          onChange={(e) => updateScene(scene.sceneId, { targetClipDurationS: parseFloat(e.target.value) })}
+          className="mt-1 w-full text-[10px] tabular-nums text-[#a1a1aa] bg-[#18181b] border border-[#27272a] rounded px-0.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-[#6366f1] cursor-pointer"
+        >
+          {[3, 4, 5, 6, 7, 8].map((d) => (
+            <option key={d} value={d}>{d}s</option>
+          ))}
+        </select>
       </div>
 
       {/* Seed image (start frame) */}

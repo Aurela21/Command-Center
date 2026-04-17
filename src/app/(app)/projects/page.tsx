@@ -14,7 +14,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Plus, Film, ChevronRight, Video, Sparkles, Search } from "lucide-react";
+import { Plus, Film, ChevronRight, Video, Sparkles, Search, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { Project } from "@/db/schema";
@@ -87,6 +87,22 @@ export default function ProjectsPage() {
       router.push(dest);
     },
     onError: () => toast.error("Failed to create project"),
+  });
+
+  // Delete project
+  const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/projects/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete project");
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["projects"] });
+      setDeleteTarget(null);
+      toast.success("Project deleted");
+    },
+    onError: () => toast.error("Failed to delete project"),
   });
 
   function handleCreate(e: React.FormEvent) {
@@ -266,6 +282,16 @@ export default function ProjectsPage() {
                   {new Date(project.createdAt!).toLocaleDateString()}
                 </p>
               </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDeleteTarget(project);
+                }}
+                className="p-1.5 rounded-lg text-[#52525b] hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                title="Delete project"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
               <ChevronRight className="h-4 w-4 text-[#52525b] group-hover:text-[#a1a1aa] shrink-0 transition-colors" />
             </button>
           ))}
@@ -349,6 +375,35 @@ export default function ProjectsPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete project?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-[#a1a1aa] py-2">
+            This will permanently delete <span className="font-medium text-[#fafafa]">{deleteTarget?.name}</span> and
+            all its scenes, generated images, videos, and jobs. Product learnings from approvals and rejections will be preserved.
+          </p>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteTarget(null)}
+              disabled={deleteMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+              disabled={deleteMutation.isPending}
+              className="bg-red-600 hover:bg-red-500 text-white"
+            >
+              {deleteMutation.isPending ? "Deleting…" : "Delete Project"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

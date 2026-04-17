@@ -27,6 +27,7 @@ import {
 import type { SceneProductionState, VideoJobStatus, VideoVersion } from "./types";
 import { PromptWithMentions } from "./tab-3a";
 import type { ProductTag } from "./tab-3a";
+import { Pencil } from "lucide-react";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -136,6 +137,124 @@ function QualityWarningDialog({
   );
 }
 
+// ─── Edit & Regenerate inline panel ──────────────────────────────────────────
+
+function EditRegeneratePanel({
+  originalPrompt,
+  projectId,
+  sceneId,
+  onRegenerate,
+}: {
+  originalPrompt: string;
+  projectId: string;
+  sceneId: string;
+  onRegenerate: (refinedPrompt: string, duration?: number) => void;
+}) {
+  const [editInstruction, setEditInstruction] = useState("");
+  const [refinedPrompt, setRefinedPrompt] = useState<string | null>(null);
+  const [refining, setRefining] = useState(false);
+  const [duration, setDuration] = useState(5);
+
+  async function handleRefine() {
+    if (!editInstruction.trim()) return;
+    setRefining(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/refine-prompt`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: `${originalPrompt}\n\n[USER EDIT: The previous generation has issues. Fix these specific problems: ${editInstruction.trim()}]\n\nRewrite the prompt to address these issues while keeping the same scene, subject, and motion intent. Focus the rewrite on avoiding the described artifacts.`,
+          target: "kling_video",
+          sceneId,
+        }),
+      });
+      if (!res.ok) throw new Error("Refinement failed");
+      const { refined } = (await res.json()) as { refined: string };
+      setRefinedPrompt(refined);
+    } catch (err) {
+      console.error("[edit-regenerate]", err);
+    } finally {
+      setRefining(false);
+    }
+  }
+
+  return (
+    <div className="mt-2 space-y-2 border-t border-[#27272a] pt-2">
+      <p className="text-[10px] font-medium uppercase tracking-widest text-[#71717a]">
+        Edit & Regenerate
+      </p>
+      {/* Original prompt reference */}
+      <p className="text-[10px] text-[#52525b] leading-relaxed line-clamp-2">
+        Original: {originalPrompt}
+      </p>
+      {/* Edit instruction */}
+      <textarea
+        value={editInstruction}
+        onChange={(e) => setEditInstruction(e.target.value)}
+        placeholder="Describe what to fix… e.g. reduce hand artifacting, smoother camera pan, less jittery motion"
+        rows={2}
+        className="w-full text-xs rounded-md border border-[#27272a] bg-[#09090b] px-2.5 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-[#6366f1]/30 transition-all text-[#e4e4e7] leading-relaxed placeholder:text-[#52525b]"
+      />
+      {!refinedPrompt ? (
+        <Button
+          onClick={handleRefine}
+          disabled={refining || !editInstruction.trim()}
+          size="sm"
+          className="gap-1.5 h-7 text-[11px] bg-[#6366f1] hover:bg-[#6366f1]/80 text-white w-full disabled:opacity-40"
+        >
+          {refining ? (
+            <>
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Rewriting prompt…
+            </>
+          ) : (
+            <>
+              <Sparkles className="h-3 w-3" />
+              Rewrite Prompt
+            </>
+          )}
+        </Button>
+      ) : (
+        <div className="space-y-2">
+          <textarea
+            value={refinedPrompt}
+            onChange={(e) => setRefinedPrompt(e.target.value)}
+            rows={3}
+            className="w-full text-xs rounded-md border border-blue-500/20 bg-blue-500/5 px-2.5 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-all text-[#e4e4e7] leading-relaxed"
+          />
+          <div className="flex items-center gap-2">
+            <div className="flex rounded-md border border-[#27272a] overflow-hidden">
+              {[3, 4, 5, 6, 7, 8].map((d, i) => (
+                <button
+                  key={d}
+                  onClick={() => setDuration(d)}
+                  className={cn(
+                    "px-2 py-0.5 text-[10px] font-medium transition-colors",
+                    i > 0 && "border-l border-[#27272a]",
+                    duration === d
+                      ? "bg-[#6366f1] text-white"
+                      : "bg-[#18181b] text-[#a1a1aa] hover:bg-[#27272a]"
+                  )}
+                >
+                  {d}s
+                </button>
+              ))}
+            </div>
+            <Button
+              onClick={() => onRegenerate(refinedPrompt, duration)}
+              size="sm"
+              className="gap-1.5 h-7 text-[11px] bg-[#6366f1] hover:bg-[#6366f1]/80 text-white flex-1"
+            >
+              <Clapperboard className="h-3 w-3" />
+              Regenerate {duration}s
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Scene generation card ────────────────────────────────────────────────────
 
 function SceneGenerationCard({
@@ -154,6 +273,7 @@ function SceneGenerationCard({
   const [warningOpen, setWarningOpen] = useState(false);
   const [enhanceOpen, setEnhanceOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [editingVersionId, setEditingVersionId] = useState<string | null>(null);
   const [refinedPrompt, setRefinedPrompt] = useState("");
   const [refining, setRefining] = useState(false);
   const [aiInstruction, setAiInstruction] = useState("");
@@ -442,6 +562,13 @@ function SceneGenerationCard({
                   </span>
                 )}
                 <button
+                  onClick={() => { setExpanded(true); setEditingVersionId(scene.videoVersions.filter((v) => !v.isRejected).at(-1)?.id ?? null); }}
+                  className="flex items-center gap-1.5 text-xs font-medium text-[#6366f1] hover:text-[#818cf8] transition-colors"
+                >
+                  <Pencil className="h-3 w-3" />
+                  Edit & Regen
+                </button>
+                <button
                   onClick={handleGenerate}
                   className="flex items-center gap-1.5 text-xs font-medium text-[#71717a] hover:text-[#a1a1aa] transition-colors"
                 >
@@ -536,13 +663,27 @@ function SceneGenerationCard({
                         v{active.length - i}
                       </span>
                     </div>
-                    <button
-                      onClick={() => handleRejectVideo(v.id)}
-                      className="p-1 rounded text-[#52525b] hover:text-red-500 hover:bg-red-500/10 opacity-0 group-hover/version:opacity-100 transition-all"
-                      title="Reject — Claude will analyze why it's bad"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setEditingVersionId(editingVersionId === v.id ? null : v.id)}
+                        className={cn(
+                          "p-1 rounded transition-all",
+                          editingVersionId === v.id
+                            ? "text-[#6366f1] bg-[#6366f1]/10"
+                            : "text-[#52525b] hover:text-[#a1a1aa] hover:bg-[#27272a] opacity-0 group-hover/version:opacity-100"
+                        )}
+                        title="Edit & Regenerate"
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </button>
+                      <button
+                        onClick={() => handleRejectVideo(v.id)}
+                        className="p-1 rounded text-[#52525b] hover:text-red-500 hover:bg-red-500/10 opacity-0 group-hover/version:opacity-100 transition-all"
+                        title="Reject — Claude will analyze why it's bad"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
                   </div>
                   {v.prompt && (
                     <p className="text-[11px] text-[#a1a1aa] leading-snug line-clamp-2">
@@ -558,6 +699,17 @@ function SceneGenerationCard({
                     <Play className="h-2.5 w-2.5" />
                     Open
                   </a>
+                  {editingVersionId === v.id && (
+                    <EditRegeneratePanel
+                      originalPrompt={v.prompt || scene.klingPrompt}
+                      projectId={projectId}
+                      sceneId={scene.sceneId}
+                      onRegenerate={(prompt, dur) => {
+                        setEditingVersionId(null);
+                        void onGenerateWithPrompt(scene.sceneId, prompt, dur);
+                      }}
+                    />
+                  )}
                 </div>
               </div>
             ))}
@@ -841,7 +993,7 @@ export function Tab3C({ scenes, updateScene, projectId }: Props) {
 
       {/* Grid */}
       <div className="flex-1 overflow-y-auto px-8 py-6">
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
           {scenes.map((scene) => (
             <SceneGenerationCard
               key={scene.sceneId}

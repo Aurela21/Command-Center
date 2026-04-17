@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { projects } from "@/db/schema";
+import { projects, scenes, jobs } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 
 type Params = { params: Promise<{ id: string }> };
@@ -43,4 +43,23 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
   return NextResponse.json(updated);
+}
+
+export async function DELETE(_req: NextRequest, { params }: Params) {
+  const { id } = await params;
+
+  const [project] = await db
+    .select({ id: projects.id })
+    .from(projects)
+    .where(eq(projects.id, id));
+
+  if (!project) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  // Cascade: scenes, asset_versions, quality_checks, jobs, chat all cascade-delete.
+  // Product learnings are safe — they reference products, not projects.
+  await db.delete(projects).where(eq(projects.id, id));
+
+  return NextResponse.json({ deleted: true });
 }

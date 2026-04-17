@@ -112,7 +112,6 @@ type Props = {
 
 export function QueueTracker({ scenes, heroGenerating }: Props) {
   const [collapsed, setCollapsed] = useState(false);
-  const [completedJobs, setCompletedJobs] = useState<TrackedJob[]>([]);
   const prevScenesRef = useRef<SceneProductionState[]>([]);
   const prevHeroRef = useRef(false);
   const [tick, setTick] = useState(0);
@@ -149,54 +148,11 @@ export function QueueTracker({ scenes, heroGenerating }: Props) {
     }
   }, [heroGenerating]);
 
-  // Detect completions and failures — add to completed list
+  // Track prev state for start-time detection
   useEffect(() => {
-    const prev = prevScenesRef.current;
-    for (const scene of scenes) {
-      const prevScene = prev.find((s) => s.sceneId === scene.sceneId);
-      if (!prevScene) continue;
-
-      // Seed completed
-      if (prevScene.seedGenerating && !scene.seedGenerating) {
-        const done: TrackedJob = { id: `seed-${scene.sceneId}-${Date.now()}`, label: `Scene ${String(scene.sceneOrder).padStart(2, "0")} — Seed`, type: "seed", status: "completed", progress: 100, startedAt: Date.now(), completedAt: Date.now() };
-        setCompletedJobs((cj) => [done, ...cj].slice(0, 5));
-      }
-
-      // Video completed
-      if (prevScene.videoJobStatus === "processing" && scene.videoJobStatus === "completed") {
-        const done: TrackedJob = { id: `video-${scene.sceneId}-${Date.now()}`, label: `Scene ${String(scene.sceneOrder).padStart(2, "0")} — Video`, type: "video", status: "completed", progress: 100, startedAt: Date.now(), completedAt: Date.now() };
-        setCompletedJobs((cj) => [done, ...cj].slice(0, 5));
-      }
-
-      // Video failed
-      if (prevScene.videoJobStatus !== "failed" && scene.videoJobStatus === "failed") {
-        const fail: TrackedJob = { id: `video-fail-${scene.sceneId}-${Date.now()}`, label: `Scene ${String(scene.sceneOrder).padStart(2, "0")} — Video`, type: "video", status: "failed", progress: 0, startedAt: Date.now(), error: scene.videoJobError };
-        setCompletedJobs((cj) => [fail, ...cj].slice(0, 5));
-      }
-    }
-
-    // Hero completed
-    if (prevHeroRef.current && !heroGenerating) {
-      const done: TrackedJob = { id: `hero-${Date.now()}`, label: "Hero Model", type: "hero", status: "completed", progress: 100, startedAt: Date.now(), completedAt: Date.now() };
-      setCompletedJobs((cj) => [done, ...cj].slice(0, 5));
-    }
-
     prevScenesRef.current = scenes;
     prevHeroRef.current = heroGenerating;
   }, [scenes, heroGenerating]);
-
-  // Auto-remove completed jobs after 60s
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCompletedJobs((cj) =>
-        cj.filter((j) => {
-          if (j.status === "failed") return true; // keep failed forever
-          return j.completedAt && Date.now() - j.completedAt < 60000;
-        })
-      );
-    }, 5000);
-    return () => clearInterval(timer);
-  }, []);
 
   // Build active jobs list
   const activeJobs: TrackedJob[] = [];
@@ -254,7 +210,7 @@ export function QueueTracker({ scenes, heroGenerating }: Props) {
     });
   }
 
-  const allJobs = [...activeJobs, ...completedJobs];
+  const allJobs = activeJobs;
   const activeCount = activeJobs.length;
 
   // Auto-expand when new active job appears
@@ -266,7 +222,7 @@ export function QueueTracker({ scenes, heroGenerating }: Props) {
   if (allJobs.length === 0) return null;
 
   return (
-    <div className="fixed bottom-0 left-60 right-0 z-40 border-t border-[#27272a] bg-[#18181b] shadow-lg">
+    <div className="border border-[#27272a] bg-[#18181b] rounded-lg">
       {/* Header */}
       <button
         onClick={() => setCollapsed(!collapsed)}
@@ -277,7 +233,6 @@ export function QueueTracker({ scenes, heroGenerating }: Props) {
           <span className="text-xs font-medium text-[#a1a1aa]">
             Queue
             {activeCount > 0 && <span className="text-[#71717a] font-normal ml-1">({activeCount} active)</span>}
-            {completedJobs.length > 0 && activeCount === 0 && <span className="text-[#71717a] font-normal ml-1">({completedJobs.length} recent)</span>}
           </span>
         </div>
         <ChevronDown className={cn("h-3.5 w-3.5 text-[#71717a] transition-transform", collapsed && "rotate-180")} />
