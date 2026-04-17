@@ -10,30 +10,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { scenes, assetVersions, jobs, projects } from "@/db/schema";
-import { eq, asc, desc, inArray, sql } from "drizzle-orm";
+import { eq, asc, desc, inArray } from "drizzle-orm";
+import { ensureSchema } from "@/db/ensure-schema";
 
 type Params = { params: Promise<{ id: string }> };
-
-// Auto-add columns if missing (avoids formal migration)
-let columnsChecked = false;
-async function ensureColumns() {
-  if (columnsChecked) return;
-  try {
-    await db.execute(sql`
-      ALTER TABLE projects
-        ADD COLUMN IF NOT EXISTS hero_source_frame INTEGER,
-        ADD COLUMN IF NOT EXISTS hero_images JSONB,
-        ADD COLUMN IF NOT EXISTS approved_hero_url TEXT;
-      ALTER TABLE scenes
-        ADD COLUMN IF NOT EXISTS end_frame_url TEXT,
-        ADD COLUMN IF NOT EXISTS end_frame_prompt TEXT,
-        ADD COLUMN IF NOT EXISTS seed_skipped BOOLEAN DEFAULT FALSE;
-    `);
-  } catch {
-    // Columns may already exist
-  }
-  columnsChecked = true;
-}
 
 export type HeroImage = {
   id: string;
@@ -43,10 +23,21 @@ export type HeroImage = {
   createdAt: string;
 };
 
+export type VoiceoverGeneration = {
+  id: string;
+  url: string;
+  voiceId: string;
+  voiceName: string;
+  speed: number;
+  matchedPacing: boolean;
+  durationMs: number;
+  createdAt: string;
+};
+
 export async function GET(_req: NextRequest, { params }: Params) {
   const { id: projectId } = await params;
 
-  await ensureColumns();
+  await ensureSchema();
 
   const [projectRows, sceneRows, jobRows] = await Promise.all([
     db.select().from(projects).where(eq(projects.id, projectId)),
@@ -90,5 +81,14 @@ export async function GET(_req: NextRequest, { params }: Params) {
     heroImages: (project?.heroImages as HeroImage[] | null) ?? [],
     approvedHeroUrl: project?.approvedHeroUrl ?? null,
     heroSourceFrame: project?.heroSourceFrame ?? null,
+    fullScript: project?.fullScript ?? "",
+    voiceover: {
+      voiceId: project?.voiceoverId ?? null,
+      voiceName: project?.voiceoverName ?? null,
+      url: project?.voiceoverUrl ?? null,
+      speed: project?.voiceoverSpeed ?? 1.0,
+      matchPacing: project?.voiceoverMatchPacing ?? false,
+      history: (project?.voiceoverHistory as VoiceoverGeneration[] | null) ?? [],
+    },
   });
 }

@@ -9,11 +9,13 @@ import {
   CheckCircle2,
   Clock,
   Clapperboard,
+  Download,
   Loader2,
   Play,
   RefreshCw,
   Sparkles,
   Trash2,
+  X,
   Zap,
 } from "lucide-react";
 import {
@@ -342,6 +344,21 @@ function SceneGenerationCard({
     void onGenerateWithPrompt(scene.sceneId, refinedPrompt, clipDuration);
   }
 
+  function handleApproveVideo(versionId: string) {
+    // Optimistic update
+    updateScene(scene.sceneId, {
+      videoVersions: scene.videoVersions.map((v) =>
+        v.id === versionId ? { ...v, isApproved: true } : v
+      ),
+    });
+    // Record positive learning in background
+    fetch(`/api/projects/${projectId}/approve-version`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ assetVersionId: versionId }),
+    }).catch(console.error);
+  }
+
   function handleRejectVideo(versionId: string) {
     // Optimistically hide
     updateScene(scene.sceneId, {
@@ -366,13 +383,13 @@ function SceneGenerationCard({
       .catch(console.error);
   }
 
-  const hasVersionHistory = scene.videoVersions && scene.videoVersions.length > 1;
+  const hasVersions = scene.videoVersions && scene.videoVersions.length > 0;
 
   return (
     <div
       className={cn(
         "rounded-xl border bg-[#18181b] overflow-hidden transition-all",
-        expanded && "col-span-full",
+        expanded && "col-span-2",
         scene.videoJobStatus === "completed"
           ? hasLowQuality
             ? "border-amber-500/30"
@@ -386,8 +403,8 @@ function SceneGenerationCard({
     >
       {/* Seed image or video thumbnail — click to expand */}
       <div
-        onClick={() => hasVersionHistory && setExpanded(!expanded)}
-        className={cn("aspect-[9/16] relative overflow-hidden", hasVersionHistory && "cursor-pointer")}
+        onClick={() => hasVersions && setExpanded(!expanded)}
+        className={cn("aspect-[9/16] relative overflow-hidden", hasVersions && "cursor-pointer")}
         style={{
           backgroundColor: scene.seedImageApproved ? scene.color : "#f5f5f5",
         }}
@@ -428,22 +445,27 @@ function SceneGenerationCard({
             </div>
           </div>
         )}
-        {scene.videoJobStatus === "completed" && (
-          <div className="absolute inset-0 bg-black/10 flex items-center justify-center">
-            <div
-              className={cn(
-                "rounded-full p-2",
-                hasLowQuality ? "bg-amber-50/90" : "bg-white/90"
-              )}
-            >
-              {hasLowQuality ? (
-                <AlertTriangle className="h-5 w-5 text-amber-600" />
-              ) : (
-                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-              )}
+        {scene.videoJobStatus === "completed" && (() => {
+          const hasApproved = scene.videoVersions.some((v) => v.isApproved && !v.isRejected);
+          return (
+            <div className="absolute inset-0 bg-black/10 flex items-center justify-center">
+              <div
+                className={cn(
+                  "rounded-full p-2",
+                  hasLowQuality ? "bg-amber-50/90" : hasApproved ? "bg-emerald-50/90" : "bg-white/90"
+                )}
+              >
+                {hasLowQuality ? (
+                  <AlertTriangle className="h-5 w-5 text-amber-600" />
+                ) : hasApproved ? (
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                ) : (
+                  <Play className="h-5 w-5 text-[#71717a]" />
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
         {scene.videoJobStatus === "failed" && (
           <div className="absolute inset-0 bg-black/10 flex items-center justify-center">
             <div className="bg-white/90 rounded-full p-2">
@@ -472,7 +494,7 @@ function SceneGenerationCard({
         </div>
 
         {/* Version count badge */}
-        {hasVersionHistory && (
+        {hasVersions && (
           <div className="absolute bottom-2 left-2">
             <span className="text-[10px] font-medium bg-black/40 text-white px-1.5 py-0.5 rounded-full backdrop-blur-sm">
               {scene.videoVersions.length} version{scene.videoVersions.length !== 1 ? "s" : ""}
@@ -543,54 +565,72 @@ function SceneGenerationCard({
               Retry
             </button>
           ) : scene.videoJobStatus === "completed" ? (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                {scene.videoUrl ? (
-                  <a
-                    href={scene.videoUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 hover:text-emerald-700 transition-colors"
-                  >
-                    <Play className="h-3 w-3" />
-                    View
-                  </a>
+            <div className="space-y-2">
+              {/* Approve / Reject row — always visible on the main card */}
+              {(() => {
+                const latest = scene.videoVersions.find((v) => !v.isRejected);
+                const anyApproved = scene.videoVersions.some((v) => v.isApproved && !v.isRejected);
+                if (!latest) return null;
+                return anyApproved ? (
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-500">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    Approved
+                  </div>
                 ) : (
-                  <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-600">
-                    <Play className="h-3 w-3" />
-                    Complete
-                  </span>
-                )}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleApproveVideo(latest.id)}
+                      className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 transition-colors"
+                    >
+                      <CheckCircle2 className="h-3 w-3" />
+                      Approve
+                    </button>
+                    <button
+                      onClick={() => handleRejectVideo(latest.id)}
+                      className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      Reject
+                    </button>
+                    {scene.qualityScore != null && (
+                      <button
+                        onClick={() => setWarningOpen(true)}
+                        className={cn(
+                          "text-[11px] font-semibold tabular-nums px-1.5 py-0.5 rounded-full transition-colors ml-auto",
+                          scene.qualityScore.overall < 60
+                            ? "bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                            : scene.qualityScore.overall < 80
+                            ? "bg-amber-500/10 text-amber-400 hover:bg-amber-500/20"
+                            : "bg-emerald-500/10 text-emerald-400"
+                        )}
+                      >
+                        {scene.qualityScore.overall}
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
+              {/* Action links */}
+              <div className="flex items-center gap-3">
                 <button
-                  onClick={() => { setExpanded(true); setEditingVersionId(scene.videoVersions.filter((v) => !v.isRejected).at(-1)?.id ?? null); }}
+                  onClick={() => {
+                    const latest = scene.videoVersions.filter((v) => !v.isRejected).at(-1);
+                    setRefinedPrompt(latest?.prompt || scene.klingPrompt);
+                    setEnhanceOpen(true);
+                  }}
                   className="flex items-center gap-1.5 text-xs font-medium text-[#6366f1] hover:text-[#818cf8] transition-colors"
                 >
                   <Pencil className="h-3 w-3" />
                   Edit & Regen
                 </button>
                 <button
-                  onClick={handleGenerate}
+                  onClick={() => void onGenerate(scene.sceneId)}
                   className="flex items-center gap-1.5 text-xs font-medium text-[#71717a] hover:text-[#a1a1aa] transition-colors"
                 >
                   <RefreshCw className="h-3 w-3" />
                   Rerun
                 </button>
               </div>
-              {scene.qualityScore != null && (
-                <button
-                  onClick={() => setWarningOpen(true)}
-                  className={cn(
-                    "text-xs font-semibold tabular-nums px-2 py-0.5 rounded-full transition-colors",
-                    scene.qualityScore.overall < 60
-                      ? "bg-red-500/10 text-red-400 hover:bg-red-500/20"
-                      : scene.qualityScore.overall < 80
-                      ? "bg-amber-500/10 text-amber-400 hover:bg-amber-500/20"
-                      : "bg-emerald-500/10 text-emerald-400"
-                  )}
-                >
-                  {scene.qualityScore.overall}
-                </button>
-              )}
             </div>
           ) : (
             <button
@@ -639,7 +679,9 @@ function SceneGenerationCard({
                 key={v.id}
                 className={cn(
                   "flex items-start gap-2.5 p-2 rounded-lg border transition-colors group/version",
-                  i === 0 ? "border-emerald-500/20 bg-emerald-500/5" : "border-[#1a1a1e] bg-[#09090b]/50"
+                  v.isApproved
+                    ? "border-emerald-500/30 bg-emerald-500/5"
+                    : i === 0 ? "border-[#27272a] bg-[#09090b]/50" : "border-[#1a1a1e] bg-[#09090b]/50"
                 )}
               >
                 <video
@@ -654,8 +696,14 @@ function SceneGenerationCard({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-1.5">
-                      {i === 0 && (
-                        <span className="text-[10px] font-medium text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded">
+                      {v.isApproved && (
+                        <span className="text-[10px] font-medium text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded flex items-center gap-1">
+                          <CheckCircle2 className="h-2.5 w-2.5" />
+                          Approved
+                        </span>
+                      )}
+                      {i === 0 && !v.isApproved && (
+                        <span className="text-[10px] font-medium text-[#a1a1aa] bg-[#27272a] px-1.5 py-0.5 rounded">
                           Latest
                         </span>
                       )}
@@ -664,6 +712,34 @@ function SceneGenerationCard({
                       </span>
                     </div>
                     <div className="flex items-center gap-1">
+                      {!v.isApproved && (
+                        <button
+                          onClick={() => handleApproveVideo(v.id)}
+                          className="p-1 rounded text-[#52525b] hover:text-emerald-500 hover:bg-emerald-500/10 opacity-0 group-hover/version:opacity-100 transition-all"
+                          title="Approve — records positive learning"
+                        >
+                          <CheckCircle2 className="h-3 w-3" />
+                        </button>
+                      )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          fetch(v.fileUrl)
+                            .then((r) => r.blob())
+                            .then((blob) => {
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement("a");
+                              a.href = url;
+                              a.download = `scene-${String(scene.sceneOrder).padStart(2, "0")}-v${active.length - i}.mp4`;
+                              a.click();
+                              URL.revokeObjectURL(url);
+                            });
+                        }}
+                        className="p-1 rounded text-[#52525b] hover:text-blue-500 hover:bg-blue-500/10 opacity-0 group-hover/version:opacity-100 transition-all"
+                        title="Download this version"
+                      >
+                        <Download className="h-3 w-3" />
+                      </button>
                       <button
                         onClick={() => setEditingVersionId(editingVersionId === v.id ? null : v.id)}
                         className={cn(
@@ -676,13 +752,15 @@ function SceneGenerationCard({
                       >
                         <Pencil className="h-3 w-3" />
                       </button>
-                      <button
-                        onClick={() => handleRejectVideo(v.id)}
-                        className="p-1 rounded text-[#52525b] hover:text-red-500 hover:bg-red-500/10 opacity-0 group-hover/version:opacity-100 transition-all"
-                        title="Reject — Claude will analyze why it's bad"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
+                      {!v.isApproved && (
+                        <button
+                          onClick={() => handleRejectVideo(v.id)}
+                          className="p-1 rounded text-[#52525b] hover:text-red-500 hover:bg-red-500/10 opacity-0 group-hover/version:opacity-100 transition-all"
+                          title="Reject — records negative learning"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      )}
                     </div>
                   </div>
                   {v.prompt && (
@@ -760,44 +838,59 @@ function SceneGenerationCard({
         />
       )}
 
-      {/* Enhance prompt dialog before Kling generation */}
-      <Dialog open={enhanceOpen} onOpenChange={setEnhanceOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>
-              Scene {String(scene.sceneOrder).padStart(2, "0")} — Kling Prompt
-            </DialogTitle>
-            <DialogDescription>
-              Review and enhance the motion prompt before sending to Kling.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 py-2">
-            {/* Show the prompt from the latest generation if different from base */}
+      {/* Enhance prompt — right side panel (video stays visible) */}
+      {enhanceOpen && (
+        <div className="fixed inset-y-0 right-0 z-50 w-96 bg-[#18181b] border-l border-[#27272a] shadow-2xl flex flex-col overflow-hidden">
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-3 border-b border-[#27272a] shrink-0">
+            <div>
+              <p className="text-sm font-medium text-[#fafafa]">
+                Scene {String(scene.sceneOrder).padStart(2, "0")} — Edit & Regen
+              </p>
+              <p className="text-[11px] text-[#71717a]">
+                Review the motion prompt while watching the video
+              </p>
+            </div>
+            <button
+              onClick={() => setEnhanceOpen(false)}
+              className="p-1.5 rounded-lg text-[#71717a] hover:text-[#fafafa] hover:bg-[#27272a] transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* Scrollable content */}
+          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+            {/* Latest generation prompt if different */}
             {(() => {
               const latestVersion = [...scene.videoVersions].filter((v) => !v.isRejected).reverse()[0];
               const lastPrompt = latestVersion?.prompt;
               return lastPrompt && lastPrompt !== scene.klingPrompt ? (
                 <div>
-                  <p className="text-xs font-medium text-blue-500 mb-1.5">
+                  <p className="text-[11px] font-medium text-blue-400 mb-1">
                     Last generation prompt
                   </p>
-                  <p className="text-xs text-blue-600 bg-blue-50 rounded px-3 py-2 leading-relaxed">
+                  <p className="text-xs text-[#a1a1aa] bg-blue-500/10 border border-blue-500/20 rounded px-3 py-2 leading-relaxed">
                     {lastPrompt}
                   </p>
                 </div>
               ) : null;
             })()}
+
+            {/* Base scene prompt */}
             <div>
-              <p className="text-xs font-medium text-[#a1a1aa] mb-1.5">
+              <p className="text-[11px] font-medium text-[#a1a1aa] mb-1">
                 Base scene prompt
               </p>
               <p className="text-xs text-[#71717a] bg-[#09090b] rounded px-3 py-2 leading-relaxed">
                 {scene.klingPrompt}
               </p>
             </div>
+
+            {/* AI direction */}
             <div>
-              <p className="text-xs font-medium text-[#a1a1aa] mb-1.5">
-                AI direction (optional)
+              <p className="text-[11px] font-medium text-[#a1a1aa] mb-1">
+                Describe what to fix
               </p>
               <div className="flex gap-2">
                 <div className="flex-1">
@@ -805,49 +898,48 @@ function SceneGenerationCard({
                     value={aiInstruction}
                     onChange={setAiInstruction}
                     products={productTags}
-                    placeholder="e.g. add @product-name, slow down the camera..."
-                    rows={1}
+                    placeholder="e.g. reduce hand artifacts, smoother camera, less jitter..."
+                    rows={2}
                   />
                 </div>
-                <Button
-                  onClick={handleEnhance}
-                  disabled={refining}
-                  variant="outline"
-                  className="gap-2 h-auto text-xs shrink-0"
-                >
-                  {refining ? (
-                    <>
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                      Enhancing…
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-3 w-3" />
-                      Enhance
-                    </>
-                  )}
-                </Button>
               </div>
-              <p className="text-[10px] text-[#52525b] mt-1">
-                Tell Claude how to adjust the prompt, or leave blank for auto-enhance
-              </p>
+              <Button
+                onClick={handleEnhance}
+                disabled={refining}
+                variant="outline"
+                className="gap-2 h-8 text-xs mt-2 w-full"
+              >
+                {refining ? (
+                  <>
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Rewriting…
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-3 w-3" />
+                    Rewrite Prompt
+                  </>
+                )}
+              </Button>
             </div>
+
+            {/* Editable prompt */}
             <div>
-              <p className="text-xs font-medium text-[#a1a1aa] mb-1.5">
-                {refinedPrompt !== scene.klingPrompt ? "Enhanced prompt (editable)" : "Prompt to send (editable)"}
+              <p className="text-[11px] font-medium text-[#a1a1aa] mb-1">
+                {refinedPrompt !== scene.klingPrompt ? "Rewritten prompt (editable)" : "Prompt to send (editable)"}
               </p>
               <textarea
                 value={refinedPrompt}
                 onChange={(e) => setRefinedPrompt(e.target.value)}
-                rows={4}
+                rows={5}
                 className={cn(
-                  "w-full text-sm rounded-md border px-3 py-2.5 resize-none focus:outline-none focus:ring-2 transition-all leading-relaxed",
+                  "w-full text-xs rounded-md border px-3 py-2.5 resize-none focus:outline-none focus:ring-2 transition-all leading-relaxed",
                   refinedPrompt !== scene.klingPrompt
-                    ? "border-blue-200 bg-blue-50/30 focus:ring-blue-200 focus:border-blue-300"
-                    : "border-[#27272a] bg-[#18181b] focus:ring-[#27272a] focus:border-[#3f3f46]"
+                    ? "border-blue-500/20 bg-blue-500/5 focus:ring-blue-500/30 text-[#e4e4e7]"
+                    : "border-[#27272a] bg-[#09090b] focus:ring-[#27272a] text-[#a1a1aa]"
                 )}
               />
-              <p className="text-[11px] text-[#71717a] mt-1">
+              <p className="text-[11px] text-[#52525b] mt-1">
                 {refinedPrompt.trim().split(/\s+/).length} words
                 {refinedPrompt.trim().split(/\s+/).length > 40 && (
                   <span className="text-amber-500 ml-1">— Kling works best under 40 words</span>
@@ -855,20 +947,22 @@ function SceneGenerationCard({
               </p>
             </div>
           </div>
-          <DialogFooter className="flex items-center !justify-between">
+
+          {/* Footer — duration + generate */}
+          <div className="shrink-0 px-5 py-3 border-t border-[#27272a] space-y-3">
             <div className="flex items-center gap-2">
-              <p className="text-xs text-[#a1a1aa]">Clip length:</p>
-              <div className="flex rounded-md border border-[#27272a] overflow-hidden">
-                {[3, 4, 5, 6, 7].map((d, i) => (
+              <p className="text-[11px] text-[#71717a]">Clip:</p>
+              <div className="flex rounded-md border border-[#27272a] overflow-hidden flex-1">
+                {[3, 4, 5, 6, 7, 8].map((d, i) => (
                   <button
                     key={d}
                     onClick={() => setClipDuration(d)}
                     className={cn(
-                      "px-3 py-1 text-xs font-medium transition-colors",
+                      "flex-1 py-1 text-[11px] font-medium transition-colors",
                       i > 0 && "border-l border-[#27272a]",
                       clipDuration === d
                         ? "bg-[#6366f1] text-white"
-                        : "bg-[#18181b] text-[#a1a1aa] hover:bg-[#27272a]"
+                        : "bg-[#09090b] text-[#a1a1aa] hover:bg-[#27272a]"
                     )}
                   >
                     {d}s
@@ -876,22 +970,17 @@ function SceneGenerationCard({
                 ))}
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={() => setEnhanceOpen(false)} className="text-xs">
-                Cancel
-              </Button>
-              <Button
-                onClick={handleSubmit}
-                disabled={!refinedPrompt.trim()}
-                className="bg-[#6366f1] hover:bg-[#6366f1]/80 text-white text-xs gap-2"
-              >
-                <Clapperboard className="h-3.5 w-3.5" />
-                Generate {clipDuration}s
-              </Button>
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <Button
+              onClick={handleSubmit}
+              disabled={!refinedPrompt.trim()}
+              className="w-full bg-[#6366f1] hover:bg-[#6366f1]/80 text-white text-xs gap-2 h-9"
+            >
+              <Clapperboard className="h-3.5 w-3.5" />
+              Generate {clipDuration}s
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -902,9 +991,11 @@ type Props = {
   scenes: SceneProductionState[];
   updateScene: (sceneId: string, patch: Partial<SceneProductionState>) => void;
   projectId: string;
+  projectName?: string;
 };
 
-export function Tab3C({ scenes, updateScene, projectId }: Props) {
+export function Tab3C({ scenes, updateScene, projectId, projectName }: Props) {
+  const [downloading, setDownloading] = useState(false);
   const readyScenes = scenes.filter(
     (s) => s.seedImageApproved && s.klingPromptApproved
   );
@@ -954,6 +1045,44 @@ export function Tab3C({ scenes, updateScene, projectId }: Props) {
     });
   }
 
+  async function handleDownloadAll() {
+    // Pick the best version per completed scene: approved > latest non-rejected
+    const versionIds: string[] = [];
+    for (const s of scenes) {
+      if (s.videoJobStatus !== "completed" || s.videoVersions.length === 0) continue;
+      const approved = s.videoVersions.find((v) => v.isApproved && !v.isRejected);
+      const latestNonRejected = s.videoVersions.find((v) => !v.isRejected);
+      const pick = approved ?? latestNonRejected;
+      if (pick) versionIds.push(pick.id);
+    }
+    if (versionIds.length === 0) return;
+
+    setDownloading(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/download-videos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ versionIds }),
+      });
+      if (!res.ok) throw new Error("Download failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const slug = (projectName ?? "videos")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+      a.download = `${slug}-videos.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("[download-all]", err);
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   return (
     <div className="h-full flex flex-col overflow-hidden">
       {/* Toolbar */}
@@ -981,14 +1110,34 @@ export function Tab3C({ scenes, updateScene, projectId }: Props) {
             </span>
           )}
         </div>
-        <Button
-          onClick={handleGenerateAll}
-          disabled={readyScenes.length === 0}
-          className="gap-2 bg-[#6366f1] hover:bg-[#6366f1]/80 text-white h-9 text-sm disabled:opacity-40"
-        >
-          <Play className="h-3.5 w-3.5" />
-          Generate All
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={handleDownloadAll}
+            disabled={completed === 0 || downloading}
+            variant="outline"
+            className="gap-2 h-9 text-sm border-[#27272a] text-[#a1a1aa] hover:text-white disabled:opacity-40"
+          >
+            {downloading ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Zipping…
+              </>
+            ) : (
+              <>
+                <Download className="h-3.5 w-3.5" />
+                Download All
+              </>
+            )}
+          </Button>
+          <Button
+            onClick={handleGenerateAll}
+            disabled={readyScenes.length === 0}
+            className="gap-2 bg-[#6366f1] hover:bg-[#6366f1]/80 text-white h-9 text-sm disabled:opacity-40"
+          >
+            <Play className="h-3.5 w-3.5" />
+            Generate All
+          </Button>
+        </div>
       </div>
 
       {/* Grid */}

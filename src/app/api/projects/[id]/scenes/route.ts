@@ -3,11 +3,13 @@ import { db } from "@/db";
 import { scenes } from "@/db/schema";
 import { eq, asc } from "drizzle-orm";
 import type { NewScene } from "@/db/schema";
+import { ensureSchema } from "@/db/ensure-schema";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, { params }: Params) {
   const { id } = await params;
+  await ensureSchema();
   const rows = await db
     .select()
     .from(scenes)
@@ -18,6 +20,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
 export async function POST(req: NextRequest, { params }: Params) {
   const { id: projectId } = await params;
+  await ensureSchema();
   const url = new URL(req.url);
   const replace = url.searchParams.get("replace") === "true";
 
@@ -31,6 +34,10 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (replace) {
     // Delete all existing scenes for this project then recreate
     await db.delete(scenes).where(eq(scenes.projectId, projectId));
+  }
+
+  if (inputs.length === 0) {
+    return NextResponse.json([], { status: 201 });
   }
 
   const created = await db.insert(scenes).values(inputs).returning();

@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { projects } from "@/db/schema";
 import { desc } from "drizzle-orm";
+import { ensureSchema } from "@/db/ensure-schema";
 
 export async function GET() {
+  await ensureSchema();
   const rows = await db
     .select()
     .from(projects)
@@ -12,6 +14,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  await ensureSchema();
   const { name, klingElementTags, type } = await req.json() as {
     name: string;
     klingElementTags?: string[];

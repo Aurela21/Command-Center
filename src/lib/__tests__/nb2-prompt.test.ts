@@ -71,7 +71,7 @@ function makeProductBundle(imageCount = 6): ProductBundle {
 
 describe("constants", () => {
   it("exports the correct model ID", () => {
-    expect(NB2_MODEL_ID).toBe("gemini-3-1-flash-image-preview");
+    expect(NB2_MODEL_ID).toBe("gemini-3.1-flash-image-preview");
   });
 
   it("exports 14 as max reference images", () => {

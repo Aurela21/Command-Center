@@ -21,6 +21,7 @@ export type VideoVersion = {
   createdAt: string;
   fileUrl: string;
   prompt?: string;
+  isApproved?: boolean;
   isRejected?: boolean;
   rejectionReason?: string;
 };
@@ -100,7 +101,7 @@ export type SSEEvent =
       substage?: string;
     };
 
-export type ProductionTab = "script" | "seed" | "review" | "video";
+export type ProductionTab = "script" | "seed" | "review" | "video" | "audio";
 
 export type HeroImage = {
   id: string;

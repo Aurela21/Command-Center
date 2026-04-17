@@ -46,6 +46,15 @@ export const projects = pgTable("projects", {
   // [{ id, url, prompt, sourceFrame, createdAt }]
   approvedHeroUrl: text("approved_hero_url"),
 
+  // Voice-over (ElevenLabs)
+  voiceoverId: text("voiceover_id"),
+  voiceoverName: text("voiceover_name"),
+  voiceoverUrl: text("voiceover_url"),
+  voiceoverSpeed: real("voiceover_speed").default(1.0),
+  voiceoverMatchPacing: boolean("voiceover_match_pacing").default(false),
+  voiceoverHistory: jsonb("voiceover_history"),
+  // [{ id, url, voiceId, voiceName, speed, matchedPacing, durationMs, createdAt }]
+
   // Sub-stage tracking
   stage3aStatus: text("stage_3a_status").default("pending"),
   // pending | in_progress | approved

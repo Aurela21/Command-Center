@@ -17,6 +17,7 @@ import { Tab3A, type ProductTag } from "./tab-3a";
 import { Tab3B } from "./tab-3b";
 import { TabReview } from "./tab-review";
 import { Tab3C } from "./tab-3c";
+import { TabAudio } from "./tab-audio";
 import { QueueTracker } from "./queue-tracker";
 import { ChatPanel } from "./chat-panel";
 import { Brain, Loader2 } from "lucide-react";
@@ -116,6 +117,7 @@ function dbToState(
     createdAt: a.createdAt,
     fileUrl: a.fileUrl,
     prompt: a.generationPrompt ?? undefined,
+    isApproved: a.isApproved ?? false,
     isRejected: a.isRejected ?? false,
     rejectionReason: a.rejectionReason ?? undefined,
   }));
@@ -227,6 +229,7 @@ const TABS: { id: ProductionTab; label: string }[] = [
   { id: "seed", label: "Seed Images" },
   { id: "review", label: "Review" },
   { id: "video", label: "Video" },
+  { id: "audio", label: "Audio" },
 ];
 
 // ─── Page ────────────────────────────────────────────────────────────────────
@@ -256,6 +259,23 @@ export default function ProductionPage() {
   const [chatOpen, setChatOpen] = useState(false);
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState<string>("");
+  const [voiceover, setVoiceover] = useState<{
+    voiceId: string | null;
+    voiceName: string | null;
+    url: string | null;
+    speed: number;
+    matchPacing: boolean;
+    history: Array<{
+      id: string;
+      url: string;
+      voiceId: string;
+      voiceName: string;
+      speed: number;
+      matchedPacing: boolean;
+      durationMs: number;
+      createdAt: string;
+    }>;
+  }>({ voiceId: null, voiceName: null, url: null, speed: 1.0, matchPacing: false, history: [] });
 
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
@@ -400,6 +420,18 @@ export default function ProductionPage() {
           projectType: "reference" | "concept";
           heroImages: HeroImage[];
           approvedHeroUrl: string | null;
+          fullScript?: string;
+          voiceover?: {
+            voiceId: string | null;
+            voiceName: string | null;
+            url: string | null;
+            speed: number;
+            matchPacing: boolean;
+            history: Array<{
+              id: string; url: string; voiceId: string; voiceName: string;
+              speed: number; matchedPacing: boolean; durationMs: number; createdAt: string;
+            }>;
+          };
         }) => {
           const mapped = data.scenes.map((s, i) =>
             dbToState(
@@ -416,6 +448,8 @@ export default function ProductionPage() {
           setProjectType(data.projectType ?? "reference");
           setHeroImages(data.heroImages ?? []);
           setApprovedHeroUrl(data.approvedHeroUrl ?? null);
+          if (data.fullScript) setScript(data.fullScript);
+          if (data.voiceover) setVoiceover(data.voiceover);
           setLoading(false);
         }
       )
@@ -672,6 +706,15 @@ export default function ProductionPage() {
             scenes={scenes}
             updateScene={updateScene}
             projectId={projectId}
+            projectName={projectName}
+          />
+        </div>
+        <div className={activeTab === "audio" ? "h-full" : "hidden"}>
+          <TabAudio
+            projectId={projectId}
+            scenes={scenes}
+            script={script}
+            voiceover={voiceover}
           />
         </div>
       </div>
